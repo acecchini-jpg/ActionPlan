@@ -303,7 +303,7 @@ body.dark-theme { --bg: #0d0f14; --bg2: #131720; --bg3: #1a2030; --border: #252d
 
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.0.1</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.0.2</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -666,6 +666,7 @@ async function doLogin() {
   if (!email || !senha) { if (errEl) { errEl.textContent = 'Preencha e-mail e senha.'; errEl.style.display = 'block'; } return; }
   try {
     showLoading('Entrando…');
+    await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.SESSION); // v19.0.2: sessão não sobrevive ao fechar o navegador
     await firebase.auth().signInWithEmailAndPassword(email, senha);
     senhaEl.value = '';
   } catch (e) {
@@ -3295,7 +3296,7 @@ function renderFazerBackup(container) {
     </div>`;
   document.getElementById('btn-gerar-backup').addEventListener('click', () => {
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.0.1', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.0.2', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
