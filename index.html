@@ -303,7 +303,7 @@ body.dark-theme { --bg: #0d0f14; --bg2: #131720; --bg3: #1a2030; --border: #252d
 
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.0.2</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.0.3</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -373,6 +373,8 @@ let _cursoSortCol           = '';  // coluna sort Curso 1 Tema
 let _cursoSortAsc           = true;
 let _defOpTopN              = 15;  // barras no gráfico de operadores
 let _defOpSemana            = '';  // filtro semana do gráfico de operadores
+let _dashAgruparPor         = 'responsavel';  // 'responsavel' | 'departamento' — agrupamento dos 3 gráficos por responsável
+let _defTurnoSemana         = '';  // filtro semana do gráfico Defeitos por Turno
 const state = { config: { ...DEFAULT_FIREBASE_CONFIG }, clientes: [], responsaveis: [], planos: [], subtopicos: [], acoes: [], presencas: [], cursos1tema: [], currentPage: 'dashboard', currentEvidenciaTarget: null, evidenciaDataURL: null, };
 
 // ==================== FUNÇÕES AUXILIARES (comuns) ====================
@@ -2011,6 +2013,24 @@ function renderDashboard(container){
   });
   const taxa=total?Math.round((fechadas/total)*100):0;
 
+  // ── v19.0.3: Agrupamento por Responsável ou Departamento (3 gráficos "por Responsável") ──
+  const _respDeptMap = {};
+  state.responsaveis.forEach(r => { _respDeptMap[r.nome] = r.departamento || 'Sem Departamento'; });
+  function _regroupPorDept(map) {
+    if (_dashAgruparPor !== 'departamento') return map;
+    const out = {};
+    Object.entries(map).forEach(([nome, planoMap]) => {
+      const dept = _respDeptMap[nome] || 'Sem Departamento';
+      if (!out[dept]) out[dept] = {};
+      Object.entries(planoMap).forEach(([pid, qtd]) => { out[dept][pid] = (out[dept][pid] || 0) + qtd; });
+    });
+    return out;
+  }
+  const pendByGrupo = _regroupPorDept(pendByRespPlano);
+  const vencByGrupo = _regroupPorDept(vencByRespPlano);
+  const fechByGrupo = _regroupPorDept(fechByRespPlano);
+  const _agrupLabel = _dashAgruparPor === 'departamento' ? 'Departamento' : 'Responsável';
+
   // ── Helper: monta datasets para um Stacked Bar Chart ──
   function buildStackedDatasets(respLabels, respPlanoMap) {
     const planoIdsUsados = new Set();
@@ -2029,9 +2049,9 @@ function renderDashboard(container){
 
   // ── Labels ordenados por total descendente ──
   const _sumMap = (map, r) => Object.values(map[r]||{}).reduce((s,v)=>s+v,0);
-  const pendRespLabels = Object.keys(pendByRespPlano).sort((a,b)=>_sumMap(pendByRespPlano,b)-_sumMap(pendByRespPlano,a));
-  const vencRespLabels = Object.keys(vencByRespPlano).sort((a,b)=>_sumMap(vencByRespPlano,b)-_sumMap(vencByRespPlano,a));
-  const fechRespLabels = Object.keys(fechByRespPlano).sort((a,b)=>_sumMap(fechByRespPlano,b)-_sumMap(fechByRespPlano,a));
+  const pendRespLabels = Object.keys(pendByGrupo).sort((a,b)=>_sumMap(pendByGrupo,b)-_sumMap(pendByGrupo,a));
+  const vencRespLabels = Object.keys(vencByGrupo).sort((a,b)=>_sumMap(vencByGrupo,b)-_sumMap(vencByGrupo,a));
+  const fechRespLabels = Object.keys(fechByGrupo).sort((a,b)=>_sumMap(fechByGrupo,b)-_sumMap(fechByGrupo,a));
 
   // ── Tabela Status por Plano com coluna % Presença ──
   const linhasPlanos = Object.entries(byPlano).map(([pid, p])=>{
@@ -2085,6 +2105,11 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
       <span style="font-size:13px;color:var(--text2);font-weight:600;">🔍 Filtrar por Plano:</span>
       <select id="dash-filtro-plano" class="form-control" style="width:auto;min-width:200px;">${_dashPlanoOpts}</select>
       ${_filtroPlanoDashboard ? `<span class="badge badge-yellow">${escHtml(state.planos.find(p=>p.id===_filtroPlanoDashboard)?.titulo||'')}</span><button id="dash-limpar-filtro" class="btn btn-ghost btn-sm">✕ Limpar</button>` : ''}
+      <span style="font-size:13px;color:var(--text2);font-weight:600;margin-left:14px;">📊 Exibir por:</span>
+      <select id="dash-agrupar-por" class="form-control" style="width:auto;">
+        <option value="responsavel" ${_dashAgruparPor==='responsavel'?'selected':''}>Responsável</option>
+        <option value="departamento" ${_dashAgruparPor==='departamento'?'selected':''}>Departamento</option>
+      </select>
     </div>
     <div class="kpi-grid">
       <div class="kpi-card" data-filter="total"><div class="kpi-value">${total}</div><div class="kpi-label">Total A.Corretivas</div></div>
@@ -2098,12 +2123,17 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
     </div>
     <div class="charts-grid">
       <div class="chart-panel"><div class="chart-title">Status Geral</div><div class="chart-wrap"><canvas id="chart-status"></canvas></div></div>
-      <div class="chart-panel"><div class="chart-title">Pendências por Responsável (por Plano)</div><div class="chart-wrap"><canvas id="chart-pend-resp"></canvas></div></div>
+      <div class="chart-panel"><div class="chart-title" id="chart-title-pend">Pendências por ${_agrupLabel} (por Plano)</div><div class="chart-wrap"><canvas id="chart-pend-resp"></canvas></div></div>
     </div>
     <div class="charts-grid">
-      <div class="chart-panel"><div class="chart-title">Fechadas por Responsável (por Plano)</div><div class="chart-wrap"><canvas id="chart-resp"></canvas></div></div>
-      <div class="chart-panel"><div class="chart-title">Vencidas por Responsável (por Plano)</div><div class="chart-wrap"><canvas id="chart-venc"></canvas></div></div>
-      <div class="chart-panel" id="panel-def-turno" style="display:none;"><div class="chart-title">Defeitos por Turno</div><div class="chart-wrap"><canvas id="chart-def-turno"></canvas></div></div>
+      <div class="chart-panel"><div class="chart-title" id="chart-title-fech">Fechadas por ${_agrupLabel} (por Plano)</div><div class="chart-wrap"><canvas id="chart-resp"></canvas></div></div>
+      <div class="chart-panel"><div class="chart-title" id="chart-title-venc">Vencidas por ${_agrupLabel} (por Plano)</div><div class="chart-wrap"><canvas id="chart-venc"></canvas></div></div>
+      <div class="chart-panel" id="panel-def-turno" style="display:none;"><div class="chart-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">Defeitos por Turno
+        <span style="flex:1;"></span>
+        <label style="font-size:11px;color:var(--text3);font-weight:400;">Semana:</label>
+        <input type="week" id="def-turno-semana" class="form-control" style="width:auto;padding:2px 6px;font-size:11px;" value="${_defTurnoSemana}">
+        <button id="def-turno-semana-clear" class="btn btn-ghost btn-xs" title="Limpar filtro de semana" style="font-size:11px;">✕</button>
+      </div><div class="chart-wrap"><canvas id="chart-def-turno"></canvas></div></div>
       <div class="chart-panel" id="panel-def-operador" style="display:none;"><div class="chart-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">Defeitos por Operador
         <span style="flex:1;"></span>
         <label style="font-size:11px;color:var(--text3);font-weight:400;">Top:</label>
@@ -2190,32 +2220,32 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
     }
   });
 
-  // Gráfico 1 — Pendências por Responsável (Stacked por Plano)
+  // Gráfico 1 — Pendências por Responsável/Departamento (Stacked por Plano)
   const ctxPendResp = document.getElementById('chart-pend-resp')?.getContext('2d');
   if (ctxPendResp && pendRespLabels.length) {
     _charts.pendResp = new Chart(ctxPendResp, {
       type: 'bar',
-      data: { labels: pendRespLabels, datasets: buildStackedDatasets(pendRespLabels, pendByRespPlano) },
+      data: { labels: pendRespLabels, datasets: buildStackedDatasets(pendRespLabels, pendByGrupo) },
       options: stackedOpts()
     });
   }
 
-  // Gráfico 2 — Fechadas por Responsável (Stacked por Plano)
+  // Gráfico 2 — Fechadas por Responsável/Departamento (Stacked por Plano)
   const ctxResp = document.getElementById('chart-resp')?.getContext('2d');
   if (ctxResp && fechRespLabels.length) {
     _charts.resp = new Chart(ctxResp, {
       type: 'bar',
-      data: { labels: fechRespLabels, datasets: buildStackedDatasets(fechRespLabels, fechByRespPlano) },
+      data: { labels: fechRespLabels, datasets: buildStackedDatasets(fechRespLabels, fechByGrupo) },
       options: stackedOpts()
     });
   }
 
-  // Gráfico 3 — Vencidas por Responsável (Stacked por Plano)
+  // Gráfico 3 — Vencidas por Responsável/Departamento (Stacked por Plano)
   const ctxVenc = document.getElementById('chart-venc')?.getContext('2d');
   if (ctxVenc && vencRespLabels.length) {
     _charts.venc = new Chart(ctxVenc, {
       type: 'bar',
-      data: { labels: vencRespLabels, datasets: buildStackedDatasets(vencRespLabels, vencByRespPlano) },
+      data: { labels: vencRespLabels, datasets: buildStackedDatasets(vencRespLabels, vencByGrupo) },
       options: stackedOpts()
     });
   }
@@ -2280,8 +2310,10 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
     });
 
     // ── Defeitos por Turno ──
+    const _rangeTurno = _defTurnoSemana ? _semanaRange(_defTurnoSemana) : null;
+    const _eventosTurno = _rangeTurno ? _eventos.filter(ev => _inRange(ev.data, _rangeTurno)) : _eventos;
     const _porTurno = { 'T1': 0, 'T2': 0, 'T3': 0, 'Não informado': 0 };
-    _eventos.forEach(ev => {
+    _eventosTurno.forEach(ev => {
       if (!ev.turnos.length) { _porTurno['Não informado'] += ev.qtd; return; }
       ev.turnos.forEach(t => { if (_porTurno[t] !== undefined) _porTurno[t] += ev.qtd; else _porTurno['Não informado'] += ev.qtd; });
     });
@@ -2310,7 +2342,7 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
     const _opLabels  = _opEntries.map(e => e[0]);
     const _opData    = _opEntries.map(e => e[1]);
 
-    const _hasTurnoData = _turnoData.some(v => v > 0);
+    const _hasTurnoData = _turnoData.some(v => v > 0) || _defTurnoSemana !== '';
     const _hasOpData    = _opData.some(v => v > 0) || _defOpSemana !== '';
     const _pTurno = document.getElementById('panel-def-turno');
     const _pOp    = document.getElementById('panel-def-operador');
@@ -2356,6 +2388,18 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
       const _pgEl = document.getElementById('page'); if (_pgEl) renderDashboard(_pgEl);
     });
   }
+  document.getElementById('dash-agrupar-por')?.addEventListener('change', function() {
+    _dashAgruparPor = this.value;
+    const _pgEl = document.getElementById('page'); if (_pgEl) renderDashboard(_pgEl);
+  });
+  document.getElementById('def-turno-semana')?.addEventListener('change', function() {
+    _defTurnoSemana = this.value;
+    const _pg = document.getElementById('page'); if (_pg) renderDashboard(_pg);
+  });
+  document.getElementById('def-turno-semana-clear')?.addEventListener('click', function() {
+    _defTurnoSemana = '';
+    const _pg = document.getElementById('page'); if (_pg) renderDashboard(_pg);
+  });
   // ── Wire: semana Atividade ──
   const _semInp=document.getElementById('atividade-semana-inp');
   if(_semInp){
@@ -3296,7 +3340,7 @@ function renderFazerBackup(container) {
     </div>`;
   document.getElementById('btn-gerar-backup').addEventListener('click', () => {
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.0.2', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.0.3', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
