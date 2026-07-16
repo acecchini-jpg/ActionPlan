@@ -303,7 +303,7 @@ body.dark-theme { --bg: #0d0f14; --bg2: #131720; --bg3: #1a2030; --border: #252d
 
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.0.3</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.0.4</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -1489,6 +1489,10 @@ function aplicarFiltrosETabela() {
     tbody.innerHTML = _html;
     document.getElementById('btn-carregar-mais-listagem')?.addEventListener('click', () => { _listPageCount++; aplicarFiltrosETabela(); });
   }
+  // v19.0.4: aplicarFiltrosETabela() redesenha a tbody fora do fluxo de render() (toggle de
+  // follow-ups, remoção de follow-up, ordenação, mudança de filtro) — sem isto, os botões
+  // ocultos por nível voltavam a aparecer nesses redesenhos.
+  if (typeof aplicarPermissoesUI === 'function') setTimeout(aplicarPermissoesUI, 0);
   const _ltbody = document.getElementById('listagem-tbody');
   if (_ltbody && !_ltbody._delegated) { _ltbody._delegated = true; _ltbody.addEventListener('click', async function(e) { const btn = e.target.closest('button,[data-ev-id]'); if (!btn) return; if (btn.classList.contains('edit-acao')) { if (e.shiftKey) { showHistorico(btn.dataset.problemaId); return; } _ncState.editingProblemaId = btn.dataset.problemaId; _ncState.editingCorretivaIdx = parseInt(btn.dataset.idx) >= 0 ? parseInt(btn.dataset.idx) : null; navigate('novo-cadastro'); return; } if (btn.classList.contains('toggle-followup')) { const key = `${btn.dataset.problemaId}_${btn.dataset.idx}`; expandedFollowupRows.has(key) ? expandedFollowupRows.delete(key) : expandedFollowupRows.add(key); aplicarFiltrosETabela(); return; } if (btn.classList.contains('add-followup-list')) { currentFollowupTarget = { acaoId: btn.dataset.acaoId, corretivaIdx: parseInt(btn.dataset.idx) }; document.getElementById('fu-data').value = today(); const _fuSel=document.getElementById('fu-responsavel'); _fuSel.innerHTML='<option value="">Selecione...</option>'+getResponsaveisAtivos().map(r=>`<option value="${escHtml(r.nome)}">${escHtml(r.nome)}</option>`).join(''); _fuSel.value=''; document.getElementById('fu-comentario').value=''; openModal('followup-modal'); return; } if (btn.classList.contains('edit-followup-list')) { openEditFollowupModal(btn.dataset.acaoId, parseInt(btn.dataset.corridx), parseInt(btn.dataset.fuidx)); return; } if (btn.classList.contains('remove-followup-list')) { const acao = state.acoes.find(a => a.id === btn.dataset.acaoId); if (acao && acao.acoes_corretivas[btn.dataset.corridx]) { acao.acoes_corretivas[btn.dataset.corridx].followups.splice(parseInt(btn.dataset.fuidx), 1); await saveData('acoes', acao.id); aplicarFiltrosETabela(); toast('Follow-up removido','success'); } return; } if (btn.classList.contains('hist-acao')) {
         showHistorico(btn.dataset.problemaId);
@@ -3340,7 +3344,7 @@ function renderFazerBackup(container) {
     </div>`;
   document.getElementById('btn-gerar-backup').addEventListener('click', () => {
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.0.3', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.0.4', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
