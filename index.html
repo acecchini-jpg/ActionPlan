@@ -8,6 +8,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
 <style id="theme-styles">
@@ -303,7 +304,7 @@ body.dark-theme { --bg: #0d0f14; --bg2: #131720; --bg3: #1a2030; --border: #252d
 
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.0.4</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.1.1</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -363,7 +364,65 @@ function podeVer(recurso) {
   return !!m[recurso];
 }
 // ==================== FIM v19.0: AUTENTICAÇÃO E NÍVEIS ====================
+
+// ==================== v19.1: HELPERS DE STORAGE ====================
+// Acesso tardio: saveConfig() deleta e recria o app Firebase, então NUNCA
+// capturamos `firebase.storage()` no top-level — cada chamada pega a instância atual.
+function _storage() { return firebase.storage(); }
+async function uploadToStorage(path, blobOrDataUrl, contentType) {
+  const ref = _storage().ref(path);
+  const snap = (typeof blobOrDataUrl === 'string')
+    ? await ref.putString(blobOrDataUrl, 'data_url')
+    : await ref.put(blobOrDataUrl, { contentType });
+  return await snap.ref.getDownloadURL();
+}
+async function deleteFromStorage(url) {
+  try { await _storage().refFromURL(url).delete(); } catch(e) { /* best-effort */ }
+}
+function isStorageUrl(v) { return typeof v === 'string' && v.startsWith('https://'); }
+function isDataUrl(v)    { return typeof v === 'string' && v.startsWith('data:'); }
+// Baixa uma URL do Storage e converte para data URL base64 — requer CORS no bucket (Guia §8).
+async function _fetchUrlToDataUrl(url) {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  const blob = await resp.blob();
+  return await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(new Error('Falha ao ler blob'));
+    r.readAsDataURL(blob);
+  });
+}
+// v19.1 (1.4): coleta as URLs do Storage de um problema (evidência + implantação das corretivas)
+function _coletarUrlsStorageProblema(prob) {
+  const urls = [];
+  if (isStorageUrl(prob.evidencia_problema)) urls.push(prob.evidencia_problema);
+  (prob.acoes_corretivas || []).forEach((cr, idx) => {
+    const v = cr['ev_implantacao_' + idx];
+    if (isStorageUrl(v)) urls.push(v);
+  });
+  return urls;
+}
+// Exclusão em cascata best-effort — nunca bloqueia a exclusão do documento em caso de falha.
+async function _excluirUrlsStorage(urls) {
+  await Promise.all(urls.map(u => deleteFromStorage(u)));
+}
+// v19.1 (1.7): detecta se um backup ainda tem evidências em base64 (formato legado, pré-migração)
+function _backupTemFotosBase64(data) {
+  const temEmAcoes = (data.acoes || []).some(p => isDataUrl(p.evidencia_problema) || (p.acoes_corretivas || []).some((cr, idx) => isDataUrl(cr['ev_implantacao_' + idx])));
+  const temEmCursos = (data.cursos1tema || []).some(c => isDataUrl(c.evidenciaCursoUrl));
+  return temEmAcoes || temEmCursos;
+}
+function _extFromDataUrl(dataUrl) {
+  const m = /^data:([^;]+);/.exec(dataUrl || '');
+  const mime = m ? m[1] : '';
+  if (mime === 'image/png') return '.png';
+  if (mime === 'application/pdf') return '.pdf';
+  return '.jpg';
+}
+// ==================== FIM v19.1: HELPERS DE STORAGE ====================
 let _modeloArrayBuffer = null;
+let _modeloOrigem = null; // v19.1: 'storage' | 'local' | null — usado no badge
 let _pendingDeeplink   = null; // { probId, idx } aguardando dados carregarem // ArrayBuffer do Curso1TemaPadrão.xlsx
 const _MODELO_LS_KEY = "curso1tema_modelo_xlsx_b64"; // localStorage key
 let _filtroPlanoAnalise = '';   // filtro ativo no Resumo para PDM
@@ -431,7 +490,7 @@ function compressImage(file, maxDim, quality) {
       return;
     }
     const _max = maxDim || 1280;
-    const _q   = quality || 0.8;
+    const _q   = quality || 0.7; // v19.1: padrão reduzido de 0.8 → 0.7 (uploads agora vão ao Storage)
     const img  = new Image();
     const url  = URL.createObjectURL(file);
     img.onload = () => {
@@ -540,7 +599,7 @@ window.showEvidenciaModal = function(dataUrl) {
   const isPdf = typeof dataUrl === 'string' && (
     dataUrl.startsWith('data:application/pdf') ||
     dataUrl.startsWith('data:application/octet-stream') ||
-    dataUrl.toLowerCase().endsWith('.pdf')
+    dataUrl.toLowerCase().includes('.pdf') // v19.1: URLs do Storage têm querystring após a extensão (?alt=media&token=...)
   );
   if (isPdf) {
     if (imgEl) { imgEl.style.display = 'none'; imgEl.src = ''; }
@@ -648,6 +707,7 @@ async function initAuth() {
       if (typeof aplicarPermissoesUI === 'function') setTimeout(aplicarPermissoesUI, 0);
       iniciarTimerInatividade();
       ligarListeners(); // Firestore só conecta com usuário autenticado
+      _carregarTemplateExcelDoStorage(); // v19.1 (1.5): tenta Storage; falha → mantém cache local já carregado por initModelo()
     } else {
       _userProfile = null;
       overlay?.classList.add('open');
@@ -853,7 +913,7 @@ function navigate(page) {
     toast('Acesso não permitido para o seu nível de usuário.', 'error');
     page = 'dashboard';
   }
-  if(page !== 'novo-cadastro') { _ncState.editingProblemaId = null; _ncState.editingCorretivaIdx = null; } state.currentPage = page; document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page===page)); document.getElementById('page-title').textContent = pageTitles[page]||page; render();
+  if(page !== 'novo-cadastro') { _ncState.editingProblemaId = null; _ncState.editingCorretivaIdx = null; _ncState._novoId = null; } state.currentPage = page; document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page===page)); document.getElementById('page-title').textContent = pageTitles[page]||page; render();
 }
 function render() { if (typeof _updateVencidasBadge === 'function') setTimeout(_updateVencidasBadge, 0); if (typeof aplicarPermissoesUI === 'function') setTimeout(aplicarPermissoesUI, 0); if (window._updateBottomNav) window._updateBottomNav(state.currentPage); const el = document.getElementById('page'); const renders = { dashboard:renderDashboard, analise:renderAnalise, clientes:renderClientes, responsaveis:renderResponsaveis, planos:renderPlanos, subtopicos:renderSubtopicos, listagem:renderListagem, 'novo-cadastro':renderNovoCadastro, 'fazer-backup':renderFazerBackup, 'recuperar-backup':renderRecuperarBackup, presenca:renderPresenca, curso1tema:renderCurso1Tema, configuracoes:renderConfiguracoes }; el.innerHTML = ''; (renders[state.currentPage]||renderDashboard)(el); }
 
@@ -1175,11 +1235,14 @@ function openEditModalListagem(problemaId, idx) {
       if (_isLast) {
         // Exclui o problema inteiro
         const _pidx = state.acoes.findIndex(a => a.id === problemaId);
-        if (_pidx !== -1) { state.acoes.splice(_pidx, 1); await deleteFireDoc('acoes', problemaId); }
+        if (_pidx !== -1) { const _urlsCascata = _coletarUrlsStorageProblema(state.acoes[_pidx]); state.acoes.splice(_pidx, 1); await deleteFireDoc('acoes', problemaId); _excluirUrlsStorage(_urlsCascata); }
       } else {
         // Exclui só a ação corretiva
+        const _crDel = _p.acoes_corretivas[idx];
+        const _urlDel = _crDel ? _crDel['ev_implantacao_'+idx] : null;
         _p.acoes_corretivas.splice(idx, 1);
         await saveData('acoes', problemaId);
+        if (isStorageUrl(_urlDel)) deleteFromStorage(_urlDel);
       }
       closeModal('edit-modal');
       _editListagemTarget = null;
@@ -1195,7 +1258,7 @@ document.getElementById('closeEditModal')?.addEventListener('click',()=>{ closeM
 let _pendingEvidFile = null;
 function openEvidencia(acaoId, field) { state.currentEvidenciaTarget = { acaoId, field }; _pendingEvidFile = null; document.getElementById('ev-preview').innerHTML = ''; openModal('evidencia-modal'); }
 function processEvidenciaFile(file) { if (!file) return; if (!file.type.startsWith('image/') && file.size > 600 * 1024) { toast('Arquivo muito grande! Limite PDF: 600KB.', 'error'); return; } _pendingEvidFile = file; const isImage = file.type.startsWith('image/'); if (isImage) { const reader = new FileReader(); reader.onload = ev => { document.getElementById('ev-preview').innerHTML = `<img src="${ev.target.result}" style="max-width:100%;max-height:200px;border-radius:4px;"><p style="font-size:11px;color:var(--text3);margin-top:4px">${escHtml(file.name)} · ${(file.size/1024).toFixed(1)} KB</p>`; }; reader.readAsDataURL(file); } else { document.getElementById('ev-preview').innerHTML = `<div style="padding:12px;background:var(--bg3);border-radius:4px;">📄 ${escHtml(file.name)} · ${(file.size/1024).toFixed(1)} KB</div>`; } }
-async function confirmEvidencia() { const { acaoId, field } = state.currentEvidenciaTarget || {}; if (!acaoId || !field) return; if (!_pendingEvidFile) { toast('Selecione um arquivo', 'warning'); return; } const acao = state.acoes.find(a => a.id === acaoId); if (!acao) return; const downloadURL = await compressImage(_pendingEvidFile); /* O3: comprime imagens, PDFs passam direto */ if (field.startsWith('ev_implantacao_')) { const idx = parseInt(field.split('_').pop()); if (acao.acoes_corretivas[idx]) acao.acoes_corretivas[idx][field] = downloadURL; } else { acao[field] = downloadURL; } closeModal('evidencia-modal'); await saveData('acoes', acaoId); aplicarFiltrosETabela(); renderListagemIfNeeded(); toast('Evidência salva!', 'success'); _pendingEvidFile = null; }
+async function confirmEvidencia() { const { acaoId, field } = state.currentEvidenciaTarget || {}; if (!acaoId || !field) return; if (!_pendingEvidFile) { toast('Selecione um arquivo', 'warning'); return; } if (!_pendingEvidFile.type.startsWith('image/') && _pendingEvidFile.size > 5*1024*1024) { toast('Arquivo muito grande! Limite PDF: 5 MB.', 'error'); return; } const acao = state.acoes.find(a => a.id === acaoId); if (!acao) return; try { showLoading('Enviando arquivo…'); const _dataUrl = await compressImage(_pendingEvidFile); /* O3: comprime imagens, PDFs passam direto */ const _pasta = field.startsWith('ev_implantacao_') ? ('corretivas/'+acaoId) : ('evidencias/'+acaoId); const _prefixo = field.startsWith('ev_implantacao_') ? (field.split('_').pop()+'_') : ''; const downloadURL = await uploadToStorage(_pasta+'/'+_prefixo+uid()+_extFromDataUrl(_dataUrl), _dataUrl); let _urlAntiga = null; if (field.startsWith('ev_implantacao_')) { const idx = parseInt(field.split('_').pop()); if (acao.acoes_corretivas[idx]) { _urlAntiga = acao.acoes_corretivas[idx][field]; acao.acoes_corretivas[idx][field] = downloadURL; } } else { _urlAntiga = acao[field]; acao[field] = downloadURL; } closeModal('evidencia-modal'); await saveData('acoes', acaoId); if (isStorageUrl(_urlAntiga)) deleteFromStorage(_urlAntiga); /* v19.1.1: evita órfão no Storage ao substituir */ aplicarFiltrosETabela(); renderListagemIfNeeded(); toast('Evidência salva!', 'success'); _pendingEvidFile = null; } catch(e) { toast('Erro ao enviar evidência: ' + e.message, 'error'); } finally { hideLoading(); } }
 function handleEvidenciaSelect(e) { processEvidenciaFile(e.target.files[0]); }
 function handleEvidenciaDrop(e) { processEvidenciaFile(e.dataTransfer.files[0]); }
 document.getElementById('closeEvidenciaModal')?.addEventListener('click',()=>closeModal('evidencia-modal')); document.getElementById('cancelEvidenciaBtn')?.addEventListener('click',()=>closeModal('evidencia-modal')); document.getElementById('confirmEvidenciaBtn')?.addEventListener('click',confirmEvidencia);
@@ -1332,11 +1395,12 @@ function renderListagem(container) {
       ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8E8E8' } };
       ws.getColumn(_evIdx + 1).width = 14; // antes das imagens: âncora usa a largura atual
       let _fotoCount = 0;
-      rows.forEach(tr => {
+      let _fotoFalhas = 0;
+      for (const tr of rows) {
         // Mapeamento determinístico: colunas do tbody = headers + coluna Ações (última).
         // Linhas curtas são preenchidas com vazio ao final (nunca puladas, p/ não perder a foto).
         const tds = [...tr.querySelectorAll('td')];
-        if (!tds.length) return;
+        if (!tds.length) continue;
         const cells = tds.slice(0, headers.length).map((td, i) => i === _evIdx ? '' : td.innerText.trim());
         while (cells.length < headers.length) cells.push('');
         const excelRow = ws.addRow(cells);
@@ -1345,21 +1409,32 @@ function renderListagem(container) {
         if (!_pid && tr.id) { const _m = tr.id.match(/^row-(.+?)-(?:\d+|noaction)$/); if (_m) _pid = _m[1]; }
         const _prob = _pid ? state.acoes.find(a => a.id === _pid) : null;
         const _ev = _prob?.evidencia_problema;
+        let _evParaEmbutir = null;
         if (_ev && typeof _ev === 'string' && _ev.startsWith('data:image')) {
+          _evParaEmbutir = _ev;
+        } else if (isStorageUrl(_ev)) {
+          // v19.1: foto migrada para o Storage — baixar via fetch para embutir (requer CORS do bucket, Guia §8)
           try {
-            const _ext = _ev.startsWith('data:image/png') ? 'png' : 'jpeg';
-            const _imgId = wb.addImage({ base64: _ev, extension: _ext });
+            const _fetched = await _fetchUrlToDataUrl(_ev);
+            if (_fetched.startsWith('data:image')) _evParaEmbutir = _fetched;
+            else if (_fetched.startsWith('data:application/pdf')) excelRow.getCell(_evIdx + 1).value = '📄 PDF';
+          } catch(e) { _fotoFalhas++; /* CORS ausente ou rede — não aborta o export */ }
+        } else if (_ev && typeof _ev === 'string' && _ev.startsWith('data:application/pdf')) {
+          excelRow.getCell(_evIdx + 1).value = '📄 PDF';
+        }
+        if (_evParaEmbutir) {
+          try {
+            const _ext = _evParaEmbutir.startsWith('data:image/png') ? 'png' : 'jpeg';
+            const _imgId = wb.addImage({ base64: _evParaEmbutir, extension: _ext });
             const _r = excelRow.number - 1; // 0-based
             excelRow.height = 50;
             // twoCellAnchor com limites inteiros: a imagem preenche a célula da Evidência
             // e escala junto com a linha/coluna — renderiza em todas as versões do Excel
             ws.addImage(_imgId, { tl: { col: _evIdx, row: _r }, br: { col: _evIdx + 1, row: _r + 1 } });
             _fotoCount++;
-          } catch(e) { /* imagem inválida — segue sem foto */ }
-        } else if (_ev && typeof _ev === 'string' && _ev.startsWith('data:application/pdf')) {
-          excelRow.getCell(_evIdx + 1).value = '📄 PDF';
+          } catch(e) { _fotoFalhas++; /* imagem inválida — segue sem foto */ }
         }
-      });
+      }
       ws.columns.forEach((col, ci) => {
         if (ci === _evIdx) return; // já definida antes das imagens
         let mx = 10; col.eachCell(c => { mx = Math.max(mx, String(c.value||'').length); }); col.width = Math.min(mx + 2, 60);
@@ -1371,8 +1446,9 @@ function renderListagem(container) {
       const _hh = new Date(); const _ts = `${today()}_${String(_hh.getHours()).padStart(2,'0')}${String(_hh.getMinutes()).padStart(2,'0')}${String(_hh.getSeconds()).padStart(2,'0')}`;
       a.download = `ActionPlan_Listagem_${_ts}.xlsx`;
       a.click(); URL.revokeObjectURL(a.href);
-      if (_fotoCount > 0) {
-        toast(`Excel gerado! (${_fotoCount} foto${_fotoCount===1?'':'s'} embutida${_fotoCount===1?'':'s'})`, 'success');
+      if (_fotoCount > 0 || _fotoFalhas > 0) {
+        const _falhaMsg = _fotoFalhas > 0 ? ` — ${_fotoFalhas} falharam (verifique o CORS do bucket, Guia §8)` : '';
+        toast(`Excel gerado! ${_fotoCount} foto${_fotoCount===1?'':'s'} embutida${_fotoCount===1?'':'s'}${_falhaMsg}`, _fotoFalhas > 0 ? 'warning' : 'success');
       } else {
         toast('Excel gerado — nenhuma foto embutida (as linhas exportadas não têm evidência em imagem).', 'warning');
       }
@@ -1441,7 +1517,9 @@ function aplicarFiltrosETabela() {
       else {
         const problemaCell = `<span>${escHtml(prob.problema?.substring(0,80) || '—')}</span>`;
         let evidenciaCellHtml = '—';
-        if(prob.evidencia_problema && prob.evidencia_problema.startsWith('data:image')) {
+        if(isStorageUrl(prob.evidencia_problema)) {
+          evidenciaCellHtml = `<button class="btn btn-ghost btn-xs evidencia-thumb" data-ev-id="${prob.id}" title="Ver evidência">🔍</button>`;
+        } else if(prob.evidencia_problema && prob.evidencia_problema.startsWith('data:image')) {
           evidenciaCellHtml = `<img src="${prob.evidencia_problema}" class="evidencia-thumb" data-ev-id="${prob.id}" title="Clique para ampliar" style="cursor:pointer;width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border2);">`;
         } else if(prob.evidencia_problema) {
           evidenciaCellHtml = `<span class="badge badge-gray" data-ev-id="${prob.id}" style="cursor:pointer;">📎 Arquivo</span>`;
@@ -1466,7 +1544,8 @@ function aplicarFiltrosETabela() {
       }
       const problemaCell = `<span>${escHtml(prob.problema?.substring(0,80) || '—')}</span>`;
       let evidenciaCellHtml = '—';
-      if(prob.evidencia_problema && prob.evidencia_problema.startsWith('data:image')) { evidenciaCellHtml = `<img src="${prob.evidencia_problema}" class="evidencia-thumb" data-ev-id="${prob.id}" title="Clique para ampliar" style="cursor:pointer;width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border2);">`;
+      if(isStorageUrl(prob.evidencia_problema)) { evidenciaCellHtml = `<button class="btn btn-ghost btn-xs evidencia-thumb" data-ev-id="${prob.id}" title="Ver evidência">🔍</button>`;
+      } else if(prob.evidencia_problema && prob.evidencia_problema.startsWith('data:image')) { evidenciaCellHtml = `<img src="${prob.evidencia_problema}" class="evidencia-thumb" data-ev-id="${prob.id}" title="Clique para ampliar" style="cursor:pointer;width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border2);">`;
       } else if(prob.evidencia_problema) { evidenciaCellHtml = `<span class="badge badge-gray" data-ev-id="${prob.id}" style="cursor:pointer;">📎 Arquivo</span>`; }
       const rowId = `row-${prob.id}-${idx}`;
       const expanded = expandedFollowupRows.has(`${prob.id}_${idx}`);
@@ -1506,7 +1585,7 @@ if (btn.classList.contains('copy-link-acao')) {
         copyToClipboard(_link, 'Link copiado!');
         return;
       }
-if (btn.classList.contains('del-problema')) { if (!(await showConfirm('Excluir este problema por completo? Esta ação não pode ser desfeita.'))) return; const pidx = state.acoes.findIndex(a => a.id === btn.dataset.problemaId); if (pidx !== -1) { const probId = state.acoes[pidx].id; state.acoes.splice(pidx, 1); await deleteFireDoc('acoes', probId); aplicarFiltrosETabela(); toast('Problema excluído','success'); } return; } if (btn.classList.contains('del-acao-list')) { if (!(await showConfirm('Excluir esta ação corretiva?'))) return; const prob = state.acoes.find(a => a.id === btn.dataset.problemaId); if (prob) { prob.acoes_corretivas.splice(parseInt(btn.dataset.idx), 1); await saveData('acoes', prob.id); aplicarFiltrosETabela(); toast('Ação corretiva excluída','success'); } return; } if (btn.dataset.evId) { const prob = state.acoes.find(a => a.id === btn.dataset.evId); if (prob && prob.evidencia_problema) showEvidenciaModal(prob.evidencia_problema); return; } }); } }
+if (btn.classList.contains('del-problema')) { if (!(await showConfirm('Excluir este problema por completo? Esta ação não pode ser desfeita.'))) return; const pidx = state.acoes.findIndex(a => a.id === btn.dataset.problemaId); if (pidx !== -1) { const probId = state.acoes[pidx].id; const _urlsCascata = _coletarUrlsStorageProblema(state.acoes[pidx]); state.acoes.splice(pidx, 1); await deleteFireDoc('acoes', probId); _excluirUrlsStorage(_urlsCascata); aplicarFiltrosETabela(); toast('Problema excluído','success'); } return; } if (btn.classList.contains('del-acao-list')) { if (!(await showConfirm('Excluir esta ação corretiva?'))) return; const prob = state.acoes.find(a => a.id === btn.dataset.problemaId); if (prob) { const _idxDel = parseInt(btn.dataset.idx); const _crDel = prob.acoes_corretivas[_idxDel]; const _urlDel = _crDel ? _crDel['ev_implantacao_'+_idxDel] : null; prob.acoes_corretivas.splice(_idxDel, 1); await saveData('acoes', prob.id); if (isStorageUrl(_urlDel)) deleteFromStorage(_urlDel); aplicarFiltrosETabela(); toast('Ação corretiva excluída','success'); } return; } if (btn.dataset.evId) { const prob = state.acoes.find(a => a.id === btn.dataset.evId); if (prob && prob.evidencia_problema) showEvidenciaModal(prob.evidencia_problema); return; } }); } }
 
 
 // ==================== ANÁLISE — RESUMO PDM COM FILTRO POR PLANO ====================
@@ -2465,10 +2544,11 @@ function renderNovoCadastro(container) {
   } else {
     _ncState.acoes_corretivas = []; _ncState.evidencia_problema = null; _ncState._evidTmp = {};
     _ncState.recorrencias = [];
+    if (!_ncState._novoId) _ncState._novoId = uid(); // v19.1: id estável para a pasta do Storage antes de salvar
   }
   const planosOpts = '<option value="">Selecione...</option>' + [...state.planos].sort((a,b)=>(a.titulo||'').localeCompare(b.titulo||'','pt-BR')).map(p=>'<option value="'+p.id+'">'+escHtml(p.titulo)+'</option>').join('');
   const respOpts = '<option value="">Selecione...</option>' + getResponsaveisAtivos().map(r=>'<option value="'+escHtml(r.nome)+'">'+escHtml(r.nome)+'</option>').join('');
-  container.innerHTML = `<div class="panel-body"><div class="form-row" style="grid-template-columns:1fr 1fr auto auto;gap:14px;"><div class="form-group"><label class="form-label">Plano</label><select class="form-control" id="nc-plano">${planosOpts}</select></div><div class="form-group"><label class="form-label">Sub-Tópico</label><select class="form-control" id="nc-subtopico"><option value="">Selecione o plano...</option></select></div><div class="form-group"><label class="form-label">Data de Abertura</label><input class="form-control" type="date" id="nc-data-abertura" value="${today()}"></div><div class="form-group" style="min-width:160px;"><label class="form-label">Responsável</label><select class="form-control" id="nc-responsavel">${respOpts}</select></div></div><div class="form-group" style="margin-top:14px;"><label class="form-label">Problema</label><textarea class="form-control" id="nc-problema" rows="2" placeholder="Descreva o problema detalhadamente..."></textarea></div><div id="nc-op-turno-row" style="display:none;"><div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;margin-bottom:8px;align-items:end;" id="nc-op-row-base"><div class="form-group" style="margin-bottom:0;"><label class="form-label">Operador</label><input class="form-control" id="nc-operador" placeholder="Nº operador"></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Data de Produção</label><input class="form-control" type="date" id="nc-data-producao"></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Turno</label><div style="display:flex;gap:10px;align-items:center;padding-top:6px;"><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t1" style="accent-color:var(--accent);"> T1</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t2" style="accent-color:var(--accent);"> T2</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t3" style="accent-color:var(--accent);"> T3</label></div></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Quantidade</label><input class="form-control" id="nc-quantidade" type="number" min="0" placeholder="Qtd."></div><div style="padding-bottom:2px;"><button type="button" class="btn btn-secondary btn-sm" id="nc-add-reincidencia" title="Adicionar linha de reincidência">➕</button></div></div><div id="nc-reincidencias-container"></div></div><div class="form-row" style="grid-template-columns:1fr auto auto;gap:14px;margin-bottom:14px;align-items:start;"><div class="form-group" style="margin-bottom:0;"><label class="form-label">Causa Raiz</label><textarea class="form-control" id="nc-causa" rows="2" placeholder="Causa raiz do problema..."></textarea></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Evidência do Problema</label><button class="btn btn-secondary btn-sm" id="nc-ev-upload-btn">📎 Upload</button><div class="help-text">Máx. 600 KB</div><input type="file" id="nc-ev-file" accept="image/*,.pdf" style="display:none;"><div id="nc-ev-preview" style="margin-top:6px;"></div></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Reincidência</label><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;margin-top:8px;"><input type="checkbox" id="nc-reincidente" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"><span>Problema Reincidente?</span></label></div></div><div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 10px;border-top:1px solid var(--border);padding-top:16px;"><span style="font-family:var(--font-hd);font-size:16px;font-weight:700;">Ações Corretivas</span><button class="btn btn-primary btn-sm" id="nc-add-corretiva">➕ Adicionar Ação</button></div><div id="nc-corretivas-container"><div style="text-align:center;padding:24px;color:var(--text3);">Nenhuma ação corretiva. Clique em Adicionar Ação para começar.</div></div><div class="modal-footer" style="padding: 20px 0 0 0; border-top: 1px solid var(--border); margin-top: 20px;"><button class="btn btn-secondary" onclick="_ncState.editingProblemaId=null; _ncState.editingCorretivaIdx=null; navigate(\'listagem\');">Cancelar</button><button class="btn btn-primary" onclick="_ncSalvar()">💾 Salvar Ação</button></div></div></div>`;
+  container.innerHTML = `<div class="panel-body"><div class="form-row" style="grid-template-columns:1fr 1fr auto auto;gap:14px;"><div class="form-group"><label class="form-label">Plano</label><select class="form-control" id="nc-plano">${planosOpts}</select></div><div class="form-group"><label class="form-label">Sub-Tópico</label><select class="form-control" id="nc-subtopico"><option value="">Selecione o plano...</option></select></div><div class="form-group"><label class="form-label">Data de Abertura</label><input class="form-control" type="date" id="nc-data-abertura" value="${today()}"></div><div class="form-group" style="min-width:160px;"><label class="form-label">Responsável</label><select class="form-control" id="nc-responsavel">${respOpts}</select></div></div><div class="form-group" style="margin-top:14px;"><label class="form-label">Problema</label><textarea class="form-control" id="nc-problema" rows="2" placeholder="Descreva o problema detalhadamente..."></textarea></div><div id="nc-op-turno-row" style="display:none;"><div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;margin-bottom:8px;align-items:end;" id="nc-op-row-base"><div class="form-group" style="margin-bottom:0;"><label class="form-label">Operador</label><input class="form-control" id="nc-operador" placeholder="Nº operador"></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Data de Produção</label><input class="form-control" type="date" id="nc-data-producao"></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Turno</label><div style="display:flex;gap:10px;align-items:center;padding-top:6px;"><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t1" style="accent-color:var(--accent);"> T1</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t2" style="accent-color:var(--accent);"> T2</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t3" style="accent-color:var(--accent);"> T3</label></div></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Quantidade</label><input class="form-control" id="nc-quantidade" type="number" min="0" placeholder="Qtd."></div><div style="padding-bottom:2px;"><button type="button" class="btn btn-secondary btn-sm" id="nc-add-reincidencia" title="Adicionar linha de reincidência">➕</button></div></div><div id="nc-reincidencias-container"></div></div><div class="form-row" style="grid-template-columns:1fr auto auto;gap:14px;margin-bottom:14px;align-items:start;"><div class="form-group" style="margin-bottom:0;"><label class="form-label">Causa Raiz</label><textarea class="form-control" id="nc-causa" rows="2" placeholder="Causa raiz do problema..."></textarea></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Evidência do Problema</label><button class="btn btn-secondary btn-sm" id="nc-ev-upload-btn">📎 Upload</button><div class="help-text">Máx. 5 MB</div><input type="file" id="nc-ev-file" accept="image/*,.pdf" style="display:none;"><div id="nc-ev-preview" style="margin-top:6px;"></div></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Reincidência</label><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;margin-top:8px;"><input type="checkbox" id="nc-reincidente" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"><span>Problema Reincidente?</span></label></div></div><div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 10px;border-top:1px solid var(--border);padding-top:16px;"><span style="font-family:var(--font-hd);font-size:16px;font-weight:700;">Ações Corretivas</span><button class="btn btn-primary btn-sm" id="nc-add-corretiva">➕ Adicionar Ação</button></div><div id="nc-corretivas-container"><div style="text-align:center;padding:24px;color:var(--text3);">Nenhuma ação corretiva. Clique em Adicionar Ação para começar.</div></div><div class="modal-footer" style="padding: 20px 0 0 0; border-top: 1px solid var(--border); margin-top: 20px;"><button class="btn btn-secondary" onclick="_ncState.editingProblemaId=null; _ncState.editingCorretivaIdx=null; navigate(\'listagem\');">Cancelar</button><button class="btn btn-primary" onclick="_ncSalvar()">💾 Salvar Ação</button></div></div></div>`;
   document.getElementById('nc-plano').addEventListener('change', _ncOnPlanoChange);
   // nc-cancelar e nc-salvar usam onclick inline no HTML; não existem como ids separados
   document.getElementById('nc-add-corretiva').addEventListener('click', _ncAddCorretiva);
@@ -2540,9 +2620,20 @@ function _ncOnPlanoChange() {
 
 async function _ncProcessEvProblema(file) {
   if (!file) return;
-  if (!file.type.startsWith('image/') && file.size > 600*1024) { toast('Arquivo muito grande! Limite PDF: 600 KB.','error'); return; }
-  const _dataUrl = await compressImage(file);
-  { const ev = { target: { result: _dataUrl } }; _ncState.evidencia_problema = ev.target.result; const isImg = file.type.startsWith('image/'); document.getElementById('nc-ev-preview').innerHTML = isImg ? '<img src="'+ev.target.result+'" style="max-width:160px;max-height:90px;border-radius:4px;border:1px solid var(--border2);">' : '<div style="padding:6px;background:var(--bg3);border-radius:4px;font-size:11px;">📄 '+escHtml(file.name)+'</div>'; toast('Evidência carregada!','success'); }
+  if (!file.type.startsWith('image/') && file.size > 5*1024*1024) { toast('Arquivo muito grande! Limite PDF: 5 MB.','error'); return; }
+  try {
+    showLoading('Enviando arquivo…');
+    const _dataUrl = await compressImage(file);
+    const _probId = _ncState.editingProblemaId || _ncState._novoId || uid();
+    const downloadURL = await uploadToStorage('evidencias/'+_probId+'/'+uid()+_extFromDataUrl(_dataUrl), _dataUrl);
+    const _urlAntiga = _ncState.evidencia_problema; // v19.1.1: evita órfão no Storage ao substituir
+    { const ev = { target: { result: downloadURL } }; _ncState.evidencia_problema = ev.target.result; const isImg = file.type.startsWith('image/'); document.getElementById('nc-ev-preview').innerHTML = isImg ? '<img src="'+ev.target.result+'" style="max-width:160px;max-height:90px;border-radius:4px;border:1px solid var(--border2);">' : '<div style="padding:6px;background:var(--bg3);border-radius:4px;font-size:11px;">📄 '+escHtml(file.name)+'</div>'; toast('Evidência carregada!','success'); }
+    if (isStorageUrl(_urlAntiga)) deleteFromStorage(_urlAntiga);
+  } catch(e) {
+    toast('Erro ao enviar evidência: ' + e.message, 'error');
+  } finally {
+    hideLoading();
+  }
 }
 
 
@@ -2626,7 +2717,7 @@ function _ncRenderCorretivas() {
     const rOpts = respOpts.replace('value="'+escHtml(cr.responsavel)+'"','value="'+escHtml(cr.responsavel)+'" selected');
     const fuHtml = (cr.followups||[]).map((fu,fIdx)=>'<div style="display:flex;align-items:center;gap:5px;font-size:10px;margin-bottom:2px;padding-left:6px;border-left:2px solid var(--border);"><span style="white-space:nowrap;font-weight:bold;">📅 '+formatDate(fu.data_followup)+' - 👤 '+escHtml(fu.responsavel)+':</span><span style="flex:1;">'+escHtml(fu.comentario)+'</span><button class="btn btn-ghost btn-xs nc-edit-fu" data-idx="'+idx+'" data-fuidx="'+fIdx+'">✏️</button><button class="btn btn-ghost btn-xs nc-del-fu" data-idx="'+idx+'" data-fuidx="'+fIdx+'">🗑️</button></div>').join('');
     const alterBadge = (cr.qtd_alteracoes_data||0)>0 ? '<span class="badge badge-yellow">🔄 '+cr.qtd_alteracoes_data+'</span>' : '';
-    return '<div class="corretiva-block" id="nc-cr-'+idx+'"><div class="corretiva-header"><span style="font-size:11px;color:var(--text3);font-weight:600;">AÇÃO CORRETIVA '+(idx+1)+'</span>'+(typeof cr.numeroAcao==="number"?'<span style="color:var(--accent);font-size:17px;font-weight:800;font-family:var(--font-hd);margin-left:6px;">#'+cr.numeroAcao+'</span>':'')+''+_ncStatusBadge(status)+'<button class="btn btn-danger btn-xs nc-del-cr" data-idx="'+idx+'">🗑️</button><button class="btn btn-ghost btn-xs nc-add-fu" data-idx="'+idx+'">💬 +Follow-up</button></div><div class="form-row cols-2"><div class="form-group"><label class="form-label">Ação</label><textarea class="form-control nc-cr-desc" data-idx="'+idx+'" rows="2" placeholder="Descreva a ação corretiva...">'+escHtml(cr.acao_descricao||'')+'</textarea></div><div class="form-group"><label class="form-label">Responsável</label><select class="form-control nc-cr-resp" data-idx="'+idx+'">'+rOpts+'</select></div></div><div class="form-row cols-3"><div class="form-group"><label class="form-label">Data Prevista</label><div style="display:flex;align-items:center;gap:6px;"><input class="form-control nc-cr-prev" type="date" data-idx="'+idx+'" value="'+(cr.data_prevista||'')+'" style="flex:1;">'+alterBadge+'</div></div><div class="form-group"><label class="form-label">Data Efetiva</label><input class="form-control nc-cr-efet" type="date" data-idx="'+idx+'" value="'+(cr.data_efetiva||'')+'"></div><div class="form-group"><label class="form-label">Evidência Fechamento</label><div style="display:flex;gap:4px;flex-wrap:wrap;">'+evBtns+'</div><div class="help-text">Máx. 600 KB</div><input type="file" class="nc-ev-corr-file" data-idx="'+idx+'" accept="image/*" style="display:none;"></div></div><div style="margin-top:10px;"><strong>Follow-ups:</strong> '+(fuHtml||'<span style="color:var(--text3);font-size:12px;">Nenhum follow-up</span>')+'</div></div>';
+    return '<div class="corretiva-block" id="nc-cr-'+idx+'"><div class="corretiva-header"><span style="font-size:11px;color:var(--text3);font-weight:600;">AÇÃO CORRETIVA '+(idx+1)+'</span>'+(typeof cr.numeroAcao==="number"?'<span style="color:var(--accent);font-size:17px;font-weight:800;font-family:var(--font-hd);margin-left:6px;">#'+cr.numeroAcao+'</span>':'')+''+_ncStatusBadge(status)+'<button class="btn btn-danger btn-xs nc-del-cr" data-idx="'+idx+'">🗑️</button><button class="btn btn-ghost btn-xs nc-add-fu" data-idx="'+idx+'">💬 +Follow-up</button></div><div class="form-row cols-2"><div class="form-group"><label class="form-label">Ação</label><textarea class="form-control nc-cr-desc" data-idx="'+idx+'" rows="2" placeholder="Descreva a ação corretiva...">'+escHtml(cr.acao_descricao||'')+'</textarea></div><div class="form-group"><label class="form-label">Responsável</label><select class="form-control nc-cr-resp" data-idx="'+idx+'">'+rOpts+'</select></div></div><div class="form-row cols-3"><div class="form-group"><label class="form-label">Data Prevista</label><div style="display:flex;align-items:center;gap:6px;"><input class="form-control nc-cr-prev" type="date" data-idx="'+idx+'" value="'+(cr.data_prevista||'')+'" style="flex:1;">'+alterBadge+'</div></div><div class="form-group"><label class="form-label">Data Efetiva</label><input class="form-control nc-cr-efet" type="date" data-idx="'+idx+'" value="'+(cr.data_efetiva||'')+'"></div><div class="form-group"><label class="form-label">Evidência Fechamento</label><div style="display:flex;gap:4px;flex-wrap:wrap;">'+evBtns+'</div><div class="help-text">Máx. 5 MB</div><input type="file" class="nc-ev-corr-file" data-idx="'+idx+'" accept="image/*" style="display:none;"></div></div><div style="margin-top:10px;"><strong>Follow-ups:</strong> '+(fuHtml||'<span style="color:var(--text3);font-size:12px;">Nenhum follow-up</span>')+'</div></div>';
   }).join('');
   container.querySelectorAll('.nc-del-cr').forEach(btn=>btn.addEventListener('click',()=>{ const i=parseInt(btn.dataset.idx); _ncState.acoes_corretivas.splice(i,1); const ne={}; Object.keys(_ncState._evidTmp).forEach(k=>{ const ki=parseInt(k); if(ki<i) ne[ki]=_ncState._evidTmp[k]; else if(ki>i) ne[ki-1]=_ncState._evidTmp[k]; }); _ncState._evidTmp=ne; _ncRenderCorretivas(); }));
   container.querySelectorAll('.nc-cr-desc').forEach(el=>el.addEventListener('input',()=>{ if(_ncState.acoes_corretivas[parseInt(el.dataset.idx)]) _ncState.acoes_corretivas[parseInt(el.dataset.idx)].acao_descricao=el.value; }));
@@ -2634,7 +2725,7 @@ function _ncRenderCorretivas() {
   container.querySelectorAll('.nc-cr-efet').forEach(el=>el.addEventListener('change',()=>{ if(_ncState.acoes_corretivas[parseInt(el.dataset.idx)]) _ncState.acoes_corretivas[parseInt(el.dataset.idx)].data_efetiva=el.value; }));
   container.querySelectorAll('.nc-cr-prev').forEach(el=>el.addEventListener('change',()=>{ const i=parseInt(el.dataset.idx); const cr=_ncState.acoes_corretivas[i]; if(!cr) return; const nd=el.value, da=cr.data_prevista||''; if(da&&nd&&nd!==da){ if(!cr.followups) cr.followups=[]; cr.qtd_alteracoes_data=(cr.qtd_alteracoes_data||0)+1; cr.followups.push({id:uid(),data_followup:today(),responsavel:cr.responsavel||'Sistema',comentario:'Data alterada para '+formatDate(nd)}); } cr.data_prevista=nd; _ncRenderCorretivas(); }));
   container.querySelectorAll('.nc-ev-corr-btn').forEach(btn=>btn.addEventListener('click',()=>{ const fi=container.querySelector('.nc-ev-corr-file[data-idx="'+btn.dataset.idx+'"]'); if(fi) fi.click(); }));
-  container.querySelectorAll('.nc-ev-corr-file').forEach(fi=>fi.addEventListener('change',async e=>{ const i=parseInt(fi.dataset.idx); const file=e.target.files[0]; if(!file) return; if(!file.type.startsWith('image/') && file.size>600*1024){toast('Arquivo muito grande! Limite PDF: 600 KB.','error');return;} const _du=await compressImage(file); _ncState._evidTmp[i]=_du; _ncRenderCorretivas(); toast('Evidência carregada!','success'); }));
+  container.querySelectorAll('.nc-ev-corr-file').forEach(fi=>fi.addEventListener('change',async e=>{ const i=parseInt(fi.dataset.idx); const file=e.target.files[0]; if(!file) return; if(!file.type.startsWith('image/') && file.size>5*1024*1024){toast('Arquivo muito grande! Limite PDF: 5 MB.','error');return;} try { showLoading('Enviando arquivo…'); const _du=await compressImage(file); const _probId = _ncState.editingProblemaId || _ncState._novoId || uid(); const _url = await uploadToStorage('corretivas/'+_probId+'/'+i+'_'+uid()+_extFromDataUrl(_du), _du); const _urlAntiga = _ncState._evidTmp[i]; _ncState._evidTmp[i]=_url; if (isStorageUrl(_urlAntiga)) deleteFromStorage(_urlAntiga); /* v19.1.1: evita órfão no Storage ao substituir */ _ncRenderCorretivas(); toast('Evidência carregada!','success'); } catch(err) { toast('Erro ao enviar evidência: ' + err.message, 'error'); } finally { hideLoading(); } }));
   container.querySelectorAll('.nc-ev-view').forEach(btn=>btn.addEventListener('click',()=>{ const src=_ncState._evidTmp[parseInt(btn.dataset.idx)]; if(src) showEvidenciaModal(src); }));
   container.querySelectorAll('.nc-add-fu').forEach(btn=>btn.addEventListener('click',()=>{ _ncState._fuTarget={idx:parseInt(btn.dataset.idx)}; document.getElementById('fu-data').value=today(); const _fuSelNc=document.getElementById('fu-responsavel'); _fuSelNc.innerHTML='<option value="">Selecione...</option>'+getResponsaveisAtivos().map(r=>`<option value="${escHtml(r.nome)}">${escHtml(r.nome)}</option>`).join(''); _fuSelNc.value=''; document.getElementById('fu-comentario').value=''; openModal('followup-modal'); }));
   container.querySelectorAll('.nc-del-fu').forEach(btn=>btn.addEventListener('click',()=>{ const i=parseInt(btn.dataset.idx),fi=parseInt(btn.dataset.fuidx); if(_ncState.acoes_corretivas[i]) { _ncState.acoes_corretivas[i].followups.splice(fi,1); _ncRenderCorretivas(); } }));
@@ -2709,7 +2800,7 @@ async function _ncSalvar() {
       _ncState.editingProblemaId = null; _ncState.editingCorretivaIdx = null;
       hideLoading(); state.currentPage='listagem'; render();
     } else {
-      const novoProblema={id:uid(),id_global:nextAcaoId(),plano_id:planoId,subtopico_id:subtId,data_abertura:dataAbertura,responsavel,problema,causa,reincidente,recorrencia_count:0,evidencia_problema:_ncState.evidencia_problema||null,acoes_corretivas:_corretivasOut};
+      const novoProblema={id:_ncState._novoId||uid(),id_global:nextAcaoId(),plano_id:planoId,subtopico_id:subtId,data_abertura:dataAbertura,responsavel,problema,causa,reincidente,recorrencia_count:0,evidencia_problema:_ncState.evidencia_problema||null,acoes_corretivas:_corretivasOut};
       if(nOpQtd){
         novoProblema.operador=operador; novoProblema.quantidade=quantidade;
         novoProblema.data_producao=data_producao; novoProblema.turnos=turnos;
@@ -2720,7 +2811,7 @@ async function _ncSalvar() {
         const probReinc = { ...novoProblema, data_abertura: reinc.data_producao || novoProblema.data_abertura, _reincidencia_id: reinc.id };
         await _autoCreateCurso1Tema(probReinc, plano, reinc.id);
       }
-      state.acoes.push(novoProblema); await saveData('acoes',novoProblema.id);
+      state.acoes.push(novoProblema); await saveData('acoes',novoProblema.id); _ncState._novoId = null;
       // ── Auto-create Curso de 1 Tema se o plano for GP12 ──
       await _autoCreateCurso1Tema(novoProblema, plano);
       toast('Problema cadastrado com sucesso!','success'); hideLoading(); state.currentPage='listagem'; render();
@@ -2913,19 +3004,12 @@ function renderCurso1Tema(container) {
       if (!e.shiftKey) return;
       inpModeloCurso.click();
     });
-    inpModeloCurso.addEventListener('change', function(e) {
+    inpModeloCurso.addEventListener('change', async function(e) {
       const file = e.target.files[0];
       if (!file) return;
       if (!file.name.toLowerCase().endsWith('.xlsx')) { toast('Selecione um arquivo .xlsx válido.', 'warning'); return; }
-      const reader = new FileReader();
-      reader.onload = ev => {
-        _modeloArrayBuffer = ev.target.result;
-        try { localStorage.setItem(_MODELO_LS_KEY, _arrayBufferToB64(_modeloArrayBuffer)); } catch(ex){}
-        _updateModeloBadge();
-        toast('Modelo carregado com sucesso!', 'success');
-        inpModeloCurso.value = '';
-      };
-      reader.readAsArrayBuffer(file);
+      await _processarNovoModeloExcel(file);
+      inpModeloCurso.value = '';
     });
   }
 
@@ -3007,10 +3091,12 @@ function renderCurso1Tema(container) {
       if (!(await showConfirm('Excluir este Curso de 1 Tema? Esta ação não pode ser desfeita.'))) return;
       const idx = state.cursos1tema.findIndex(c => c.id === cursoId);
       if (idx === -1) return;
+      const _urlCurso = state.cursos1tema[idx].evidenciaCursoUrl;
       state.cursos1tema.splice(idx, 1);
       try {
         if (db) await db.collection('cursos1tema').doc(cursoId).delete();
       } catch(ex) { console.warn('Erro ao excluir do Firestore:', ex); }
+      if (isStorageUrl(_urlCurso)) deleteFromStorage(_urlCurso);
       toast('Curso excluído.', 'success');
       renderCurso1Tema(container);
     }
@@ -3063,25 +3149,35 @@ function _rebindCursoUpload(cursoId) {
   inp.addEventListener('change', async function(e) {
     const file = e.target.files[0];
     if (!file) return;
-    if (!file.type.startsWith('image/') && file.size > 600 * 1024) { toast('Arquivo muito grande! Limite PDF: 600 KB.', 'error'); return; }
-    const _duCurso = await compressImage(file);
-    {
-      const ev = { target: { result: _duCurso } };
-      const curso = state.cursos1tema.find(c => c.id === cursoId);
-      if (!curso) return;
-      curso.evidenciaCursoUrl = ev.target.result;
-      // Auto-marca T1, T2 e T3 ao enviar evidência
-      curso.t1 = true; curso.t2 = true; curso.t3 = true;
-      curso.statusCurso = 'Finalizado';
-      await saveData('cursos1tema', cursoId);
-      // re-render row
-      const tbody = document.getElementById('curso1tema-tbody');
-      if (tbody) {
-        const row = tbody.querySelector(`tr[data-curso-id="${cursoId}"]`);
-        if (row) row.outerHTML = _renderCursoRow(curso);
-        _rebindCursoUpload(cursoId);
+    if (!file.type.startsWith('image/') && file.size > 5*1024*1024) { toast('Arquivo muito grande! Limite PDF: 5 MB.', 'error'); return; }
+    try {
+      showLoading('Enviando arquivo…');
+      const _duCurso = await compressImage(file);
+      const _urlCurso = await uploadToStorage('cursos/'+cursoId+'/'+uid()+_extFromDataUrl(_duCurso), _duCurso);
+      {
+        const ev = { target: { result: _urlCurso } };
+        const curso = state.cursos1tema.find(c => c.id === cursoId);
+        if (!curso) return;
+        const _urlAntigaCurso = curso.evidenciaCursoUrl; // v19.1.1: evita órfão no Storage ao substituir
+        curso.evidenciaCursoUrl = ev.target.result;
+        // Auto-marca T1, T2 e T3 ao enviar evidência
+        curso.t1 = true; curso.t2 = true; curso.t3 = true;
+        curso.statusCurso = 'Finalizado';
+        await saveData('cursos1tema', cursoId);
+        if (isStorageUrl(_urlAntigaCurso)) deleteFromStorage(_urlAntigaCurso);
+        // re-render row
+        const tbody = document.getElementById('curso1tema-tbody');
+        if (tbody) {
+          const row = tbody.querySelector(`tr[data-curso-id="${cursoId}"]`);
+          if (row) row.outerHTML = _renderCursoRow(curso);
+          _rebindCursoUpload(cursoId);
+        }
+        toast('Evidência salva! T1, T2 e T3 marcados automaticamente. ✅', 'success');
       }
-      toast('Evidência salva! T1, T2 e T3 marcados automaticamente. ✅', 'success');
+    } catch(err) {
+      toast('Erro ao enviar evidência: ' + err.message, 'error');
+    } finally {
+      hideLoading();
     }
   });
 }
@@ -3258,15 +3354,58 @@ function _arrayBufferToB64(buf) {
   return btoa(bin);
 }
 function _updateModeloBadge() {
-  const badge = document.getElementById('modelo-badge');
-  if (!badge) return;
-  if (_modeloArrayBuffer) {
-    badge.className = 'modelo-badge ok';
-    badge.textContent = '✅ Modelo Pronto';
-  } else {
-    badge.className = 'modelo-badge nok';
-    badge.textContent = '❌ Modelo Excel';
+  let cls, txt;
+  if (_modeloArrayBuffer && _modeloOrigem === 'storage') { cls = 'modelo-badge ok'; txt = '☁️ Modelo (Storage)'; }
+  else if (_modeloArrayBuffer) { cls = 'modelo-badge ok'; txt = '💾 Modelo (local)'; }
+  else { cls = 'modelo-badge nok'; txt = '❌ Modelo Excel'; }
+  ['modelo-badge', 'modelo-badge-config'].forEach(id => {
+    const badge = document.getElementById(id);
+    if (!badge) return;
+    badge.className = cls;
+    badge.textContent = txt;
+  });
+}
+// v19.1 (1.5): busca o template no Storage após login; falha (offline/CORS) → mantém o cache do localStorage já carregado por initModelo()
+async function _carregarTemplateExcelDoStorage() {
+  try {
+    const url = await _storage().ref('config/Curso1TemaPadrao.xlsx').getDownloadURL();
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const buf = await resp.arrayBuffer();
+    _modeloArrayBuffer = buf;
+    _modeloOrigem = 'storage';
+    try { localStorage.setItem(_MODELO_LS_KEY, _arrayBufferToB64(buf)); } catch(e) {}
+    _updateModeloBadge();
+  } catch(e) {
+    // offline, sem template no Storage ainda, ou CORS pendente (Guia §8) — cache local (initModelo) prevalece
+    console.warn('Template não disponível no Storage — usando cache local, se houver.', e);
   }
+}
+// v19.1: processa um novo arquivo de modelo — carrega localmente e envia ao Storage (degrada para local em falha)
+async function _processarNovoModeloExcel(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = async ev => {
+      _modeloArrayBuffer = ev.target.result;
+      try { localStorage.setItem(_MODELO_LS_KEY, _arrayBufferToB64(_modeloArrayBuffer)); } catch(ex) {}
+      _modeloOrigem = 'local';
+      _updateModeloBadge();
+      try {
+        showLoading('Enviando modelo ao Storage…');
+        await uploadToStorage('config/Curso1TemaPadrao.xlsx', file, file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        _modeloOrigem = 'storage';
+        _updateModeloBadge();
+        toast('Modelo carregado e enviado ao Storage — disponível para todos!', 'success');
+      } catch(err) {
+        toast('Modelo carregado localmente, mas falhou ao enviar ao Storage: ' + err.message, 'warning');
+      } finally {
+        hideLoading();
+        resolve();
+      }
+    };
+    reader.onerror = () => { toast('Erro ao ler o arquivo.', 'error'); resolve(); };
+    reader.readAsArrayBuffer(file);
+  });
 }
 function initModelo() {
   // Tenta restaurar do localStorage
@@ -3274,6 +3413,7 @@ function initModelo() {
     const saved = localStorage.getItem(_MODELO_LS_KEY);
     if (saved) {
       _modeloArrayBuffer = _b64ToArrayBuffer(saved);
+      _modeloOrigem = 'local';
       _updateModeloBadge();
     }
   } catch(e) { console.warn('initModelo: localStorage indisponível', e); }
@@ -3294,6 +3434,7 @@ function initModelo() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       _modeloArrayBuffer = ev.target.result;
+      _modeloOrigem = 'local';
       // Persiste no localStorage como Base64
       try {
         const b64 = _arrayBufferToB64(_modeloArrayBuffer);
@@ -3339,26 +3480,63 @@ function renderFazerBackup(container) {
             <div class="kpi-value" style="font-size:28px;">${state.cursos1tema.length}</div><div class="kpi-label">Cursos GP12</div>
           </div>
         </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-bottom:14px;">
+          <input type="checkbox" id="backup-incluir-fotos" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);">
+          <span>Incluir fotos no backup (baixa cada foto do Storage e embute como base64 — requer CORS do bucket, Guia §8; pode demorar)</span>
+        </label>
+        <div style="background:var(--bg3);border-radius:4px;height:8px;overflow:hidden;display:none;margin-bottom:14px;" id="backup-progress-wrap"><div id="backup-progress" style="background:var(--accent);height:100%;width:0%;transition:width .2s;"></div></div>
         <button class="btn btn-primary" id="btn-gerar-backup">💾 Gerar e Baixar Backup</button>
       </div>
     </div>`;
-  document.getElementById('btn-gerar-backup').addEventListener('click', () => {
+  document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
+    const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.0.4', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.1.1', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
       subtopicos: state.subtopicos,
-      acoes: state.acoes,
+      acoes: JSON.parse(JSON.stringify(state.acoes)), // clone — nunca mutar o state em memória abaixo
       presencas: state.presencas,
-      cursos1tema: state.cursos1tema
+      cursos1tema: JSON.parse(JSON.stringify(state.cursos1tema))
     };
+
+    if (incluirFotos) {
+      const btnEl = document.getElementById('btn-gerar-backup');
+      const barWrap = document.getElementById('backup-progress-wrap');
+      const bar = document.getElementById('backup-progress');
+      if (btnEl) btnEl.disabled = true;
+      if (barWrap) barWrap.style.display = 'block';
+
+      const alvos = [];
+      payload.acoes.forEach(prob => {
+        if (isStorageUrl(prob.evidencia_problema)) alvos.push({ obj: prob, campo: 'evidencia_problema' });
+        (prob.acoes_corretivas || []).forEach((cr, idx) => {
+          const campo = 'ev_implantacao_' + idx;
+          if (isStorageUrl(cr[campo])) alvos.push({ obj: cr, campo });
+        });
+      });
+      payload.cursos1tema.forEach(c => { if (isStorageUrl(c.evidenciaCursoUrl)) alvos.push({ obj: c, campo: 'evidenciaCursoUrl' }); });
+
+      let falhas = 0;
+      for (let i = 0; i < alvos.length; i++) {
+        try {
+          alvos[i].obj[alvos[i].campo] = await _fetchUrlToDataUrl(alvos[i].obj[alvos[i].campo]);
+        } catch(e) { falhas++; /* CORS ausente ou rede — mantém a URL nesse campo e segue */ }
+        if (bar) bar.style.width = Math.round(((i + 1) / Math.max(alvos.length, 1)) * 100) + '%';
+        if (typeof window._resetarTimerInatividade === 'function') window._resetarTimerInatividade();
+      }
+      if (btnEl) btnEl.disabled = false;
+      if (barWrap) barWrap.style.display = 'none';
+      if (falhas > 0) toast(`${falhas} foto(s) não puderam ser baixadas (confira o CORS do bucket, Guia §8) — backup gerado com URL nesses campos.`, 'warning');
+    }
+
     const json = JSON.stringify(payload, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     const dataStr = new Date().toISOString().slice(0,10);
-    a.href = url; a.download = `Backup_ActionPlan_${dataStr}.json`;
+    a.href = url; a.download = `Backup_ActionPlan_${dataStr}${incluirFotos ? '_com_fotos' : ''}.json`;
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
     toast('Backup gerado e download iniciado!', 'success');
@@ -3411,6 +3589,7 @@ function renderRecuperarBackup(container) {
               <span>⚡ Problemas: <strong>${data.acoes.length}</strong></span>
               <span>🗓️ Atas de Presença: <strong>${data.presencas.length}</strong></span>
             </div>
+            ${_backupTemFotosBase64(data) ? '<div style="margin-top:10px;color:var(--yellow, #eab308);font-size:12px;">📸 Este arquivo contém fotos em base64 (formato legado, pré-migração). Após restaurar, rode "🚀 Migrar fotos para o Storage" em Configurações.</div>' : ''}
           </div>`;
         document.getElementById('btn-restaurar-backup').style.display = '';
         toast('Arquivo carregado. Revise e confirme para restaurar.', 'info');
@@ -3473,6 +3652,9 @@ function renderRecuperarBackup(container) {
       }
       hideLoading();
       toast(`Backup restaurado! ${_backupData.acoes.length} problemas e ${(state.presencas||[]).length} atas recarregados.`, 'success');
+      if (_backupTemFotosBase64(_backupData)) {
+        toast('Este backup tinha fotos em base64 — rode "🚀 Migrar fotos para o Storage" em Configurações para movê-las.', 'warning');
+      }
       navigate('dashboard');
     } catch (err) {
       hideLoading();
@@ -3482,6 +3664,81 @@ function renderRecuperarBackup(container) {
 }
 
 // ==================== v19.0: PÁGINA CONFIGURAÇÕES (nível 1) ====================
+// ==================== v19.1: MIGRAÇÃO DE FOTOS PARA O STORAGE (nível 1) ====================
+let _migracaoEmAndamento = false;
+async function _migrarFotosParaStorage() {
+  if (_migracaoEmAndamento) return;
+  if (!podeVer('config')) { toast('Acesso não permitido.', 'error'); return; }
+  if (!(await showConfirm('Recomendado: faça o Backup (com fotos) ANTES de migrar — a migração reescreve os campos de evidência. Deseja continuar agora?'))) return;
+
+  _migracaoEmAndamento = true;
+  const barWrap = document.getElementById('migracao-progress-wrap');
+  const bar = document.getElementById('migracao-progress');
+  const statusEl = document.getElementById('migracao-status');
+  const btnEl = document.getElementById('cfg-migrar-fotos');
+  if (btnEl) btnEl.disabled = true;
+  if (barWrap) barWrap.style.display = 'block';
+
+  let totalVarrido = 0, migradosAgora = 0, jaMigrados = 0, erros = 0;
+  const errosDetalhe = [];
+  const totalItens = state.acoes.length + state.cursos1tema.length;
+  let processados = 0;
+  const _tick = (msg) => {
+    processados++;
+    if (bar) bar.style.width = Math.round((processados / Math.max(totalItens, 1)) * 100) + '%';
+    if (statusEl) statusEl.textContent = msg;
+    if (typeof window._resetarTimerInatividade === 'function') window._resetarTimerInatividade(); // v19.1 risco #9: não deslogar durante migração longa
+  };
+
+  for (const prob of state.acoes) {
+    totalVarrido++;
+    let alterado = false, jaTinhaUrl = false;
+    if (isDataUrl(prob.evidencia_problema)) {
+      try {
+        const url = await uploadToStorage(`evidencias/${prob.id}/${uid()}${_extFromDataUrl(prob.evidencia_problema)}`, prob.evidencia_problema);
+        prob.evidencia_problema = url; alterado = true;
+      } catch(e) { erros++; errosDetalhe.push(`Problema ${prob.id}: evidência do problema — ${e.message}`); }
+    } else if (isStorageUrl(prob.evidencia_problema)) { jaTinhaUrl = true; }
+
+    for (let idx = 0; idx < (prob.acoes_corretivas || []).length; idx++) {
+      const cr = prob.acoes_corretivas[idx];
+      const campo = 'ev_implantacao_' + idx;
+      if (isDataUrl(cr[campo])) {
+        try {
+          const url = await uploadToStorage(`corretivas/${prob.id}/${idx}_${uid()}${_extFromDataUrl(cr[campo])}`, cr[campo]);
+          cr[campo] = url; alterado = true;
+        } catch(e) { erros++; errosDetalhe.push(`Problema ${prob.id}, ação ${idx+1}: evidência de implantação — ${e.message}`); }
+      } else if (isStorageUrl(cr[campo])) { jaTinhaUrl = true; }
+    }
+
+    if (alterado) {
+      prob.migrado_storage = true;
+      try { await saveData('acoes', prob.id); migradosAgora++; } catch(e) { erros++; errosDetalhe.push(`Problema ${prob.id}: falha ao salvar — ${e.message}`); }
+    } else if (jaTinhaUrl || prob.migrado_storage) { jaMigrados++; }
+    _tick(`Migrando problemas... ${processados}/${totalItens}`);
+  }
+
+  for (const curso of state.cursos1tema) {
+    totalVarrido++;
+    if (isDataUrl(curso.evidenciaCursoUrl)) {
+      try {
+        const url = await uploadToStorage(`cursos/${curso.id}/${uid()}${_extFromDataUrl(curso.evidenciaCursoUrl)}`, curso.evidenciaCursoUrl);
+        curso.evidenciaCursoUrl = url;
+        try { await saveData('cursos1tema', curso.id); migradosAgora++; } catch(e) { erros++; errosDetalhe.push(`Curso ${curso.id}: falha ao salvar — ${e.message}`); }
+      } catch(e) { erros++; errosDetalhe.push(`Curso ${curso.id}: evidência — ${e.message}`); }
+    } else if (isStorageUrl(curso.evidenciaCursoUrl)) { jaMigrados++; }
+    _tick(`Migrando cursos... ${processados}/${totalItens}`);
+  }
+
+  _migracaoEmAndamento = false;
+  if (btnEl) btnEl.disabled = false;
+  if (bar) bar.style.width = '100%';
+  const _msg = `Migração concluída: ${totalVarrido} varridos, ${migradosAgora} migrados agora, ${jaMigrados} já migrados, ${erros} erro(s).`;
+  if (statusEl) statusEl.textContent = _msg + (erros ? ' Rode novamente para tentar os itens com erro (veja o console).' : '');
+  if (erros) console.warn('Erros na migração de fotos:', errosDetalhe);
+  toast(_msg, erros ? 'warning' : 'success');
+}
+// ==================== FIM v19.1: MIGRAÇÃO DE FOTOS ====================
 function renderConfiguracoes(container) {
   container.innerHTML = `
     <div class="panel">
@@ -3504,6 +3761,25 @@ function renderConfiguracoes(container) {
             </div>
           </div>
         </div>
+        <div class="form-row cols-2" style="margin-bottom:10px;">
+          <div class="panel" style="margin-bottom:0;">
+            <div class="panel-header"><span>📊</span><span class="panel-title" style="font-size:14px;">Modelo Excel (Curso 1 Tema)</span></div>
+            <div class="panel-body" style="display:flex;flex-direction:column;gap:8px;">
+              <span id="modelo-badge-config" class="modelo-badge nok">❌ Modelo Excel</span>
+              <button class="btn btn-secondary" id="cfg-upload-modelo">📎 Carregar/Substituir Modelo (.xlsx)</button>
+              <input type="file" id="cfg-modelo-file-input" accept=".xlsx" style="display:none;">
+            </div>
+          </div>
+          <div class="panel" style="margin-bottom:0;">
+            <div class="panel-header"><span>🚀</span><span class="panel-title" style="font-size:14px;">Migração de Fotos</span></div>
+            <div class="panel-body" style="display:flex;flex-direction:column;gap:8px;">
+              <p style="font-size:11px;color:var(--text3);margin:0;">⚠️ Faça o Backup (com fotos) antes de migrar. Pode ser executado mais de uma vez — itens já migrados são pulados.</p>
+              <button class="btn btn-secondary" id="cfg-migrar-fotos">🚀 Migrar fotos para o Storage</button>
+              <div style="background:var(--bg3);border-radius:4px;height:8px;overflow:hidden;display:none;" id="migracao-progress-wrap"><div id="migracao-progress" style="background:var(--accent);height:100%;width:0%;transition:width .2s;"></div></div>
+              <div id="migracao-status" style="font-size:12px;color:var(--text2);"></div>
+            </div>
+          </div>
+        </div>
         <div class="panel" style="margin-bottom:0;">
           <div class="panel-header"><span>👤</span><span class="panel-title" style="font-size:14px;">Usuários</span>
             <div class="panel-actions"><button class="btn btn-primary btn-sm" id="cfg-novo-usuario">➕ Novo Usuário</button></div>
@@ -3518,6 +3794,16 @@ function renderConfiguracoes(container) {
   document.getElementById('cfg-ir-recuperar-backup')?.addEventListener('click', () => navigate('recuperar-backup'));
   document.getElementById('cfg-abrir-firebase')?.addEventListener('click', () => openModal('config-modal'));
   document.getElementById('cfg-novo-usuario')?.addEventListener('click', () => openUsuarioModal(null));
+  document.getElementById('cfg-upload-modelo')?.addEventListener('click', () => document.getElementById('cfg-modelo-file-input')?.click());
+  document.getElementById('cfg-modelo-file-input')?.addEventListener('change', async function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.xlsx')) { toast('Selecione um arquivo .xlsx válido.', 'warning'); return; }
+    await _processarNovoModeloExcel(file);
+    this.value = '';
+  });
+  document.getElementById('cfg-migrar-fotos')?.addEventListener('click', _migrarFotosParaStorage);
+  _updateModeloBadge(); // reflete o estado atual do modelo (☁️/💾/❌) ao abrir a página
   const statusEl = document.getElementById('firebase-status-cfg');
   if (statusEl) statusEl.textContent = db ? '✅ Conectado' : '❌ Não conectado';
   _renderUsuariosPainel();
