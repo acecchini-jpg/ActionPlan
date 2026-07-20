@@ -304,7 +304,7 @@ body.dark-theme { --bg: #0d0f14; --bg2: #131720; --bg3: #1a2030; --border: #252d
 
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.1.1</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.1.2</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -3491,7 +3491,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.1.1', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.1.2', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
@@ -3678,56 +3678,79 @@ async function _migrarFotosParaStorage() {
   const btnEl = document.getElementById('cfg-migrar-fotos');
   if (btnEl) btnEl.disabled = true;
   if (barWrap) barWrap.style.display = 'block';
+  if (statusEl) statusEl.textContent = 'Preparando migração…';
+
+  // v19.1.2: desliga os listeners em tempo real durante a migração. Sem isso, cada gravação
+  // dispara o onSnapshot (recarrega a coleção inteira + render()), o que (a) sobrecarrega o
+  // write stream do Firestore ("resource-exhausted") e (b) faz state.acoes ser substituído no
+  // meio do processo, perdendo as mutações já aplicadas. Lemos/gravamos direto no Firestore,
+  // sem depender de state.acoes/saveData, e religamos os listeners ao final (mesmo em erro).
+  desligarListeners();
 
   let totalVarrido = 0, migradosAgora = 0, jaMigrados = 0, erros = 0;
   const errosDetalhe = [];
-  const totalItens = state.acoes.length + state.cursos1tema.length;
-  let processados = 0;
-  const _tick = (msg) => {
-    processados++;
-    if (bar) bar.style.width = Math.round((processados / Math.max(totalItens, 1)) * 100) + '%';
-    if (statusEl) statusEl.textContent = msg;
-    if (typeof window._resetarTimerInatividade === 'function') window._resetarTimerInatividade(); // v19.1 risco #9: não deslogar durante migração longa
-  };
 
-  for (const prob of state.acoes) {
-    totalVarrido++;
-    let alterado = false, jaTinhaUrl = false;
-    if (isDataUrl(prob.evidencia_problema)) {
-      try {
-        const url = await uploadToStorage(`evidencias/${prob.id}/${uid()}${_extFromDataUrl(prob.evidencia_problema)}`, prob.evidencia_problema);
-        prob.evidencia_problema = url; alterado = true;
-      } catch(e) { erros++; errosDetalhe.push(`Problema ${prob.id}: evidência do problema — ${e.message}`); }
-    } else if (isStorageUrl(prob.evidencia_problema)) { jaTinhaUrl = true; }
+  try {
+    const [acoesSnap, cursosSnap] = await Promise.all([
+      db.collection('acoes').get(),
+      db.collection('cursos1tema').get()
+    ]);
+    const totalItens = acoesSnap.size + cursosSnap.size;
+    let processados = 0;
+    const _tick = (msg) => {
+      processados++;
+      if (bar) bar.style.width = Math.round((processados / Math.max(totalItens, 1)) * 100) + '%';
+      if (statusEl) statusEl.textContent = msg;
+      if (typeof window._resetarTimerInatividade === 'function') window._resetarTimerInatividade(); // v19.1 risco #9: não deslogar durante migração longa
+    };
 
-    for (let idx = 0; idx < (prob.acoes_corretivas || []).length; idx++) {
-      const cr = prob.acoes_corretivas[idx];
-      const campo = 'ev_implantacao_' + idx;
-      if (isDataUrl(cr[campo])) {
+    for (const doc of acoesSnap.docs) {
+      totalVarrido++;
+      const prob = doc.data();
+      const upd = {};
+      let jaTinhaUrl = false;
+
+      if (isDataUrl(prob.evidencia_problema)) {
         try {
-          const url = await uploadToStorage(`corretivas/${prob.id}/${idx}_${uid()}${_extFromDataUrl(cr[campo])}`, cr[campo]);
-          cr[campo] = url; alterado = true;
-        } catch(e) { erros++; errosDetalhe.push(`Problema ${prob.id}, ação ${idx+1}: evidência de implantação — ${e.message}`); }
-      } else if (isStorageUrl(cr[campo])) { jaTinhaUrl = true; }
+          upd.evidencia_problema = await uploadToStorage(`evidencias/${doc.id}/${uid()}${_extFromDataUrl(prob.evidencia_problema)}`, prob.evidencia_problema);
+        } catch(e) { erros++; errosDetalhe.push(`Problema ${doc.id}: evidência do problema — ${e.message}`); }
+      } else if (isStorageUrl(prob.evidencia_problema)) { jaTinhaUrl = true; }
+
+      let corretivasAlteradas = null;
+      for (let idx = 0; idx < (prob.acoes_corretivas || []).length; idx++) {
+        const campo = 'ev_implantacao_' + idx;
+        const valor = prob.acoes_corretivas[idx][campo];
+        if (isDataUrl(valor)) {
+          try {
+            const url = await uploadToStorage(`corretivas/${doc.id}/${idx}_${uid()}${_extFromDataUrl(valor)}`, valor);
+            if (!corretivasAlteradas) corretivasAlteradas = JSON.parse(JSON.stringify(prob.acoes_corretivas));
+            corretivasAlteradas[idx][campo] = url;
+          } catch(e) { erros++; errosDetalhe.push(`Problema ${doc.id}, ação ${idx+1}: evidência de implantação — ${e.message}`); }
+        } else if (isStorageUrl(valor)) { jaTinhaUrl = true; }
+      }
+      if (corretivasAlteradas) upd.acoes_corretivas = corretivasAlteradas;
+
+      if (Object.keys(upd).length) {
+        upd.migrado_storage = true;
+        try { await doc.ref.update(upd); migradosAgora++; } catch(e) { erros++; errosDetalhe.push(`Problema ${doc.id}: falha ao salvar — ${e.message}`); }
+      } else if (jaTinhaUrl || prob.migrado_storage) { jaMigrados++; }
+      _tick(`Migrando problemas... ${processados}/${totalItens}`);
     }
 
-    if (alterado) {
-      prob.migrado_storage = true;
-      try { await saveData('acoes', prob.id); migradosAgora++; } catch(e) { erros++; errosDetalhe.push(`Problema ${prob.id}: falha ao salvar — ${e.message}`); }
-    } else if (jaTinhaUrl || prob.migrado_storage) { jaMigrados++; }
-    _tick(`Migrando problemas... ${processados}/${totalItens}`);
-  }
-
-  for (const curso of state.cursos1tema) {
-    totalVarrido++;
-    if (isDataUrl(curso.evidenciaCursoUrl)) {
-      try {
-        const url = await uploadToStorage(`cursos/${curso.id}/${uid()}${_extFromDataUrl(curso.evidenciaCursoUrl)}`, curso.evidenciaCursoUrl);
-        curso.evidenciaCursoUrl = url;
-        try { await saveData('cursos1tema', curso.id); migradosAgora++; } catch(e) { erros++; errosDetalhe.push(`Curso ${curso.id}: falha ao salvar — ${e.message}`); }
-      } catch(e) { erros++; errosDetalhe.push(`Curso ${curso.id}: evidência — ${e.message}`); }
-    } else if (isStorageUrl(curso.evidenciaCursoUrl)) { jaMigrados++; }
-    _tick(`Migrando cursos... ${processados}/${totalItens}`);
+    for (const doc of cursosSnap.docs) {
+      totalVarrido++;
+      const curso = doc.data();
+      if (isDataUrl(curso.evidenciaCursoUrl)) {
+        try {
+          const url = await uploadToStorage(`cursos/${doc.id}/${uid()}${_extFromDataUrl(curso.evidenciaCursoUrl)}`, curso.evidenciaCursoUrl);
+          await doc.ref.update({ evidenciaCursoUrl: url });
+          migradosAgora++;
+        } catch(e) { erros++; errosDetalhe.push(`Curso ${doc.id}: evidência — ${e.message}`); }
+      } else if (isStorageUrl(curso.evidenciaCursoUrl)) { jaMigrados++; }
+      _tick(`Migrando cursos... ${processados}/${totalItens}`);
+    }
+  } finally {
+    ligarListeners(); // v19.1.2: religa ao final — mesmo em erro — um único refresh completo acontece aqui
   }
 
   _migracaoEmAndamento = false;
