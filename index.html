@@ -308,7 +308,7 @@ button.evidencia-thumb { border:none!important; background:transparent!important
 
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.1.3</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.1.4</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -831,6 +831,8 @@ function aplicarPermissoesUI() {
   if (configNav) configNav.style.display = podeVer('config') ? '' : 'none';
   const configHint = document.getElementById('config-hint-footer');
   if (configHint) configHint.style.display = podeVer('config') ? '' : 'none';
+  const btnImportLote = document.getElementById('btn-importar-followups-lote');
+  if (btnImportLote) btnImportLote.style.display = podeVer('config') ? '' : 'none';
 }
 // ==================== v19.0: GESTÃO DE USUÁRIOS (nível 1) ====================
 let _editingUsuarioUid = null;
@@ -1489,7 +1491,7 @@ function renderListagem(container) {
     finally { hideLoading(); _forcarTabelaCompleta = false; aplicarFiltrosETabela(); }
   });
   document.getElementById('btn-importar-followups-lote')?.addEventListener('click', () => {
-    if (!podeVer('followup')) { toast('Acesso não permitido para o seu nível de usuário.', 'error'); return; }
+    if (!podeVer('config')) { toast('Acesso não permitido para o seu nível de usuário.', 'error'); return; }
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.xlsx';
@@ -3543,7 +3545,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.1.3', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.1.4', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
@@ -3823,7 +3825,7 @@ async function _migrarFotosParaStorage() {
 // Casa pelo numeroAcao (sequencial único por ação corretiva) — não depende de state.acoes
 // (mesma lição da migração: lê e grava direto no Firestore, desligando os listeners).
 async function _importarFollowupsEmLote(file) {
-  if (!podeVer('followup')) { toast('Acesso não permitido para o seu nível de usuário.', 'error'); return; }
+  if (!podeVer('config')) { toast('Acesso não permitido para o seu nível de usuário.', 'error'); return; }
   showLoading('Lendo arquivo…');
   desligarListeners();
   try {
