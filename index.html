@@ -308,7 +308,7 @@ button.evidencia-thumb { border:none!important; background:transparent!important
 
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.1.5</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.3</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -447,6 +447,8 @@ function toast(msg, type) { const icons={success:'✅',error:'❌',info:'ℹ️'
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 function uid() { return Date.now().toString(36)+Math.random().toString(36).substr(2,6); }
+// v19.3: numeroAcao pode ser um número sequencial normal OU um código externo (ex: '003G', Fast Response)
+function _numAcaoValido(v) { return v !== undefined && v !== null && v !== ''; }
 function today() { return new Date().toISOString().slice(0,10); }
 function daysDiff(from, to) { const dtFrom = normalizeDate(parseDateSafe(from)); const dtTo = to ? normalizeDate(parseDateSafe(to)) : normalizeDate(new Date()); if (!dtFrom || !dtTo) return 0; return Math.floor((dtTo - dtFrom) / 86400000); }
 function formatDate(d) { if (!d) return '—'; if (typeof d === 'string') { if (/^\d{4}-\d{2}-\d{2}/.test(d)) { const [y,m,dd]=d.slice(0,10).split('-'); return dd+'/'+m+'/'+y; } if (/^\d{2}\/\d{2}\/\d{4}$/.test(d)) return d; } const dt = parseDateSafe(d); if (!dt) return '—'; return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`; }
@@ -1186,7 +1188,7 @@ function openEditModalListagem(problemaId, idx) {
     </fieldset>
     <fieldset style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <legend style="font-size:11px;font-weight:700;color:var(--text3);padding:0 6px;text-transform:uppercase;letter-spacing:1px;position:static;float:none;">Ação Corretiva ${idx + 1}${typeof cr.numeroAcao === 'number' ? ` <span style='color:var(--accent);font-size:18px;font-weight:800;font-family:var(--font-hd);'>#${cr.numeroAcao}</span>` : ''}</legend>
+        <legend style="font-size:11px;font-weight:700;color:var(--text3);padding:0 6px;text-transform:uppercase;letter-spacing:1px;position:static;float:none;">Ação Corretiva ${idx + 1}${_numAcaoValido(cr.numeroAcao) ? ` <span style='color:var(--accent);font-size:18px;font-weight:800;font-family:var(--font-hd);'>#${cr.numeroAcao}</span>` : ''}</legend>
         <div style="display:flex;gap:6px;">
           <button type="button" id="modal-hist-btn" class="btn btn-ghost btn-xs" title="Ver histórico de alterações">🕘 Histórico</button><button type="button" id="modal-copy-link-btn" class="btn btn-ghost btn-xs" title="Copiar link direto para esta ação">🔗 Copiar link</button>
           <button type="button" id="modal-del-acao-btn" class="btn btn-danger btn-xs" title="Excluir esta ação corretiva">🗑️ Excluir ação</button>
@@ -1602,7 +1604,7 @@ function aplicarFiltrosETabela() {
       const expanded = expandedFollowupRows.has(`${prob.id}_${idx}`);
       const followupRowId = `followup-${prob.id}-${idx}`;
       const followupsHtml = (cr.followups || []).map((fu, fIdx) => `<div style="display:flex; align-items:center; gap:5px; font-size:10px; margin-bottom:2px; padding-left:6px; border-left:2px solid var(--border);"><span style="white-space:nowrap; font-weight:bold;">📅 ${formatDate(fu.data_followup)} - 👤 ${escHtml(fu.responsavel)}:</span> <span style="flex:1;">${escHtml(fu.comentario)}</span> <button class="btn btn-ghost btn-xs edit-followup-list" data-acao-id="${prob.id}" data-corridx="${idx}" data-fuidx="${fIdx}">✏️</button> <button class="btn btn-ghost btn-xs remove-followup-list" data-acao-id="${prob.id}" data-corridx="${idx}" data-fuidx="${fIdx}">🗑️</button></div>`).join('') || '<div style="color:var(--text3); padding-left:20px;">Nenhum follow-up registrado.</div>';
-      linhasData.push({ sortKey: { plano: plano?plano.titulo:'', subtopico: subtopico?subtopico.descricao:'', problema: prob.problema||'', responsavel: cr.responsavel||'', abertura: prob.data_abertura||'', prazo: cr.data_prevista||'', fup: (()=>{ const _fus=(cr.followups||[]); if(!_fus.length) return prob.data_abertura||''; return _fus.reduce((mx,f)=>f.data_followup>mx?f.data_followup:mx,''); })(), num: typeof cr.numeroAcao==='number'?String(cr.numeroAcao).padStart(6,'0'):'', acao: cr.acao_descricao||'', idade: prob.data_abertura||'', status: calcStatusAcao(cr) }, html: `<tr id="${rowId}" style="line-height:1.2;"><td style="padding:3px 8px;vertical-align:middle;">${plano ? escHtml(plano.titulo) : '—'}</td><td style="padding:3px 8px;vertical-align:middle;text-align:center;font-family:var(--font-hd);font-weight:800;color:var(--accent);font-size:16px;">${typeof cr.numeroAcao === 'number' ? cr.numeroAcao : '—'}</td><td style="padding:3px 8px;vertical-align:middle;">${subtopico ? escHtml(subtopico.descricao) : '—'}</td><td style="padding:3px 8px;vertical-align:middle;">${problemaCell}</td><td style="padding:3px 8px;vertical-align:middle;text-align:center;">${evidenciaCellHtml}</td><td style="padding:3px 8px;vertical-align:middle;">${escHtml(cr.acao_descricao?.substring(0,80) || '—')}</td><td style="padding:3px 8px;vertical-align:middle;">${escHtml(cr.responsavel || '—')}</td><td style="padding:3px 8px;vertical-align:middle;white-space:nowrap;">${formatDate(prob.data_abertura)}</td><td style="padding:3px 8px;vertical-align:middle;white-space:nowrap;"><div>${formatDate(cr.data_prevista)}${(cr.qtd_alteracoes_data||0)>0?` <span class="badge badge-yellow" title="Data alterada ${cr.qtd_alteracoes_data} vez(es)">🔄 ${cr.qtd_alteracoes_data}</span>`:''}</div></td><td style="padding:3px 8px;vertical-align:middle;white-space:nowrap;">${(()=>{ const _fus=(cr.followups||[]); if(!_fus.length) return formatDate(prob.data_abertura); const _lf=_fus.reduce((mx,f)=>f.data_followup>mx?f.data_followup:mx,''); return formatDate(_lf); })()}</td><td style="padding:3px 8px;vertical-align:middle;">${(()=>{const _i=prob.data_abertura?new Date(prob.data_abertura):null;const _f=cr.data_efetiva?new Date(cr.data_efetiva):new Date();return _i?Math.floor((_f-_i)/864e5)+' d':'—';})()}</td><td style="padding:3px 8px;vertical-align:middle;">${statusBadge(status)}</td><td style="padding:3px 8px;vertical-align:middle;" class="acao-buttons"><button class="btn btn-ghost btn-xs edit-acao" data-problema-id="${prob.id}" data-idx="${idx}" style="${(prob.historico||[]).length ? '' : 'color:var(--text3);opacity:.45;'}" title="Editar ação (Shift+clique: histórico)">✏️</button><button class="btn btn-ghost btn-xs copy-link-acao" data-problema-id="${prob.id}" data-idx="${idx}" data-cr-id="${cr.id||''}" title="Copiar link direto para esta ação">🔗</button><button class="btn btn-ghost btn-xs toggle-followup" data-problema-id="${prob.id}" data-idx="${idx}" title="Ver follow-ups">💬 ${(cr.followups||[]).length}</button><button class="btn btn-ghost btn-xs add-followup-list" data-acao-id="${prob.id}" data-idx="${idx}" title="Adicionar follow-up">➕</button><button class="btn btn-danger btn-xs del-acao-list" data-problema-id="${prob.id}" data-idx="${idx}" title="Excluir ação corretiva (Shift+clique)">🗑️</button></td></tr>${expanded ? `<tr id="${followupRowId}" class="followup-row"><td colspan="12" style="padding:2px 8px;vertical-align:middle;background:var(--bg3);"><div style="padding:0;"><strong style="font-size:11px;">Follow-ups:</strong><div style="margin-top:2px;">${followupsHtml}</div></div></td></tr>` : ''}` });
+      linhasData.push({ sortKey: { plano: plano?plano.titulo:'', subtopico: subtopico?subtopico.descricao:'', problema: prob.problema||'', responsavel: cr.responsavel||'', abertura: prob.data_abertura||'', prazo: cr.data_prevista||'', fup: (()=>{ const _fus=(cr.followups||[]); if(!_fus.length) return prob.data_abertura||''; return _fus.reduce((mx,f)=>f.data_followup>mx?f.data_followup:mx,''); })(), num: _numAcaoValido(cr.numeroAcao)?String(cr.numeroAcao).padStart(6,'0'):'', acao: cr.acao_descricao||'', idade: prob.data_abertura||'', status: calcStatusAcao(cr) }, html: `<tr id="${rowId}" style="line-height:1.2;"><td style="padding:3px 8px;vertical-align:middle;">${plano ? escHtml(plano.titulo) : '—'}</td><td style="padding:3px 8px;vertical-align:middle;text-align:center;font-family:var(--font-hd);font-weight:800;color:var(--accent);font-size:16px;">${_numAcaoValido(cr.numeroAcao) ? cr.numeroAcao : '—'}</td><td style="padding:3px 8px;vertical-align:middle;">${subtopico ? escHtml(subtopico.descricao) : '—'}</td><td style="padding:3px 8px;vertical-align:middle;">${problemaCell}</td><td style="padding:3px 8px;vertical-align:middle;text-align:center;">${evidenciaCellHtml}</td><td style="padding:3px 8px;vertical-align:middle;">${escHtml(cr.acao_descricao?.substring(0,80) || '—')}</td><td style="padding:3px 8px;vertical-align:middle;">${escHtml(cr.responsavel || '—')}</td><td style="padding:3px 8px;vertical-align:middle;white-space:nowrap;">${formatDate(prob.data_abertura)}</td><td style="padding:3px 8px;vertical-align:middle;white-space:nowrap;"><div>${formatDate(cr.data_prevista)}${(cr.qtd_alteracoes_data||0)>0?` <span class="badge badge-yellow" title="Data alterada ${cr.qtd_alteracoes_data} vez(es)">🔄 ${cr.qtd_alteracoes_data}</span>`:''}</div></td><td style="padding:3px 8px;vertical-align:middle;white-space:nowrap;">${(()=>{ const _fus=(cr.followups||[]); if(!_fus.length) return formatDate(prob.data_abertura); const _lf=_fus.reduce((mx,f)=>f.data_followup>mx?f.data_followup:mx,''); return formatDate(_lf); })()}</td><td style="padding:3px 8px;vertical-align:middle;">${(()=>{const _i=prob.data_abertura?new Date(prob.data_abertura):null;const _f=cr.data_efetiva?new Date(cr.data_efetiva):new Date();return _i?Math.floor((_f-_i)/864e5)+' d':'—';})()}</td><td style="padding:3px 8px;vertical-align:middle;">${statusBadge(status)}</td><td style="padding:3px 8px;vertical-align:middle;" class="acao-buttons"><button class="btn btn-ghost btn-xs edit-acao" data-problema-id="${prob.id}" data-idx="${idx}" style="${(prob.historico||[]).length ? '' : 'color:var(--text3);opacity:.45;'}" title="Editar ação (Shift+clique: histórico)">✏️</button><button class="btn btn-ghost btn-xs copy-link-acao" data-problema-id="${prob.id}" data-idx="${idx}" data-cr-id="${cr.id||''}" title="Copiar link direto para esta ação">🔗</button><button class="btn btn-ghost btn-xs toggle-followup" data-problema-id="${prob.id}" data-idx="${idx}" title="Ver follow-ups">💬 ${(cr.followups||[]).length}</button><button class="btn btn-ghost btn-xs add-followup-list" data-acao-id="${prob.id}" data-idx="${idx}" title="Adicionar follow-up">➕</button><button class="btn btn-danger btn-xs del-acao-list" data-problema-id="${prob.id}" data-idx="${idx}" title="Excluir ação corretiva (Shift+clique)">🗑️</button></td></tr>${expanded ? `<tr id="${followupRowId}" class="followup-row"><td colspan="12" style="padding:2px 8px;vertical-align:middle;background:var(--bg3);"><div style="padding:0;"><strong style="font-size:11px;">Follow-ups:</strong><div style="margin-top:2px;">${followupsHtml}</div></div></td></tr>` : ''}` });
     }
   }
   linhasData.sort((a,b)=>{ const col=_listagemSort.col; const va=a.sortKey[col]||'', vb=b.sortKey[col]||''; let r; if(col==='num'){ r=parseInt(va||'0')-parseInt(vb||'0'); } else if(col==='idade'){ r=(va||'').localeCompare(vb||''); } else { r=va.localeCompare(vb,'pt-BR',{sensitivity:'base'}); } return _listagemSort.asc?r:-r; });
@@ -1659,7 +1661,7 @@ function renderAnalise(container) {
         if (status === 'FECHADO') return;
         const dtAbertura = parseDateSafe(prob.data_abertura);
         const diasAberto = dtAbertura ? Math.floor((new Date() - dtAbertura) / 86400000) : 0;
-        const numAcao = typeof cr.numeroAcao === 'number' ? String(cr.numeroAcao) : '?';
+        const numAcao = _numAcaoValido(cr.numeroAcao) ? String(cr.numeroAcao) : '?';
         const reincR = prob.reincidente ? '|R' : '';
         const prazoFmt = cr.data_prevista ? formatDate(cr.data_prevista) : 'S/PRAZO';
         const resp = cr.responsavel || '—';
@@ -2780,7 +2782,7 @@ function _ncRenderCorretivas() {
     const rOpts = respOpts.replace('value="'+escHtml(cr.responsavel)+'"','value="'+escHtml(cr.responsavel)+'" selected');
     const fuHtml = (cr.followups||[]).map((fu,fIdx)=>'<div style="display:flex;align-items:center;gap:5px;font-size:10px;margin-bottom:2px;padding-left:6px;border-left:2px solid var(--border);"><span style="white-space:nowrap;font-weight:bold;">📅 '+formatDate(fu.data_followup)+' - 👤 '+escHtml(fu.responsavel)+':</span><span style="flex:1;">'+escHtml(fu.comentario)+'</span><button class="btn btn-ghost btn-xs nc-edit-fu" data-idx="'+idx+'" data-fuidx="'+fIdx+'">✏️</button><button class="btn btn-ghost btn-xs nc-del-fu" data-idx="'+idx+'" data-fuidx="'+fIdx+'">🗑️</button></div>').join('');
     const alterBadge = (cr.qtd_alteracoes_data||0)>0 ? '<span class="badge badge-yellow">🔄 '+cr.qtd_alteracoes_data+'</span>' : '';
-    return '<div class="corretiva-block" id="nc-cr-'+idx+'"><div class="corretiva-header"><span style="font-size:11px;color:var(--text3);font-weight:600;">AÇÃO CORRETIVA '+(idx+1)+'</span>'+(typeof cr.numeroAcao==="number"?'<span style="color:var(--accent);font-size:17px;font-weight:800;font-family:var(--font-hd);margin-left:6px;">#'+cr.numeroAcao+'</span>':'')+''+_ncStatusBadge(status)+'<button class="btn btn-danger btn-xs nc-del-cr" data-idx="'+idx+'">🗑️</button><button class="btn btn-ghost btn-xs nc-add-fu" data-idx="'+idx+'">💬 +Follow-up</button></div><div class="form-row cols-2"><div class="form-group"><label class="form-label">Ação</label><textarea class="form-control nc-cr-desc" data-idx="'+idx+'" rows="2" placeholder="Descreva a ação corretiva...">'+escHtml(cr.acao_descricao||'')+'</textarea></div><div class="form-group"><label class="form-label">Responsável</label><select class="form-control nc-cr-resp" data-idx="'+idx+'">'+rOpts+'</select></div></div><div class="form-row cols-3"><div class="form-group"><label class="form-label">Data Prevista</label><div style="display:flex;align-items:center;gap:6px;"><input class="form-control nc-cr-prev" type="date" data-idx="'+idx+'" value="'+(cr.data_prevista||'')+'" style="flex:1;">'+alterBadge+'</div></div><div class="form-group"><label class="form-label">Data Efetiva</label><input class="form-control nc-cr-efet" type="date" data-idx="'+idx+'" value="'+(cr.data_efetiva||'')+'"></div><div class="form-group"><label class="form-label">Evidência Fechamento</label><div style="display:flex;gap:4px;flex-wrap:wrap;">'+evBtns+'</div><div class="help-text">Máx. 5 MB</div><input type="file" class="nc-ev-corr-file" data-idx="'+idx+'" accept="image/*" style="display:none;"></div></div><div style="margin-top:10px;"><strong>Follow-ups:</strong> '+(fuHtml||'<span style="color:var(--text3);font-size:12px;">Nenhum follow-up</span>')+'</div></div>';
+    return '<div class="corretiva-block" id="nc-cr-'+idx+'"><div class="corretiva-header"><span style="font-size:11px;color:var(--text3);font-weight:600;">AÇÃO CORRETIVA '+(idx+1)+'</span>'+(_numAcaoValido(cr.numeroAcao)?'<span style="color:var(--accent);font-size:17px;font-weight:800;font-family:var(--font-hd);margin-left:6px;">#'+cr.numeroAcao+'</span>':'')+''+_ncStatusBadge(status)+'<button class="btn btn-danger btn-xs nc-del-cr" data-idx="'+idx+'">🗑️</button><button class="btn btn-ghost btn-xs nc-add-fu" data-idx="'+idx+'">💬 +Follow-up</button></div><div class="form-row cols-2"><div class="form-group"><label class="form-label">Ação</label><textarea class="form-control nc-cr-desc" data-idx="'+idx+'" rows="2" placeholder="Descreva a ação corretiva...">'+escHtml(cr.acao_descricao||'')+'</textarea></div><div class="form-group"><label class="form-label">Responsável</label><select class="form-control nc-cr-resp" data-idx="'+idx+'">'+rOpts+'</select></div></div><div class="form-row cols-3"><div class="form-group"><label class="form-label">Data Prevista</label><div style="display:flex;align-items:center;gap:6px;"><input class="form-control nc-cr-prev" type="date" data-idx="'+idx+'" value="'+(cr.data_prevista||'')+'" style="flex:1;">'+alterBadge+'</div></div><div class="form-group"><label class="form-label">Data Efetiva</label><input class="form-control nc-cr-efet" type="date" data-idx="'+idx+'" value="'+(cr.data_efetiva||'')+'"></div><div class="form-group"><label class="form-label">Evidência Fechamento</label><div style="display:flex;gap:4px;flex-wrap:wrap;">'+evBtns+'</div><div class="help-text">Máx. 5 MB</div><input type="file" class="nc-ev-corr-file" data-idx="'+idx+'" accept="image/*" style="display:none;"></div></div><div style="margin-top:10px;"><strong>Follow-ups:</strong> '+(fuHtml||'<span style="color:var(--text3);font-size:12px;">Nenhum follow-up</span>')+'</div></div>';
   }).join('');
   container.querySelectorAll('.nc-del-cr').forEach(btn=>btn.addEventListener('click',()=>{ const i=parseInt(btn.dataset.idx); _ncState.acoes_corretivas.splice(i,1); const ne={}; Object.keys(_ncState._evidTmp).forEach(k=>{ const ki=parseInt(k); if(ki<i) ne[ki]=_ncState._evidTmp[k]; else if(ki>i) ne[ki-1]=_ncState._evidTmp[k]; }); _ncState._evidTmp=ne; _ncRenderCorretivas(); }));
   container.querySelectorAll('.nc-cr-desc').forEach(el=>el.addEventListener('input',()=>{ if(_ncState.acoes_corretivas[parseInt(el.dataset.idx)]) _ncState.acoes_corretivas[parseInt(el.dataset.idx)].acao_descricao=el.value; }));
@@ -2819,7 +2821,7 @@ async function _ncSalvar() {
     const _corretivasOut = _ncState.acoes_corretivas.map((cr,idx)=>{
       const obj={...cr};
       obj['ev_implantacao_'+idx]=(_ncState._evidTmp[idx]!=null?_ncState._evidTmp[idx]:(cr['ev_implantacao_'+idx]||null));
-      if (typeof obj.numeroAcao !== 'number') { obj.numeroAcao = _nextNum++; }
+      if (!_numAcaoValido(obj.numeroAcao)) { obj.numeroAcao = _nextNum++; }
       return obj;
     });
     if (_ncState.editingProblemaId) {
@@ -3554,7 +3556,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.1.5', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.3', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
@@ -3848,7 +3850,7 @@ async function _importarFollowupsEmLote(file) {
     const porNumero = {}; // numeroAcao -> { docId }
     acoesSnap.docs.forEach(doc => {
       (doc.data().acoes_corretivas || []).forEach((cr, idx) => {
-        if (typeof cr.numeroAcao === 'number') porNumero[cr.numeroAcao] = { docId: doc.id, idx };
+        if (_numAcaoValido(cr.numeroAcao)) porNumero[cr.numeroAcao] = { docId: doc.id, idx };
       });
     });
 
@@ -3901,6 +3903,294 @@ async function _importarFollowupsEmLote(file) {
   }
 }
 // ==================== FIM v19.1.3: IMPORTAÇÃO DE FOLLOW-UPS EM LOTE ====================
+
+// ==================== v19.3: IMPORTAÇÃO FAST RESPONSE ====================
+// Cada importação apaga e recria do zero todos os problemas do Plano "Fast Response"
+// (gestão é feita pela planilha, não pelo app — decisão do projeto, opção A).
+
+function _levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  const dp = [];
+  for (let i = 0; i <= m; i++) dp[i] = [i];
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    }
+  }
+  return dp[m][n];
+}
+function _normalizarNome(s) {
+  return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+function _sugerirResponsavel(nomeRaw, nomesCadastrados) {
+  const norm = _normalizarNome(nomeRaw);
+  if (!norm) return null;
+  const exato = nomesCadastrados.find(n => _normalizarNome(n) === norm);
+  if (exato) return { match: exato, exato: true };
+  const sub = nomesCadastrados.find(n => { const nn = _normalizarNome(n); return nn.length > 2 && norm.length > 2 && (nn.includes(norm) || norm.includes(nn)); });
+  if (sub) return { match: sub, exato: false };
+  let melhor = null, melhorDist = 4;
+  nomesCadastrados.forEach(n => { const d = _levenshtein(norm, _normalizarNome(n)); if (d < melhorDist) { melhorDist = d; melhor = n; } });
+  return melhor ? { match: melhor, exato: false } : { match: null, exato: false };
+}
+// v19.3: desembrulha células com fórmula (VLOOKUP etc. → {formula,result}) ou rich text do ExcelJS
+function _cellValor(cell) {
+  let v = cell ? cell.value : null;
+  for (let i = 0; i < 3 && v && typeof v === 'object' && !(v instanceof Date); i++) {
+    if ('result' in v) v = v.result;
+    else if (Array.isArray(v.richText)) v = v.richText.map(rt => rt.text).join('');
+    else break;
+  }
+  if (v && typeof v === 'object' && !(v instanceof Date)) return ''; // erro de fórmula (#N/A etc.) ou estrutura inesperada
+  return v;
+}
+function _frParseData(v) {
+  if (v == null || v === '') return '';
+  if (v instanceof Date) { const y=v.getUTCFullYear(),m=String(v.getUTCMonth()+1).padStart(2,'0'),d=String(v.getUTCDate()).padStart(2,'0'); return `${y}-${m}-${d}`; } // UTC: ExcelJS monta a data em UTC-meia-noite; usar getters locais causaria off-by-one
+  const s = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0, 10); // resultado de fórmula em ISO (já UTC)
+  const m1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m1) return `${m1[3]}-${m1[2].padStart(2,'0')}-${m1[1].padStart(2,'0')}`;
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  return '';
+}
+
+let _frEstado = null; // guarda o plano de importação entre as etapas do modal
+
+function _frModal() {
+  let overlay = document.getElementById('fr-import-modal');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'fr-import-modal';
+    overlay.innerHTML = '<div class="modal" style="max-width:720px;"><div class="modal-header"><span>⚡</span><span class="modal-title">Importar Fast Response</span><button class="modal-close" id="fr-modal-close">✕</button></div><div class="modal-body" id="fr-modal-body"></div></div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('#fr-modal-close').addEventListener('click', () => overlay.classList.remove('open'));
+  }
+  return overlay;
+}
+
+async function _frIniciarImportacao(file) {
+  if (!podeVer('config')) { toast('Acesso não permitido para o seu nível de usuário.', 'error'); return; }
+  const plano = state.planos.find(p => (p.titulo || '').trim().toLowerCase() === 'fast response');
+  if (!plano) { toast('Plano "Fast Response" não encontrado. Cadastre-o primeiro (Planos de Ação) com esse nome exato.', 'error'); return; }
+  showLoading('Lendo arquivo…');
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf);
+    _frEstado = { wb, plano };
+    _frRenderEscolhaAba();
+  } catch(e) {
+    toast('Erro ao ler o arquivo: ' + e.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function _frRenderEscolhaAba() {
+  const overlay = _frModal();
+  const body = overlay.querySelector('#fr-modal-body');
+  const nomes = [];
+  _frEstado.wb.eachSheet(ws => nomes.push(ws.name));
+  const preSelecionada = nomes.find(n => n.trim().toLowerCase() === 'c em foco') || nomes[0];
+  body.innerHTML = `<div class="form-group"><label class="form-label">Qual aba contém os dados?</label>
+    <select class="form-control" id="fr-select-aba">${nomes.map(n => `<option value="${escHtml(n)}" ${n===preSelecionada?'selected':''}>${escHtml(n)}</option>`).join('')}</select></div>
+    <div class="modal-footer" style="padding:0;margin-top:16px;"><button class="btn btn-primary" id="fr-confirmar-aba">Continuar →</button></div>`;
+  overlay.classList.add('open');
+  overlay.querySelector('#fr-confirmar-aba').addEventListener('click', () => {
+    const sheetName = overlay.querySelector('#fr-select-aba').value;
+    _frProcessarAba(sheetName);
+  });
+}
+
+function _frProcessarAba(sheetName) {
+  const ws = _frEstado.wb.getWorksheet(sheetName);
+  if (!ws) { toast('Aba não encontrada.', 'error'); return; }
+
+  let headerRow = -1;
+  for (let r = 1; r <= Math.min(ws.rowCount, 15); r++) {
+    const v = String(_cellValor(ws.getCell(r, 1)) || '').trim().toUpperCase();
+    if (v === 'ITEM') { headerRow = r; break; }
+  }
+  if (headerRow === -1) { toast('Não encontrei a coluna "ITEM" nas primeiras linhas da aba selecionada — confira o arquivo.', 'error'); return; }
+
+  const itens = {};
+  const ordemItens = [];
+  for (let r = headerRow + 1; r <= ws.rowCount; r++) {
+    const codigo = String(_cellValor(ws.getCell(r, 1)) || '').trim();
+    if (!codigo) continue;
+    const dataAbertura = _frParseData(_cellValor(ws.getCell(r, 2)));
+    const cliente = String(_cellValor(ws.getCell(r, 3)) || '').trim();
+    const peca = String(_cellValor(ws.getCell(r, 4)) || '').trim();
+    const classificacao = String(_cellValor(ws.getCell(r, 5)) || '').trim();
+    const problema = String(_cellValor(ws.getCell(r, 6)) || '').trim();
+    const acao = String(_cellValor(ws.getCell(r, 7)) || '').trim();
+    const responsavelRaw = String(_cellValor(ws.getCell(r, 8)) || '').trim();
+    const prazo = _frParseData(_cellValor(ws.getCell(r, 10)));
+    const conclusao = _frParseData(_cellValor(ws.getCell(r, 11)));
+    if (!itens[codigo]) { itens[codigo] = { classificacao, cliente, peca, problema, data_abertura: dataAbertura, linhas: [] }; ordemItens.push(codigo); }
+    itens[codigo].linhas.push({ acao, responsavelRaw, prazo, conclusao });
+  }
+
+  if (!ordemItens.length) { toast('Nenhuma linha de dados encontrada nessa aba.', 'error'); return; }
+
+  const classificacoesUnicas = new Set(Object.values(itens).map(i => i.classificacao).filter(Boolean));
+  const subtopicosExistentes = state.subtopicos.filter(s => s.plano_id === _frEstado.plano.id);
+  const subtopicosNovos = [...classificacoesUnicas].filter(c => !subtopicosExistentes.some(s => _normalizarNome(s.descricao) === _normalizarNome(c)));
+
+  const mapeamento = _frEstado.plano.mapeamento_responsaveis || {};
+  const nomesCadastrados = state.responsaveis.map(r => r.nome);
+  const brutos = new Set();
+  Object.values(itens).forEach(it => it.linhas.forEach(l => { if (l.responsavelRaw) brutos.add(l.responsavelRaw); }));
+  const pendentes = {};
+  brutos.forEach(raw => {
+    const chave = _normalizarNome(raw);
+    if (mapeamento[chave]) return;
+    if (nomesCadastrados.some(n => _normalizarNome(n) === chave)) return;
+    if (pendentes[chave]) return;
+    const sug = _sugerirResponsavel(raw, nomesCadastrados);
+    pendentes[chave] = { raw, sugestao: sug && !sug.exato ? sug.match : null };
+  });
+
+  const problemasExistentes = state.acoes.filter(a => a.plano_id === _frEstado.plano.id).length;
+  const totalCorretivas = Object.values(itens).reduce((s, it) => s + it.linhas.length, 0);
+
+  _frEstado.itens = itens;
+  _frEstado.ordemItens = ordemItens;
+  _frEstado.subtopicosNovos = subtopicosNovos;
+  _frEstado.pendentes = pendentes;
+  _frEstado.resumo = { problemasExistentes, novosItens: ordemItens.length, totalCorretivas };
+
+  _frRenderRevisao();
+}
+
+function _frRenderRevisao() {
+  const overlay = _frModal();
+  const body = overlay.querySelector('#fr-modal-body');
+  const { resumo, subtopicosNovos, pendentes } = _frEstado;
+  const chavesPendentes = Object.keys(pendentes);
+  const nomesCadastrados = state.responsaveis.map(r => r.nome).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+
+  body.innerHTML = `
+    <div style="font-size:13px;line-height:1.6;margin-bottom:14px;">
+      <strong>${resumo.novosItens}</strong> itens únicos (problemas) · <strong>${resumo.totalCorretivas}</strong> ações corretivas ao todo.<br>
+      ⚠️ <strong>${resumo.problemasExistentes}</strong> problema(s) já existente(s) no Plano "Fast Response" serão <strong>apagados</strong> e substituídos pelos dados desta planilha.
+      ${subtopicosNovos.length ? `<br>📁 Sub-tópicos novos a criar: ${subtopicosNovos.map(s=>`<span class="badge badge-blue">${escHtml(s)}</span>`).join(' ')}` : ''}
+    </div>
+    ${chavesPendentes.length ? `<div style="margin-bottom:14px;">
+      <strong style="font-size:13px;">Responsáveis sem correspondência (${chavesPendentes.length}):</strong>
+      <div class="table-wrap" style="margin-top:8px;"><table><thead><tr><th>Na planilha</th><th>Usar</th></tr></thead><tbody>
+        ${chavesPendentes.map(chave => {
+          const p = pendentes[chave];
+          const opts = ['<option value="">— selecione —</option>']
+            .concat(nomesCadastrados.map(n => `<option value="${escHtml(n)}" ${p.sugestao===n?'selected':''}>${escHtml(n)}${p.sugestao===n?' (sugestão)':''}</option>`))
+            .concat([`<option value="__novo__">➕ Criar novo: "${escHtml(p.raw)}"</option>`])
+            .join('');
+          return `<tr><td>${escHtml(p.raw)}</td><td><select class="form-control fr-resp-select" data-chave="${escHtml(chave)}" style="min-width:220px;">${opts}</select></td></tr>`;
+        }).join('')}
+      </tbody></table></div>
+    </div>` : '<div style="margin-bottom:14px;color:var(--green);">✅ Todos os responsáveis já têm correspondência.</div>'}
+    <div id="fr-progress-wrap" style="background:var(--bg3);border-radius:4px;height:8px;overflow:hidden;display:none;margin-bottom:8px;"><div id="fr-progress" style="background:var(--accent);height:100%;width:0%;transition:width .2s;"></div></div>
+    <div id="fr-status" style="font-size:12px;color:var(--text2);margin-bottom:8px;"></div>
+    <div class="modal-footer" style="padding:0;"><button class="btn btn-secondary" id="fr-voltar">← Voltar</button><button class="btn btn-danger" id="fr-confirmar-importacao">⚡ Confirmar e Importar</button></div>
+  `;
+
+  overlay.querySelector('#fr-voltar').addEventListener('click', () => _frRenderEscolhaAba());
+  const btnConfirmar = overlay.querySelector('#fr-confirmar-importacao');
+  const _validar = () => {
+    const selects = [...overlay.querySelectorAll('.fr-resp-select')];
+    btnConfirmar.disabled = !selects.every(s => s.value !== '');
+  };
+  overlay.querySelectorAll('.fr-resp-select').forEach(s => s.addEventListener('change', _validar));
+  _validar();
+
+  btnConfirmar.addEventListener('click', async () => {
+    if (!(await showConfirm(`Confirma? Isso vai apagar ${resumo.problemasExistentes} problema(s) existente(s) do Plano "Fast Response" e criar ${resumo.novosItens} novo(s), com ${resumo.totalCorretivas} ações corretivas. Esta ação não pode ser desfeita.`))) return;
+    const resolvidos = {};
+    overlay.querySelectorAll('.fr-resp-select').forEach(s => {
+      const chave = s.dataset.chave;
+      const valor = s.value;
+      resolvidos[chave] = valor === '__novo__' ? pendentes[chave].raw : valor;
+    });
+    await _frExecutarImportacao(resolvidos);
+  });
+}
+
+async function _frExecutarImportacao(resolvidos) {
+  const overlay = _frModal();
+  const barWrap = overlay.querySelector('#fr-progress-wrap');
+  const bar = overlay.querySelector('#fr-progress');
+  const statusEl = overlay.querySelector('#fr-status');
+  const btnConfirmar = overlay.querySelector('#fr-confirmar-importacao');
+  const btnVoltar = overlay.querySelector('#fr-voltar');
+  if (btnConfirmar) btnConfirmar.disabled = true;
+  if (btnVoltar) btnVoltar.disabled = true;
+  if (barWrap) barWrap.style.display = 'block';
+
+  const { plano, itens, ordemItens, subtopicosNovos } = _frEstado;
+  desligarListeners();
+  try {
+    const mapeamento = { ...(plano.mapeamento_responsaveis || {}), ...resolvidos };
+
+    if (statusEl) statusEl.textContent = 'Criando sub-tópicos…';
+    const subtopicosPorNome = {};
+    state.subtopicos.filter(s => s.plano_id === plano.id).forEach(s => { subtopicosPorNome[_normalizarNome(s.descricao)] = s.id; });
+    for (const nome of subtopicosNovos) {
+      const novoSub = { id: uid(), descricao: nome, plano_id: plano.id, cliente_id: null, ativo: true };
+      const { id: _subId, ...subData } = novoSub;
+      await db.collection('subtopicos').doc(_subId).set(subData);
+      subtopicosPorNome[_normalizarNome(nome)] = _subId;
+    }
+
+    if (statusEl) statusEl.textContent = 'Removendo problemas antigos…';
+    const antigosSnap = await db.collection('acoes').where('plano_id', '==', plano.id).get();
+    for (const doc of antigosSnap.docs) {
+      const urls = _coletarUrlsStorageProblema(doc.data());
+      await doc.ref.delete();
+      _excluirUrlsStorage(urls);
+    }
+
+    let nextIdGlobal = nextAcaoId();
+    let criados = 0, corretivasCriadas = 0, processados = 0;
+    for (const codigo of ordemItens) {
+      const it = itens[codigo];
+      const subId = subtopicosPorNome[_normalizarNome(it.classificacao)] || null;
+      const acoes_corretivas = it.linhas.map(l => {
+        const chaveResp = _normalizarNome(l.responsavelRaw);
+        const responsavelFinal = mapeamento[chaveResp] || l.responsavelRaw;
+        return { id: uid(), acao_descricao: l.acao, responsavel: responsavelFinal, data_prevista: l.prazo, data_efetiva: l.conclusao, followups: [], qtd_alteracoes_data: 0, numeroAcao: codigo };
+      });
+      const sufixo = (it.peca || it.cliente) ? ` (${[it.peca, it.cliente].filter(Boolean).join('-')})` : '';
+      const novoProblema = {
+        id: uid(), id_global: nextIdGlobal++, plano_id: plano.id, subtopico_id: subId,
+        data_abertura: it.data_abertura, responsavel: plano.responsavel || '', problema: (it.problema || '') + sufixo,
+        causa: '', reincidente: false, recorrencia_count: 0, evidencia_problema: null, acoes_corretivas
+      };
+      const { id: _probId, ...probData } = novoProblema;
+      await db.collection('acoes').doc(_probId).set(probData);
+      criados++; corretivasCriadas += acoes_corretivas.length;
+      processados++;
+      if (bar) bar.style.width = Math.round((processados / ordemItens.length) * 100) + '%';
+      if (statusEl) statusEl.textContent = `Criando problemas... ${processados}/${ordemItens.length}`;
+      if (typeof window._resetarTimerInatividade === 'function') window._resetarTimerInatividade();
+    }
+
+    await db.collection('planos').doc(plano.id).update({ mapeamento_responsaveis: mapeamento });
+
+    if (statusEl) statusEl.textContent = `✅ Concluído: ${criados} problema(s) criado(s), ${corretivasCriadas} ação(ões) corretiva(s), ${subtopicosNovos.length} sub-tópico(s) novo(s).`;
+    toast('Importação Fast Response concluída!', 'success');
+  } catch(e) {
+    if (statusEl) statusEl.textContent = '❌ Erro: ' + e.message;
+    toast('Erro na importação: ' + e.message, 'error');
+  } finally {
+    ligarListeners();
+    if (btnVoltar) btnVoltar.disabled = false;
+  }
+}
+// ==================== FIM v19.3: IMPORTAÇÃO FAST RESPONSE ====================
 function renderConfiguracoes(container) {
   container.innerHTML = `
     <div class="panel">
@@ -3942,6 +4232,14 @@ function renderConfiguracoes(container) {
             </div>
           </div>
         </div>
+        <div class="panel" style="margin-bottom:10px;">
+          <div class="panel-header"><span>⚡</span><span class="panel-title" style="font-size:14px;">Importar Fast Response</span></div>
+          <div class="panel-body" style="display:flex;flex-direction:column;gap:8px;">
+            <p style="font-size:11px;color:var(--text3);margin:0;">⚠️ Cada importação <strong>apaga e recria do zero</strong> todos os problemas do Plano "Fast Response". A gestão é feita pela planilha, não pelo app. Faça um Backup antes da primeira execução.</p>
+            <button class="btn btn-secondary" id="cfg-importar-fast-response">📥 Importar Planilha Fast Response</button>
+            <input type="file" id="fr-file-input" accept=".xlsx,.xlsm" style="display:none;">
+          </div>
+        </div>
         <div class="panel" style="margin-bottom:0;">
           <div class="panel-header"><span>👤</span><span class="panel-title" style="font-size:14px;">Usuários</span>
             <div class="panel-actions"><button class="btn btn-secondary btn-sm" id="cfg-historico-login">📜 Histórico de Login</button><button class="btn btn-primary btn-sm" id="cfg-novo-usuario">➕ Novo Usuário</button></div>
@@ -3966,6 +4264,8 @@ function renderConfiguracoes(container) {
     this.value = '';
   });
   document.getElementById('cfg-migrar-fotos')?.addEventListener('click', _migrarFotosParaStorage);
+  document.getElementById('cfg-importar-fast-response')?.addEventListener('click', () => document.getElementById('fr-file-input')?.click());
+  document.getElementById('fr-file-input')?.addEventListener('change', (e) => { const file = e.target.files[0]; if (file) _frIniciarImportacao(file); e.target.value = ''; });
   _updateModeloBadge(); // reflete o estado atual do modelo (☁️/💾/❌) ao abrir a página
   const statusEl = document.getElementById('firebase-status-cfg');
   if (statusEl) statusEl.textContent = db ? '✅ Conectado' : '❌ Não conectado';
