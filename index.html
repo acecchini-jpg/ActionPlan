@@ -308,7 +308,7 @@ button.evidencia-thumb { border:none!important; background:transparent!important
 
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.1.4</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.1.5</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -1363,7 +1363,7 @@ function renderListagem(container) {
   const responsavelOpts = `<option value="">Todos os responsáveis</option>` + Array.from(responsaveisSet).sort((a,b)=>a.localeCompare(b,'pt-BR')).map(r=>`<option value="${escHtml(r)}">${escHtml(r)}</option>`).join('');
   const statusOpts = `<option value="">Todos os status</option><option value="EM ANDAMENTO">Em Andamento</option><option value="VENCIDO">Vencido</option><option value="FECHADO">Fechado</option><option value="SEM_PRAZO">Sem Prazo</option>`;
   // ── CORREÇÃO 2: O id do container da tabela é "listagem-tbody" — confirmado e correto ──
-  container.innerHTML = `<div class="panel"><div class="panel-body"><div class="filters-bar" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;"><select id="filtro-plano" class="form-control" style="width:auto;">${planosOpts}</select><select id="filtro-subtopico" class="form-control" style="width:auto;">${subtopicosOpts}</select><select id="filtro-responsavel" class="form-control" style="width:auto;">${responsavelOpts}</select><select id="filtro-status" class="form-control" style="width:auto;">${statusOpts}</select><input type="search" id="filtro-busca" class="form-control" placeholder="🔍 Buscar..." style="min-width:180px;flex:1;max-width:360px;"><button id="limpar-filtros" class="btn btn-ghost btn-sm">✕ Limpar</button><span style="flex:1;"></span><button id="btn-importar-followups-lote" class="btn btn-ghost btn-sm" title="Importar Follow-ups em Lote (Excel: Número da Ação, Data, Responsável, Comentário)" style="font-size:15px;padding:4px 8px;">➕📥</button><button id="btn-excel-listagem" class="btn btn-ghost btn-sm" title="Exportar para Excel" style="font-size:15px;padding:4px 8px;">📥</button><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;white-space:nowrap;"><input type="checkbox" id="filtro-exibir-fechados" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"> Exibir Fechados</label></div><div class="table-wrap"><table id="tabela-acoes"><thead><tr><th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-plano">Plano</th><th style="min-width:58px;text-align:center;cursor:pointer;user-select:none;" id="lh-num">Nº Ação</th><th style="min-width:140px;cursor:pointer;user-select:none;" id="lh-subtopico">Sub-Tópico</th><th style="min-width:180px;cursor:pointer;user-select:none;" id="lh-problema">Problema</th><th style="min-width:60px;">Evidência</th><th style="min-width:200px;cursor:pointer;user-select:none;" id="lh-acao">Ação Corretiva</th><th style="min-width:130px;cursor:pointer;user-select:none;" id="lh-responsavel">Responsável</th><th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-abertura">Abertura</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-prazo">Prazo</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-fup">Último FUP</th><th style="min-width:60px;cursor:pointer;user-select:none;" id="lh-idade">Idade</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-status">Status</th><th style="min-width:160px;">Ações</th></tr></thead><tbody id="listagem-tbody"></tbody></table></div></div></div>`;
+  container.innerHTML = `<div class="panel"><div class="panel-body"><div class="filters-bar" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;"><select id="filtro-plano" class="form-control" style="width:auto;">${planosOpts}</select><select id="filtro-subtopico" class="form-control" style="width:auto;">${subtopicosOpts}</select><select id="filtro-responsavel" class="form-control" style="width:auto;">${responsavelOpts}</select><select id="filtro-status" class="form-control" style="width:auto;">${statusOpts}</select><input type="search" id="filtro-busca" class="form-control" placeholder="🔍 Buscar..." style="min-width:180px;flex:1;max-width:360px;"><button id="limpar-filtros" class="btn btn-ghost btn-sm">✕ Limpar</button><button id="expandir-tudo-followups" class="btn btn-ghost btn-sm" title="Expandir todos os follow-ups">⬇️ Expandir tudo</button><button id="colapsar-tudo-followups" class="btn btn-ghost btn-sm" title="Recolher todos os follow-ups">⬆️ Colapsar tudo</button><span style="flex:1;"></span><button id="btn-importar-followups-lote" class="btn btn-ghost btn-sm" title="Importar Follow-ups em Lote (Excel: Número da Ação, Data, Responsável, Comentário)" style="font-size:15px;padding:4px 8px;">➕📥</button><button id="btn-excel-listagem" class="btn btn-ghost btn-sm" title="Exportar para Excel" style="font-size:15px;padding:4px 8px;">📥</button><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;white-space:nowrap;"><input type="checkbox" id="filtro-exibir-fechados" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"> Exibir Fechados</label></div><div class="table-wrap"><table id="tabela-acoes"><thead><tr><th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-plano">Plano</th><th style="min-width:58px;text-align:center;cursor:pointer;user-select:none;" id="lh-num">Nº Ação</th><th style="min-width:140px;cursor:pointer;user-select:none;" id="lh-subtopico">Sub-Tópico</th><th style="min-width:180px;cursor:pointer;user-select:none;" id="lh-problema">Problema</th><th style="min-width:60px;">Evidência</th><th style="min-width:200px;cursor:pointer;user-select:none;" id="lh-acao">Ação Corretiva</th><th style="min-width:130px;cursor:pointer;user-select:none;" id="lh-responsavel">Responsável</th><th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-abertura">Abertura</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-prazo">Prazo</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-fup">Último FUP</th><th style="min-width:60px;cursor:pointer;user-select:none;" id="lh-idade">Idade</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-status">Status</th><th style="min-width:160px;">Ações</th></tr></thead><tbody id="listagem-tbody"></tbody></table></div></div></div>`;
   // ── PERSISTÊNCIA DOS FILTROS DA LISTAGEM (localStorage) ──
   const _LS_FILTROS_KEY = 'listagem_filtros_v1';
   function _salvarFiltrosListagem() {
@@ -1521,6 +1521,14 @@ function renderListagem(container) {
     const cbFechados = document.getElementById('filtro-exibir-fechados'); if(cbFechados) cbFechados.checked = false;
     try { localStorage.removeItem(_LS_FILTROS_KEY); } catch(e) {}
     _listPageCount = 1;
+    aplicarFiltrosETabela();
+  });
+  document.getElementById('expandir-tudo-followups')?.addEventListener('click', () => {
+    state.acoes.forEach(prob => { (prob.acoes_corretivas || []).forEach((cr, idx) => { expandedFollowupRows.add(`${prob.id}_${idx}`); }); });
+    aplicarFiltrosETabela();
+  });
+  document.getElementById('colapsar-tudo-followups')?.addEventListener('click', () => {
+    expandedFollowupRows.clear();
     aplicarFiltrosETabela();
   });
 }
@@ -2086,7 +2094,7 @@ function renderDashboard(container){
   destroyCharts();
   const _acoesDash  = _filtroPlanoDashboard ? state.acoes.filter(a=>a.plano_id===_filtroPlanoDashboard) : state.acoes;
   const _planosDash = _filtroPlanoDashboard ? state.planos.filter(p=>p.id===_filtroPlanoDashboard)      : state.planos;
-  let total=0,fechadas=0,emAndamento=0,vencidas=0,semAcoes=0;
+  let total=0,fechadas=0,emAndamento=0,vencidas=0,semAcoes=0,semPrazo=0;
   const byResp={}; const byPlano={};
   // Inicializa byPlano com planos filtrados
   _planosDash.forEach(p=>{ byPlano[p.id]={titulo:p.titulo,pendentes:0,fechadas:0,vencidas:0,emAberto:0}; });
@@ -2114,6 +2122,7 @@ function renderDashboard(container){
     if(!corretivas.length){ semAcoes++; total++; if(byPlano[ac.plano_id]){ byPlano[ac.plano_id].pendentes++; byPlano[ac.plano_id].emAberto++; } return; }
     corretivas.forEach(cr=>{
       total++;
+      if (!cr.data_prevista) semPrazo++; // v19.1.5: mesmo critério do filtro SEM_PRAZO da Listagem
       const s=calcStatusAcao(cr);
       const r=cr.responsavel||'N/D';
       if(!byResp[r]) byResp[r]={total:0,fechadas:0,vencidas:0};
@@ -2244,7 +2253,7 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
       <div class="kpi-card" data-filter="fechadas"><div class="kpi-value" style="color:var(--green)">${fechadas}</div><div class="kpi-label">Fechadas</div></div>
       <div class="kpi-card" data-filter="vencidas"><div class="kpi-value" style="color:var(--red)">${vencidas}</div><div class="kpi-label">Vencidas</div></div>
       <div class="kpi-card" data-filter="taxa"><div class="kpi-value" style="color:var(--yellow)">${taxa}%</div><div class="kpi-label">Taxa Fechamento</div></div>
-      <div class="kpi-card" data-filter="sem_prazo"><div class="kpi-value" style="color:var(--text2)">${semAcoes}</div><div class="kpi-label">Sem Prazo Def.</div></div>
+      <div class="kpi-card" data-filter="sem_prazo"><div class="kpi-value" style="color:var(--text2)">${semPrazo}</div><div class="kpi-label">Sem Prazo Def.</div></div>
     </div>
     </div>
     <div class="charts-grid">
@@ -3545,7 +3554,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.1.4', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.1.5', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
