@@ -81,6 +81,9 @@ body.dark-theme { --bg: #0d0f14; --bg2: #131720; --bg3: #1a2030; --border: #252d
   /* page padding smaller + bottom pad for bottom-nav */
   #page { padding: 12px 10px 72px; }
 
+  /* Rodapé Salvar/Cancelar do Novo Cadastro sempre visível, acima da barra inferior */
+  #nc-form-footer { position: sticky; bottom: 56px; background: var(--bg2); box-shadow: 0 -4px 10px rgba(0,0,0,.15); z-index: 10; padding-bottom: 12px !important; }
+
   /* panels */
   .panel-header { padding: 10px 12px; flex-wrap: wrap; gap: 6px; }
   .panel-body { padding: 12px 10px; }
@@ -306,9 +309,22 @@ button.evidencia-thumb { border:none!important; background:transparent!important
   </div>
 </div>
 
+<!-- ==================== v19.4: VISUALIZAÇÃO PÚBLICA (visitante sem login via link direto) ==================== -->
+<div id="visualizacao-publica" style="display:none;min-height:100vh;background:var(--bg);">
+  <div style="max-width:900px;margin:0 auto;padding:24px 16px 60px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+      <div class="logo-icon">AP</div>
+      <div style="font-weight:700;font-size:18px;">ActionPlan</div>
+      <span style="flex:1;"></span>
+      <button class="btn btn-primary" id="vp-login-btn">🔒 Fazer Login</button>
+    </div>
+    <div id="vp-conteudo"></div>
+  </div>
+</div>
+<!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.3</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.4.2</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -742,7 +758,7 @@ async function initAuth() {
     const overlay = document.getElementById('login-overlay');
     const errEl = document.getElementById('login-error');
     if (errEl) errEl.style.display = 'none';
-    if (user) {
+    if (user && !user.isAnonymous) {
       try {
         const snap = await db.collection('usuarios').doc(user.uid).get();
         if (snap.exists) {
@@ -756,6 +772,7 @@ async function initAuth() {
         _userProfile = { uid: user.uid, email: user.email, nome: user.email, nivel: 5 };
         toast('Erro ao carregar perfil — acesso somente leitura.', 'warning');
       }
+      document.getElementById('visualizacao-publica').style.display = 'none'; // v19.4: sai da visualização pública se estava nela
       overlay?.classList.remove('open');
       atualizarTopbarUsuario();
       if (typeof aplicarPermissoesUI === 'function') setTimeout(aplicarPermissoesUI, 0);
@@ -763,6 +780,10 @@ async function initAuth() {
       ligarListeners(); // Firestore só conecta com usuário autenticado
       _carregarTemplateExcelDoStorage(); // v19.1 (1.5): tenta Storage; falha → mantém cache local já carregado por initModelo()
       _registrarEventoLogin('login', _userProfile); // v19.1.3: histórico de login/logout
+    } else if (_pendingDeeplink && (!user || user.isAnonymous)) {
+      // v19.4: visitante sem conta, chegando por link direto → visualização pública somente-leitura
+      overlay?.classList.remove('open');
+      await _abrirVisualizacaoPublica(_pendingDeeplink);
     } else {
       _userProfile = null;
       overlay?.classList.add('open');
@@ -772,6 +793,106 @@ async function initAuth() {
     }
   });
 }
+
+// ==================== v19.4: VISUALIZAÇÃO PÚBLICA (somente leitura, via link direto) ====================
+let _vpAberta = false;
+async function _abrirVisualizacaoPublica(deeplink) {
+  if (_vpAberta) return; // evita reabrir ao re-disparar onAuthStateChanged após o login anônimo
+  _vpAberta = true;
+  const appEl = document.getElementById('app');
+  const vpEl = document.getElementById('visualizacao-publica');
+  if (appEl) appEl.style.display = 'none';
+  if (vpEl) vpEl.style.display = 'block';
+  document.getElementById('vp-login-btn')?.addEventListener('click', () => {
+    if (vpEl) vpEl.style.display = 'none';
+    document.getElementById('login-overlay')?.classList.add('open');
+  });
+  try {
+    if (!firebase.auth().currentUser) await firebase.auth().signInAnonymously();
+    const doc = await db.collection('acoes').doc(deeplink.probId).get();
+    if (!doc.exists) { _renderVisualizacaoPublica(null, null, null, 'Esta ação não foi encontrada — pode ter sido removida.'); return; }
+    const prob = doc.data();
+    const cr = (prob.acoes_corretivas || [])[deeplink.idx];
+    if (!cr) { _renderVisualizacaoPublica(prob, doc.id, null, 'Esta ação corretiva não foi encontrada dentro do problema.'); return; }
+    const [planoDoc, subDoc] = await Promise.all([
+      prob.plano_id ? db.collection('planos').doc(prob.plano_id).get() : Promise.resolve(null),
+      prob.subtopico_id ? db.collection('subtopicos').doc(prob.subtopico_id).get() : Promise.resolve(null)
+    ]);
+    _renderVisualizacaoPublica(prob, doc.id, deeplink.idx, null, planoDoc?.exists ? planoDoc.data().titulo : '', subDoc?.exists ? subDoc.data().descricao : '');
+  } catch(e) {
+    const msg = (e.code === 'auth/operation-not-allowed' || e.code === 'auth/admin-restricted-operation')
+      ? 'O login anônimo ainda não foi habilitado no Firebase Console — veja o guia de configuração.'
+      : 'Erro ao carregar: ' + e.message;
+    _renderVisualizacaoPublica(null, null, null, msg);
+  }
+}
+
+function _renderVisualizacaoPublica(prob, probId, idx, erro, planoTitulo, subDesc) {
+  const body = document.getElementById('vp-conteudo');
+  if (!body) return;
+  if (erro || !prob) {
+    body.innerHTML = `<div class="panel"><div class="panel-body"><div class="empty-state">⚠️ ${escHtml(erro || 'Não foi possível carregar esta ação.')}</div></div></div>`;
+    return;
+  }
+  const cr = idx != null ? (prob.acoes_corretivas || [])[idx] : null;
+
+  let fotoHtml = '<div style="color:var(--text3);font-size:13px;padding:20px;text-align:center;background:var(--bg3);border-radius:8px;">Sem evidência anexada.</div>';
+  if (prob.evidencia_problema) {
+    if (isStorageUrl(prob.evidencia_problema) || prob.evidencia_problema.startsWith('data:image')) {
+      fotoHtml = `<img src="${prob.evidencia_problema}" id="vp-foto-img" style="max-width:100%;border-radius:8px;border:1px solid var(--border2);cursor:pointer;display:block;">`;
+    } else {
+      fotoHtml = `<div id="vp-ver-pdf" style="padding:16px;background:var(--bg3);border-radius:8px;font-size:13px;cursor:pointer;text-align:center;">📄 Evidência em PDF — clique para ver</div>`;
+    }
+  }
+
+  const outrasAcoes = (prob.acoes_corretivas || []).filter((_, i) => i !== idx);
+
+  body.innerHTML = `
+    <div class="panel">
+      <div class="panel-header"><span>📋</span><span class="panel-title">${escHtml(planoTitulo || 'Plano')} · ${escHtml(subDesc || 'Sub-tópico')}</span></div>
+      <div class="panel-body">
+        <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
+          <div style="flex:0 0 260px;max-width:100%;">${fotoHtml}</div>
+          <div style="flex:1;min-width:240px;display:flex;flex-direction:column;gap:9px;font-size:14px;">
+            <div><strong>Plano:</strong> ${escHtml(planoTitulo || '—')}</div>
+            <div><strong>Sub-tópico:</strong> ${escHtml(subDesc || '—')}</div>
+            <div><strong>Data de Abertura:</strong> ${escHtml(formatDate ? formatDate(prob.data_abertura) : (prob.data_abertura || '—'))}</div>
+            <div><strong>Responsável:</strong> ${escHtml(prob.responsavel || '—')}</div>
+            <div><strong>Problema:</strong> ${escHtml(prob.problema || '—')}</div>
+            <div><strong>Causa Raiz:</strong> ${escHtml(prob.causa || '—')}</div>
+            ${prob.reincidente ? '<div><span class="badge badge-yellow">🔁 Reincidente</span></div>' : ''}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    ${cr ? `<div class="panel">
+      <div class="panel-header"><span>🔧</span><span class="panel-title">Ação Relacionada</span></div>
+      <div class="panel-body">
+        <div style="font-size:14px;">${_numAcaoValido(cr.numeroAcao) ? `<strong style="color:var(--accent);">#${escHtml(String(cr.numeroAcao))}</strong> — ` : ''}${escHtml(cr.acao_descricao || '—')}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:6px;">Responsável: ${escHtml(cr.responsavel || '—')} · Prazo: ${escHtml(formatDate(cr.data_prevista))}${cr.data_efetiva ? ' · Fechado em: ' + escHtml(formatDate(cr.data_efetiva)) : ''}</div>
+        <div style="margin-top:14px;">
+          <strong style="font-size:13px;">Follow-ups</strong>
+          <div style="margin-top:6px;">${(cr.followups || []).length
+            ? cr.followups.map(f => `<div style="padding:7px 0;border-bottom:1px solid var(--border2);font-size:13px;"><strong>${escHtml(formatDate(f.data_followup))}</strong> — ${escHtml(f.responsavel || '')}: ${escHtml(f.comentario || '')}</div>`).join('')
+            : '<div style="color:var(--text3);font-size:13px;">Nenhum follow-up registrado.</div>'}
+          </div>
+        </div>
+      </div>
+    </div>` : ''}
+
+    ${outrasAcoes.length ? `<details style="margin-top:4px;">
+      <summary style="cursor:pointer;font-size:13px;color:var(--text2);padding:8px 0;">Existem ${outrasAcoes.length} ação(ões) adicional(is) para tratar esse problema</summary>
+      <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px;">
+        ${outrasAcoes.map(cr2 => `<div class="panel" style="margin-bottom:0;"><div class="panel-body" style="padding:10px 14px;font-size:13px;">${_numAcaoValido(cr2.numeroAcao) ? `<strong>#${escHtml(String(cr2.numeroAcao))}</strong> — ` : ''}${escHtml(cr2.acao_descricao || '—')} <span style="color:var(--text2);">(Responsável: ${escHtml(cr2.responsavel || '—')})</span></div></div>`).join('')}
+      </div>
+    </details>` : ''}
+  `;
+
+  document.getElementById('vp-foto-img')?.addEventListener('click', () => showEvidenciaModal(prob.evidencia_problema));
+  document.getElementById('vp-ver-pdf')?.addEventListener('click', () => showEvidenciaModal(prob.evidencia_problema));
+}
+// ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ====================
 
 async function doLogin() {
   const emailEl = document.getElementById('login-email');
@@ -1971,7 +2092,7 @@ function getStatusProblema(prob){ const corr=prob.acoes_corretivas||[]; if(!corr
       }
     });
   }
-  // Plugin 2: total no topo das barras
+  // Plugin 2: total no topo das barras (soma só os datasets visíveis — respeita clique na legenda)
   if (!Chart.registry.plugins.get('barTotalLabels')) {
     Chart.register({ id: 'barTotalLabels',
       afterDatasetsDraw(chart) {
@@ -1979,24 +2100,27 @@ function getStatusProblema(prob){ const corr=prob.acoes_corretivas||[]; if(!corr
           if (chart.config.type !== 'bar') return;
           const { ctx: c, data } = chart;
           if (!data.datasets?.length) return;
-          const totals = (data.datasets[0].data || []).map((_, i) =>
-            data.datasets.reduce((s, ds) => s + (Number(ds.data[i]) || 0), 0)
-          );
-          const lastIdx = data.datasets.length - 1;
-          const lastMeta = chart.getDatasetMeta(lastIdx);
-          if (!lastMeta?.data?.length) return;
+          const n = (data.datasets[0]?.data || []).length;
           const textColor = getComputedStyle(document.documentElement)
             .getPropertyValue('--text2').trim() || '#94a3b8';
-          lastMeta.data.forEach((bar, i) => {
-            if (!totals[i]) return;
+          for (let i = 0; i < n; i++) {
+            let total = 0;
+            let topBar = null; // bar do dataset visível mais "no topo" da pilha, nesse índice
+            data.datasets.forEach((ds, j) => {
+              if (!chart.isDatasetVisible(j)) return; // ignora datasets ocultados pela legenda
+              total += Number(ds.data[i]) || 0;
+              const meta = chart.getDatasetMeta(j);
+              if (meta?.data?.[i]) topBar = meta.data[i];
+            });
+            if (!total || !topBar) continue;
             c.save();
             c.font = 'bold 11px sans-serif';
             c.fillStyle = textColor;
             c.textAlign = 'center';
             c.textBaseline = 'bottom';
-            c.fillText(totals[i], bar.x, bar.y - 3);
+            c.fillText(total, topBar.x, topBar.y - 3);
             c.restore();
-          });
+          }
         } catch(e) { /* plugin defensivo */ }
       }
     });
@@ -2331,7 +2455,7 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
     </div>`;
 
   const cd={color:'#94a3b8',plugins:{legend:{labels:{color:'#94a3b8',font:{family:"'Barlow', sans-serif"}}}},scales:{x:{ticks:{color:'#64748b'},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#64748b'},grid:{color:'rgba(255,255,255,.05)'}}}};
-  const ctxStatus=document.getElementById('chart-status')?.getContext('2d');   if(ctxStatus) _charts.status=new Chart(ctxStatus,{type:'doughnut',data:{labels:['Em Andamento','Fechadas','Vencidas','Sem Prazo'],datasets:[{data:[emAndamento,fechadas,vencidas,semAcoes],backgroundColor:['#3b82f6','#22c55e','#ef4444','#64748b'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{
+  const ctxStatus=document.getElementById('chart-status')?.getContext('2d');   if(ctxStatus) _charts.status=new Chart(ctxStatus,{type:'doughnut',data:{labels:['Em Andamento','Fechadas','Vencidas','Sem Prazo'],datasets:[{data:[Math.max(0,emAndamento-semPrazo),fechadas,vencidas,semPrazo],backgroundColor:['#3b82f6','#22c55e','#ef4444','#64748b'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{
       ...cd.plugins,
       _datalabels:{ display: ctx=>ctx.dataset.data[ctx.dataIndex]>0,
         formatter:(v,ctx)=>{ const tot=ctx.dataset.data.reduce((a,b)=>a+b,0); return tot?Math.round(v/tot*100)+'%':''; },
@@ -2602,7 +2726,7 @@ function renderNovoCadastro(container) {
   }
   const planosOpts = '<option value="">Selecione...</option>' + [...state.planos].sort((a,b)=>(a.titulo||'').localeCompare(b.titulo||'','pt-BR')).map(p=>'<option value="'+p.id+'">'+escHtml(p.titulo)+'</option>').join('');
   const respOpts = '<option value="">Selecione...</option>' + getResponsaveisAtivos().map(r=>'<option value="'+escHtml(r.nome)+'">'+escHtml(r.nome)+'</option>').join('');
-  container.innerHTML = `<div class="panel-body"><div class="form-row" style="grid-template-columns:1fr 1fr auto auto;gap:14px;"><div class="form-group"><label class="form-label">Plano</label><select class="form-control" id="nc-plano">${planosOpts}</select></div><div class="form-group"><label class="form-label">Sub-Tópico</label><select class="form-control" id="nc-subtopico"><option value="">Selecione o plano...</option></select></div><div class="form-group"><label class="form-label">Data de Abertura</label><input class="form-control" type="date" id="nc-data-abertura" value="${today()}"></div><div class="form-group" style="min-width:160px;"><label class="form-label">Responsável</label><select class="form-control" id="nc-responsavel">${respOpts}</select></div></div><div class="form-group" style="margin-top:14px;"><label class="form-label">Problema</label><textarea class="form-control" id="nc-problema" rows="2" placeholder="Descreva o problema detalhadamente..."></textarea></div><div id="nc-op-turno-row" style="display:none;"><div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;margin-bottom:8px;align-items:end;" id="nc-op-row-base"><div class="form-group" style="margin-bottom:0;"><label class="form-label">Operador</label><input class="form-control" id="nc-operador" placeholder="Nº operador"></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Data de Produção</label><input class="form-control" type="date" id="nc-data-producao"></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Turno</label><div style="display:flex;gap:10px;align-items:center;padding-top:6px;"><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t1" style="accent-color:var(--accent);"> T1</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t2" style="accent-color:var(--accent);"> T2</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t3" style="accent-color:var(--accent);"> T3</label></div></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Quantidade</label><input class="form-control" id="nc-quantidade" type="number" min="0" placeholder="Qtd."></div><div style="padding-bottom:2px;"><button type="button" class="btn btn-secondary btn-sm" id="nc-add-reincidencia" title="Adicionar linha de reincidência">➕</button></div></div><div id="nc-reincidencias-container"></div></div><div class="form-row" style="grid-template-columns:1fr auto auto;gap:14px;margin-bottom:14px;align-items:start;"><div class="form-group" style="margin-bottom:0;"><label class="form-label">Causa Raiz</label><textarea class="form-control" id="nc-causa" rows="2" placeholder="Causa raiz do problema..."></textarea></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Evidência do Problema</label><div id="nc-ev-btns"><button class="btn btn-secondary btn-sm" id="nc-ev-upload-btn">📎 Upload</button></div><div class="help-text">Máx. 5 MB</div><input type="file" id="nc-ev-file" accept="image/*,.pdf" style="display:none;"><div id="nc-ev-preview" style="margin-top:6px;"></div></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Reincidência</label><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;margin-top:8px;"><input type="checkbox" id="nc-reincidente" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"><span>Problema Reincidente?</span></label></div></div><div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 10px;border-top:1px solid var(--border);padding-top:16px;"><span style="font-family:var(--font-hd);font-size:16px;font-weight:700;">Ações Corretivas</span><button class="btn btn-primary btn-sm" id="nc-add-corretiva">➕ Adicionar Ação</button></div><div id="nc-corretivas-container"><div style="text-align:center;padding:24px;color:var(--text3);">Nenhuma ação corretiva. Clique em Adicionar Ação para começar.</div></div><div class="modal-footer" style="padding: 20px 0 0 0; border-top: 1px solid var(--border); margin-top: 20px;"><button class="btn btn-secondary" onclick="_ncState.editingProblemaId=null; _ncState.editingCorretivaIdx=null; navigate(\'listagem\');">Cancelar</button><button class="btn btn-primary" onclick="_ncSalvar()">💾 Salvar Ação</button></div></div></div>`;
+  container.innerHTML = `<div class="panel-body"><div class="form-row" style="grid-template-columns:1fr 1fr auto auto;gap:14px;"><div class="form-group"><label class="form-label">Plano</label><select class="form-control" id="nc-plano">${planosOpts}</select></div><div class="form-group"><label class="form-label">Sub-Tópico</label><select class="form-control" id="nc-subtopico"><option value="">Selecione o plano...</option></select></div><div class="form-group"><label class="form-label">Data de Abertura</label><input class="form-control" type="date" id="nc-data-abertura" value="${today()}"></div><div class="form-group" style="min-width:160px;"><label class="form-label">Responsável</label><select class="form-control" id="nc-responsavel">${respOpts}</select></div></div><div class="form-group" style="margin-top:14px;"><label class="form-label">Problema</label><textarea class="form-control" id="nc-problema" rows="2" placeholder="Descreva o problema detalhadamente..."></textarea></div><div id="nc-op-turno-row" style="display:none;"><div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;margin-bottom:8px;align-items:end;" id="nc-op-row-base"><div class="form-group" style="margin-bottom:0;"><label class="form-label">Operador</label><input class="form-control" id="nc-operador" placeholder="Nº operador"></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Data de Produção</label><input class="form-control" type="date" id="nc-data-producao"></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Turno</label><div style="display:flex;gap:10px;align-items:center;padding-top:6px;"><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t1" style="accent-color:var(--accent);"> T1</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t2" style="accent-color:var(--accent);"> T2</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t3" style="accent-color:var(--accent);"> T3</label></div></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Quantidade</label><input class="form-control" id="nc-quantidade" type="number" min="0" placeholder="Qtd."></div><div style="padding-bottom:2px;"><button type="button" class="btn btn-secondary btn-sm" id="nc-add-reincidencia" title="Adicionar linha de reincidência">➕</button></div></div><div id="nc-reincidencias-container"></div></div><div class="form-row" style="grid-template-columns:1fr auto auto;gap:14px;margin-bottom:14px;align-items:start;"><div class="form-group" style="margin-bottom:0;"><label class="form-label">Causa Raiz</label><textarea class="form-control" id="nc-causa" rows="2" placeholder="Causa raiz do problema..."></textarea></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Evidência do Problema</label><div id="nc-ev-btns"><button class="btn btn-secondary btn-sm" id="nc-ev-upload-btn">📎 Upload</button></div><div class="help-text">Máx. 5 MB</div><input type="file" id="nc-ev-file" accept="image/*,.pdf" style="display:none;"><div id="nc-ev-preview" style="margin-top:6px;"></div></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Reincidência</label><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;margin-top:8px;"><input type="checkbox" id="nc-reincidente" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"><span>Problema Reincidente?</span></label></div></div><div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 10px;border-top:1px solid var(--border);padding-top:16px;"><span style="font-family:var(--font-hd);font-size:16px;font-weight:700;">Ações Corretivas</span><button class="btn btn-primary btn-sm" id="nc-add-corretiva">➕ Adicionar Ação</button></div><div id="nc-corretivas-container"><div style="text-align:center;padding:24px;color:var(--text3);">Nenhuma ação corretiva. Clique em Adicionar Ação para começar.</div></div><div class="modal-footer" id="nc-form-footer" style="padding: 20px 0 0 0; border-top: 1px solid var(--border); margin-top: 20px;"><button class="btn btn-secondary" onclick="_ncState.editingProblemaId=null; _ncState.editingCorretivaIdx=null; navigate(\'listagem\');">Cancelar</button><button class="btn btn-primary" onclick="_ncSalvar()">💾 Salvar Ação</button></div></div></div>`;
   document.getElementById('nc-plano').addEventListener('change', _ncOnPlanoChange);
   // nc-cancelar e nc-salvar usam onclick inline no HTML; não existem como ids separados
   document.getElementById('nc-add-corretiva').addEventListener('click', _ncAddCorretiva);
@@ -3556,7 +3680,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.3', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.4.2', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
