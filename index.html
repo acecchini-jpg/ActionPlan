@@ -324,7 +324,7 @@ button.evidencia-thumb { border:none!important; background:transparent!important
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.4.2</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.5</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -465,6 +465,28 @@ function closeModal(id) { document.getElementById(id).classList.remove('open'); 
 function uid() { return Date.now().toString(36)+Math.random().toString(36).substr(2,6); }
 // v19.3: numeroAcao pode ser um número sequencial normal OU um código externo (ex: '003G', Fast Response)
 function _numAcaoValido(v) { return v !== undefined && v !== null && v !== ''; }
+// v19.5: mantém a coleção 'indice_numeroacao' sincronizada — permite achar uma ação pelo
+// número (numeroAcao) via get() direto (inclusive anônimo), sem precisar de list/consulta.
+// Um mesmo número pode ter mais de uma entrada (Fast Response: várias ações por código).
+async function _sincronizarIndiceNumeroAcao(problemaId, corretivasAtuais, corretivasAnteriores) {
+  if (!db) return;
+  const porNumero = {};
+  (corretivasAtuais || []).forEach((cr, idx) => {
+    if (!_numAcaoValido(cr.numeroAcao)) return;
+    const num = String(cr.numeroAcao);
+    if (!porNumero[num]) porNumero[num] = [];
+    porNumero[num].push({ problema_id: problemaId, idx, data_prevista: cr.data_prevista || '', data_efetiva: cr.data_efetiva || '' });
+  });
+  const numerosAnteriores = new Set();
+  (corretivasAnteriores || []).forEach(cr => { if (_numAcaoValido(cr.numeroAcao)) numerosAnteriores.add(String(cr.numeroAcao)); });
+  const todos = new Set([...Object.keys(porNumero), ...numerosAnteriores]);
+  for (const num of todos) {
+    try {
+      if (porNumero[num]) await db.collection('indice_numeroacao').doc(num).set({ entradas: porNumero[num] });
+      else await db.collection('indice_numeroacao').doc(num).delete();
+    } catch(e) { console.warn('Erro ao sincronizar índice de número da ação:', num, e); }
+  }
+}
 function today() { return new Date().toISOString().slice(0,10); }
 function daysDiff(from, to) { const dtFrom = normalizeDate(parseDateSafe(from)); const dtTo = to ? normalizeDate(parseDateSafe(to)) : normalizeDate(new Date()); if (!dtFrom || !dtTo) return 0; return Math.floor((dtTo - dtFrom) / 86400000); }
 function formatDate(d) { if (!d) return '—'; if (typeof d === 'string') { if (/^\d{4}-\d{2}-\d{2}/.test(d)) { const [y,m,dd]=d.slice(0,10).split('-'); return dd+'/'+m+'/'+y; } if (/^\d{2}\/\d{2}\/\d{4}$/.test(d)) return d; } const dt = parseDateSafe(d); if (!dt) return '—'; return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`; }
@@ -1380,6 +1402,7 @@ function openEditModalListagem(problemaId, idx) {
     p.updated_at = new Date().toISOString();
     p.updated_by = _userProfile?.email || 'sistema';
     await saveData('acoes', pid);
+    await _sincronizarIndiceNumeroAcao(pid, p.acoes_corretivas, null);
     closeModal('edit-modal');
     _editListagemTarget = null;
     saveBtn.onclick = null;
@@ -1416,7 +1439,7 @@ function openEditModalListagem(problemaId, idx) {
       if (_isLast) {
         // Exclui o problema inteiro
         const _pidx = state.acoes.findIndex(a => a.id === problemaId);
-        if (_pidx !== -1) { const _urlsCascata = _coletarUrlsStorageProblema(state.acoes[_pidx]); state.acoes.splice(_pidx, 1); await deleteFireDoc('acoes', problemaId); _excluirUrlsStorage(_urlsCascata); }
+        if (_pidx !== -1) { const _urlsCascata = _coletarUrlsStorageProblema(state.acoes[_pidx]); const _corretivasApagadas = state.acoes[_pidx].acoes_corretivas || []; state.acoes.splice(_pidx, 1); await deleteFireDoc('acoes', problemaId); _excluirUrlsStorage(_urlsCascata); await _sincronizarIndiceNumeroAcao(problemaId, [], _corretivasApagadas); }
       } else {
         // Exclui só a ação corretiva
         const _crDel = _p.acoes_corretivas[idx];
@@ -1424,6 +1447,7 @@ function openEditModalListagem(problemaId, idx) {
         _p.acoes_corretivas.splice(idx, 1);
         await saveData('acoes', problemaId);
         if (isStorageUrl(_urlDel)) deleteFromStorage(_urlDel);
+        await _sincronizarIndiceNumeroAcao(problemaId, _p.acoes_corretivas, _crDel ? [_crDel] : []);
       }
       closeModal('edit-modal');
       _editListagemTarget = null;
@@ -1759,7 +1783,7 @@ if (btn.classList.contains('copy-link-acao')) {
         copyToClipboard(_link, 'Link copiado!');
         return;
       }
-if (btn.classList.contains('del-problema')) { if (!e.shiftKey) { toast('Shift+clique para excluir.', 'info'); return; } if (!(await showConfirm('Excluir este problema por completo? Esta ação não pode ser desfeita.'))) return; const pidx = state.acoes.findIndex(a => a.id === btn.dataset.problemaId); if (pidx !== -1) { const probId = state.acoes[pidx].id; const _urlsCascata = _coletarUrlsStorageProblema(state.acoes[pidx]); state.acoes.splice(pidx, 1); await deleteFireDoc('acoes', probId); _excluirUrlsStorage(_urlsCascata); aplicarFiltrosETabela(); toast('Problema excluído','success'); } return; } if (btn.classList.contains('del-acao-list')) { if (!e.shiftKey) { toast('Shift+clique para excluir.', 'info'); return; } if (!(await showConfirm('Excluir esta ação corretiva?'))) return; const prob = state.acoes.find(a => a.id === btn.dataset.problemaId); if (prob) { const _idxDel = parseInt(btn.dataset.idx); const _crDel = prob.acoes_corretivas[_idxDel]; const _urlDel = _crDel ? _crDel['ev_implantacao_'+_idxDel] : null; prob.acoes_corretivas.splice(_idxDel, 1); await saveData('acoes', prob.id); if (isStorageUrl(_urlDel)) deleteFromStorage(_urlDel); aplicarFiltrosETabela(); toast('Ação corretiva excluída','success'); } return; } if (btn.dataset.evId) { const prob = state.acoes.find(a => a.id === btn.dataset.evId); if (prob && prob.evidencia_problema) { const _idxEv = parseInt(btn.dataset.idx); const _cr = (_idxEv >= 0 && prob.acoes_corretivas) ? prob.acoes_corretivas[_idxEv] : null; const _sub = state.subtopicos.find(s => s.id === prob.subtopico_id); const _partes = []; if (_cr && typeof _cr.numeroAcao === 'number') _partes.push(`Ação #${_cr.numeroAcao}`); if (_sub) _partes.push(_sub.descricao); if (prob.problema) _partes.push(prob.problema.substring(0,100)); showEvidenciaModal(prob.evidencia_problema, _partes.join(' · ')); } return; } }); } }
+if (btn.classList.contains('del-problema')) { if (!e.shiftKey) { toast('Shift+clique para excluir.', 'info'); return; } if (!(await showConfirm('Excluir este problema por completo? Esta ação não pode ser desfeita.'))) return; const pidx = state.acoes.findIndex(a => a.id === btn.dataset.problemaId); if (pidx !== -1) { const probId = state.acoes[pidx].id; const _urlsCascata = _coletarUrlsStorageProblema(state.acoes[pidx]); const _corretivasApagadas = state.acoes[pidx].acoes_corretivas || []; state.acoes.splice(pidx, 1); await deleteFireDoc('acoes', probId); _excluirUrlsStorage(_urlsCascata); await _sincronizarIndiceNumeroAcao(probId, [], _corretivasApagadas); aplicarFiltrosETabela(); toast('Problema excluído','success'); } return; } if (btn.classList.contains('del-acao-list')) { if (!e.shiftKey) { toast('Shift+clique para excluir.', 'info'); return; } if (!(await showConfirm('Excluir esta ação corretiva?'))) return; const prob = state.acoes.find(a => a.id === btn.dataset.problemaId); if (prob) { const _idxDel = parseInt(btn.dataset.idx); const _crDel = prob.acoes_corretivas[_idxDel]; const _urlDel = _crDel ? _crDel['ev_implantacao_'+_idxDel] : null; prob.acoes_corretivas.splice(_idxDel, 1); await saveData('acoes', prob.id); if (isStorageUrl(_urlDel)) deleteFromStorage(_urlDel); await _sincronizarIndiceNumeroAcao(prob.id, prob.acoes_corretivas, _crDel ? [_crDel] : []); aplicarFiltrosETabela(); toast('Ação corretiva excluída','success'); } return; } if (btn.dataset.evId) { const prob = state.acoes.find(a => a.id === btn.dataset.evId); if (prob && prob.evidencia_problema) { const _idxEv = parseInt(btn.dataset.idx); const _cr = (_idxEv >= 0 && prob.acoes_corretivas) ? prob.acoes_corretivas[_idxEv] : null; const _sub = state.subtopicos.find(s => s.id === prob.subtopico_id); const _partes = []; if (_cr && typeof _cr.numeroAcao === 'number') _partes.push(`Ação #${_cr.numeroAcao}`); if (_sub) _partes.push(_sub.descricao); if (prob.problema) _partes.push(prob.problema.substring(0,100)); showEvidenciaModal(prob.evidencia_problema, _partes.join(' · ')); } return; } }); } }
 
 
 // ==================== ANÁLISE — RESUMO PDM COM FILTRO POR PLANO ====================
@@ -2969,6 +2993,7 @@ async function _ncSalvar() {
           }
         });
         if (existente.historico.length > 200) existente.historico = existente.historico.slice(-200);
+        const _corretivasAntesIdx = JSON.parse(JSON.stringify(existente.acoes_corretivas || [])); // v19.5: p/ sincronizar índice de nº de ação
         Object.assign(existente, { plano_id: planoId, subtopico_id: subtId, data_abertura: dataAbertura, responsavel, problema, causa, reincidente, evidencia_problema: _ncState.evidencia_problema != null ? _ncState.evidencia_problema : existente.evidencia_problema, acoes_corretivas: _corretivasOut, updated_at: new Date().toISOString(), updated_by: _userProfile?.email || 'sistema' });
         if (nOpQtd) {
           existente.operador = operador; existente.quantidade = quantidade;
@@ -2984,6 +3009,7 @@ async function _ncSalvar() {
           }
         }
         await saveData('acoes', existente.id);
+        await _sincronizarIndiceNumeroAcao(existente.id, existente.acoes_corretivas, _corretivasAntesIdx);
         toast('Cadastro atualizado!','success');
       }
       _ncState.editingProblemaId = null; _ncState.editingCorretivaIdx = null;
@@ -3001,6 +3027,7 @@ async function _ncSalvar() {
         await _autoCreateCurso1Tema(probReinc, plano, reinc.id);
       }
       state.acoes.push(novoProblema); await saveData('acoes',novoProblema.id); _ncState._novoId = null;
+      await _sincronizarIndiceNumeroAcao(novoProblema.id, novoProblema.acoes_corretivas, null);
       // ── Auto-create Curso de 1 Tema se o plano for GP12 ──
       await _autoCreateCurso1Tema(novoProblema, plano);
       toast('Problema cadastrado com sucesso!','success'); hideLoading(); state.currentPage='listagem'; render();
@@ -3680,7 +3707,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.4.2', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.5', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
@@ -4275,6 +4302,7 @@ async function _frExecutarImportacao(resolvidos) {
       const urls = _coletarUrlsStorageProblema(doc.data());
       await doc.ref.delete();
       _excluirUrlsStorage(urls);
+      await _sincronizarIndiceNumeroAcao(doc.id, [], doc.data().acoes_corretivas || []);
     }
 
     let nextIdGlobal = nextAcaoId();
@@ -4295,6 +4323,7 @@ async function _frExecutarImportacao(resolvidos) {
       };
       const { id: _probId, ...probData } = novoProblema;
       await db.collection('acoes').doc(_probId).set(probData);
+      await _sincronizarIndiceNumeroAcao(_probId, acoes_corretivas, null);
       criados++; corretivasCriadas += acoes_corretivas.length;
       processados++;
       if (bar) bar.style.width = Math.round((processados / ordemItens.length) * 100) + '%';
