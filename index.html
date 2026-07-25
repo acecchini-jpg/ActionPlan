@@ -328,7 +328,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.8</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.9</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -1221,17 +1221,22 @@ function _perguntarSubstitutoResponsavel(respDesativado) {
   });
 }
 // v19.7: transfere responsável (problema + ações corretivas ainda não fechadas) de um nome para outro
-async function _transferirAcoesPendentes(nomeAntigo, nomeNovo) {
+// v19.9: escopo=true → só ações pendentes (usado na desativação/substituição);
+// escopo=false → todas as ações, inclusive fechadas (usado no rename — é a mesma pessoa, não uma troca)
+async function _substituirResponsavelEmAcoes(nomeAntigo, nomeNovo, apenasPendentes) {
   let problemasAfetados = 0, acoesAfetadas = 0;
   for (const prob of state.acoes) {
     let mudou = false;
     if (prob.responsavel === nomeAntigo) { prob.responsavel = nomeNovo; mudou = true; }
     (prob.acoes_corretivas || []).forEach(cr => {
-      if (cr.responsavel === nomeAntigo && !cr.data_efetiva) { cr.responsavel = nomeNovo; mudou = true; acoesAfetadas++; }
+      if (cr.responsavel === nomeAntigo && (!apenasPendentes || !cr.data_efetiva)) { cr.responsavel = nomeNovo; mudou = true; acoesAfetadas++; }
     });
     if (mudou) { problemasAfetados++; await saveData('acoes', prob.id); }
   }
   return { problemasAfetados, acoesAfetadas };
+}
+async function _transferirAcoesPendentes(nomeAntigo, nomeNovo) {
+  return _substituirResponsavelEmAcoes(nomeAntigo, nomeNovo, true);
 }
 function attachResponsavelEvents() {
   document.querySelectorAll('.edit-responsavel').forEach(btn=>btn.addEventListener('click',()=>openResponsavelModal(btn.dataset.id)));
@@ -1279,10 +1284,23 @@ function openResponsavelModal(id) {
     const departamento=document.getElementById('rs-departamento').value.trim();
     const email=document.getElementById('rs-email').value.trim();
     if(!nome){ toast('Nome obrigatório','warning'); return; }
+    const nomeAntigo = _editingResponsavel ? _editingResponsavel.nome : null; // v19.9: pra detectar rename
     if(_editingResponsavel){ _editingResponsavel.nome=nome; _editingResponsavel.departamento=departamento; _editingResponsavel.email=email; }
     else{ state.responsaveis.push({id:uid(),nome,departamento,email,ativo:true}); }
     const _nr=_editingResponsavel||state.responsaveis[state.responsaveis.length-1];
     modal.remove(); await saveData('responsaveis',_nr.id); renderResponsaveisTable();
+    // v19.9: se o nome mudou, propaga pra todas as ações (abertas e fechadas) — é a mesma pessoa
+    if (nomeAntigo && nomeAntigo !== nome) {
+      try {
+        showLoading('Atualizando ações com o novo nome…');
+        const { problemasAfetados, acoesAfetadas } = await _substituirResponsavelEmAcoes(nomeAntigo, nome, false);
+        toast(`Nome atualizado em ${acoesAfetadas} ação(ões) de ${problemasAfetados} problema(s).`, 'success');
+      } catch(e) {
+        toast('Responsável salvo, mas houve erro ao atualizar as ações antigas: ' + e.message, 'error');
+      } finally {
+        hideLoading();
+      }
+    }
   });
 }
 function getResponsaveisAtivos() { return [...state.responsaveis].filter(r=>r.ativo!==false).sort((a,b)=>(a.nome||'').localeCompare(b.nome||'','pt-BR',{sensitivity:'base'})); }
@@ -3941,7 +3959,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.8', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.9', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
