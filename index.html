@@ -211,6 +211,10 @@ body.dark-theme { --bg: #0d0f14; --bg2: #131720; --bg3: #1a2030; --border: #252d
 /* ── v19.1.3: cosméticos da Listagem Geral ── */
 .acao-buttons .btn-xs { font-size:16.5px; padding:4.5px 10px; line-height:1; } /* item 7: ícones +50% */
 button.evidencia-thumb { border:none!important; background:transparent!important; font-size:1.3em; } /* item 6: lupa sem borda, +30% (img legado em base64 mantém borda) */
+.nc-btn-padrao { min-width:150px; height:38px; display:inline-flex; align-items:center; justify-content:center; }
+.nc-notas-summary::-webkit-details-marker { display:none; }
+.nc-notas-marcador { display:inline-block; transition:transform .15s; font-size:11px; color:var(--accent); }
+details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); }
 </style>
 </head>
 <body>
@@ -324,7 +328,7 @@ button.evidencia-thumb { border:none!important; background:transparent!important
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.7</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.8</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -468,6 +472,9 @@ let _cursoSortCol           = '';  // coluna sort Curso 1 Tema
 let _cursoSortAsc           = true;
 let _defOpTopN              = 15;  // barras no gráfico de operadores
 let _defOpSemana            = '';  // filtro semana do gráfico de operadores
+let _dashModoContagem       = 'pecas'; // 'pecas' | 'ocorrencias' — compartilhado entre Operador e Sub-tópico
+let _subtopicoTopN          = 20;  // barras no gráfico de Análise por Sub-tópico
+let _subtopicoSemana        = ''; // filtro semana do gráfico de Análise por Sub-tópico
 let _dashAgruparPor         = 'responsavel';  // 'responsavel' | 'departamento' — agrupamento dos 3 gráficos por responsável
 let _defTurnoSemana         = '';  // filtro semana do gráfico Defeitos por Turno
 const state = { config: { ...DEFAULT_FIREBASE_CONFIG }, clientes: [], responsaveis: [], planos: [], subtopicos: [], acoes: [], presencas: [], cursos1tema: [], currentPage: 'dashboard', currentEvidenciaTarget: null, evidenciaDataURL: null, };
@@ -2526,6 +2533,11 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
       </div><div class="chart-wrap"><canvas id="chart-def-turno"></canvas></div></div>
       <div class="chart-panel" id="panel-def-operador" style="display:none;"><div class="chart-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">Defeitos por Operador
         <span style="flex:1;"></span>
+        <label style="font-size:11px;color:var(--text3);font-weight:400;">Exibir:</label>
+        <select id="dash-modo-contagem" class="form-control" style="width:auto;padding:2px 6px;font-size:11px;">
+          <option value="pecas" ${_dashModoContagem==='pecas'?'selected':''}>Quantidade de Peças</option>
+          <option value="ocorrencias" ${_dashModoContagem==='ocorrencias'?'selected':''}>Quantidade de Ocorrências</option>
+        </select>
         <label style="font-size:11px;color:var(--text3);font-weight:400;">Top:</label>
         <select id="def-op-topn" class="form-control" style="width:auto;padding:2px 6px;font-size:11px;">
           ${[5,10,15,20,30,0].map(n=>`<option value="${n}" ${_defOpTopN===n?'selected':''}>${n===0?'Todos':n}</option>`).join('')}
@@ -2535,6 +2547,16 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
         <button id="def-op-semana-clear" class="btn btn-ghost btn-xs" title="Limpar filtro de semana" style="font-size:11px;">✕</button>
       </div><div class="chart-wrap"><canvas id="chart-def-operador"></canvas></div></div>
     </div>
+    <div class="chart-panel" id="panel-def-subtopico" style="display:none;width:100%;"><div class="chart-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">Análise por Sub-tópico
+      <span style="flex:1;"></span>
+      <label style="font-size:11px;color:var(--text3);font-weight:400;">Top:</label>
+      <select id="def-subtopico-topn" class="form-control" style="width:auto;padding:2px 6px;font-size:11px;">
+        ${[5,10,15,20,30,0].map(n=>`<option value="${n}" ${_subtopicoTopN===n?'selected':''}>${n===0?'Todos':n}</option>`).join('')}
+      </select>
+      <label style="font-size:11px;color:var(--text3);font-weight:400;">Semana:</label>
+      <input type="week" id="def-subtopico-semana" class="form-control" style="width:auto;padding:2px 6px;font-size:11px;" value="${_subtopicoSemana}">
+      <button id="def-subtopico-semana-clear" class="btn btn-ghost btn-xs" title="Limpar filtro de semana" style="font-size:11px;">✕</button>
+    </div><div class="chart-wrap"><canvas id="chart-def-subtopico"></canvas></div></div>
     <div class="panel">
       <div class="panel-header"><span>📋</span><span class="panel-title">Status por Plano</span></div>
       <div class="panel-body">
@@ -2684,22 +2706,48 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
     });
   }
 
-  // ── v18.1: Defeitos por Turno e por Operador ──
+  // ── v18.1/v19.8: Defeitos por Turno, Operador e Sub-tópico ──
   {
     // Coleta eventos: registro principal + reincidências de cada problema
-    // Regra: quantidade cheia p/ cada turno marcado e p/ cada operador (separados por /)
     const _eventos = [];
     _acoesDash.forEach(p => {
       const _push = (operador, turnos, qtd, dataEv) => {
         const q = parseInt(qtd, 10);
         if (!q || q <= 0) return;
-        _eventos.push({ operador: (operador||'').trim(), turnos: Array.isArray(turnos) ? turnos : [], qtd: q, data: dataEv || '' });
+        _eventos.push({ operador: (operador||'').trim(), turnos: Array.isArray(turnos) ? turnos : [], qtd: q, data: dataEv || '', subtopico_id: p.subtopico_id || '' });
       };
       if (p.operador !== undefined || p.quantidade !== undefined || (p.turnos||[]).length) _push(p.operador, p.turnos, p.quantidade, p.data_producao || p.data_abertura);
       (p.recorrencias || []).forEach(r => _push(r.operador, r.turnos, r.quantidade, r.data_producao || p.data_abertura));
     });
 
-    // ── Defeitos por Turno ──
+    // v19.8: divide uma quantidade entre N chaves com distribuição do resto (não arredonda tudo pra cima)
+    // ex: 10 ÷ 3 → [4,3,3] — soma sempre bate exata, evita inflar os totais agregados
+    function _dividirComResto(qtd, n) {
+      const base = Math.floor(qtd / n), resto = qtd % n, partes = [];
+      for (let i = 0; i < n; i++) partes.push(base + (i < resto ? 1 : 0));
+      return partes;
+    }
+    // v19.8: operador aceita "/" (convenção antiga) ou ";" (novo) como separador de múltiplos códigos
+    function _extrairOperadores(ev) {
+      return ev.operador ? ev.operador.split(/[\/;]/).map(s => s.trim()).filter(Boolean) : [];
+    }
+    // v19.8: agrega uma lista de eventos por chave(s) — respeita o modo Peças (soma dividida) / Ocorrências (contagem)
+    function _agregarPorChave(eventos, extrairChaves, modo) {
+      const acumulado = {};
+      eventos.forEach(ev => {
+        const chaves = extrairChaves(ev);
+        if (!chaves.length) return;
+        if (modo === 'ocorrencias') {
+          chaves.forEach(k => { acumulado[k] = (acumulado[k] || 0) + 1; });
+        } else {
+          const partes = _dividirComResto(ev.qtd, chaves.length);
+          chaves.forEach((k, i) => { acumulado[k] = (acumulado[k] || 0) + partes[i]; });
+        }
+      });
+      return acumulado;
+    }
+
+    // ── Defeitos por Turno (inalterado — sempre soma peças) ──
     const _rangeTurno = _defTurnoSemana ? _semanaRange(_defTurnoSemana) : null;
     const _eventosTurno = _rangeTurno ? _eventos.filter(ev => _inRange(ev.data, _rangeTurno)) : _eventos;
     const _porTurno = { 'T1': 0, 'T2': 0, 'T3': 0, 'Não informado': 0 };
@@ -2710,34 +2758,40 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
     const _turnoLabels = Object.keys(_porTurno).filter(k => _porTurno[k] > 0);
     const _turnoData   = _turnoLabels.map(k => _porTurno[k]);
 
-    // ── Defeitos por Operador (código [Turno]) ──
-    const _porOp = {};
+    // ── Defeitos por Operador (código [Turno]) — respeita modo Peças/Ocorrências e divide entre operadores ──
     const _rangeOp = _defOpSemana ? _semanaRange(_defOpSemana) : null;
     const _eventosOp = _rangeOp ? _eventos.filter(ev => _inRange(ev.data, _rangeOp)) : _eventos;
-    _eventosOp.forEach(ev => {
+    const _porOp = _agregarPorChave(_eventosOp, ev => {
       const _tLabel = ev.turnos.length ? `[${ev.turnos.join('/')}]` : '[?]';
-      const _ops = ev.operador ? ev.operador.split('/').map(s => s.trim()).filter(Boolean) : [];
-      if (!_ops.length) {
-        const k = `Não informado ${_tLabel}`;
-        _porOp[k] = (_porOp[k] || 0) + ev.qtd;
-        return;
-      }
-      _ops.forEach(op => {
-        const k = `${op} ${_tLabel}`;
-        _porOp[k] = (_porOp[k] || 0) + ev.qtd;
-      });
-    });
+      const _ops = _extrairOperadores(ev);
+      return (_ops.length ? _ops : ['Não informado']).map(op => `${op} ${_tLabel}`);
+    }, _dashModoContagem);
     let _opEntries = Object.entries(_porOp).sort((a,b) => b[1] - a[1]);
     if (_defOpTopN > 0 && _opEntries.length > _defOpTopN) _opEntries = _opEntries.slice(0, _defOpTopN);
     const _opLabels  = _opEntries.map(e => e[0]);
     const _opData    = _opEntries.map(e => e[1]);
 
+    // ── Análise por Sub-tópico — mesmos controles do Operador, respeita o mesmo modo Peças/Ocorrências ──
+    const _rangeSub = _subtopicoSemana ? _semanaRange(_subtopicoSemana) : null;
+    const _eventosSub = _rangeSub ? _eventos.filter(ev => _inRange(ev.data, _rangeSub)) : _eventos;
+    const _porSub = _agregarPorChave(_eventosSub, ev => {
+      const sub = state.subtopicos.find(s => s.id === ev.subtopico_id);
+      return [sub ? sub.descricao : 'Sem Sub-tópico'];
+    }, _dashModoContagem);
+    let _subEntries = Object.entries(_porSub).sort((a,b) => b[1] - a[1]);
+    if (_subtopicoTopN > 0 && _subEntries.length > _subtopicoTopN) _subEntries = _subEntries.slice(0, _subtopicoTopN);
+    const _subLabels = _subEntries.map(e => e[0]);
+    const _subData   = _subEntries.map(e => e[1]);
+
     const _hasTurnoData = _turnoData.some(v => v > 0) || _defTurnoSemana !== '';
     const _hasOpData    = _opData.some(v => v > 0) || _defOpSemana !== '';
+    const _hasSubData   = _subData.some(v => v > 0) || _subtopicoSemana !== '';
     const _pTurno = document.getElementById('panel-def-turno');
     const _pOp    = document.getElementById('panel-def-operador');
+    const _pSub   = document.getElementById('panel-def-subtopico');
     if (_pTurno) _pTurno.style.display = _hasTurnoData ? '' : 'none';
     if (_pOp)    _pOp.style.display    = _hasOpData ? '' : 'none';
+    if (_pSub)   _pSub.style.display   = _hasSubData ? '' : 'none';
 
     const _ctxDT = document.getElementById('chart-def-turno')?.getContext('2d');
     if (_ctxDT && _hasTurnoData) {
@@ -2756,6 +2810,18 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
         type: 'bar',
         data: { labels: _opLabels, datasets: [{ label: 'Defeitos', data: _opData,
           backgroundColor: '#f97316', borderRadius: 4 }] },
+        options: { responsive: true, maintainAspectRatio: false, ...cd,
+          plugins: { ...cd.plugins, legend: { display: false } },
+          scales: { x: { ...cd.scales.x, ticks: { ...cd.scales.x.ticks, autoSkip: false, maxRotation: 60, minRotation: 30 } },
+                    y: { ...cd.scales.y, beginAtZero: true, ticks: { ...cd.scales.y.ticks, precision: 0 } } } }
+      });
+    }
+    const _ctxDS = document.getElementById('chart-def-subtopico')?.getContext('2d');
+    if (_ctxDS && _hasSubData) {
+      _charts.defSubtopico = new Chart(_ctxDS, {
+        type: 'bar',
+        data: { labels: _subLabels, datasets: [{ label: 'Defeitos', data: _subData,
+          backgroundColor: '#a855f7', borderRadius: 4 }] },
         options: { responsive: true, maintainAspectRatio: false, ...cd,
           plugins: { ...cd.plugins, legend: { display: false } },
           scales: { x: { ...cd.scales.x, ticks: { ...cd.scales.x.ticks, autoSkip: false, maxRotation: 60, minRotation: 30 } },
@@ -2812,6 +2878,24 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
     _defOpSemana = '';
     const _pg = document.getElementById('page'); if (_pg) renderDashboard(_pg);
   });
+  // ── Wire: modo de contagem (Peças/Ocorrências), compartilhado entre Operador e Sub-tópico ──
+  document.getElementById('dash-modo-contagem')?.addEventListener('change', function() {
+    _dashModoContagem = this.value;
+    const _pg = document.getElementById('page'); if (_pg) renderDashboard(_pg);
+  });
+  // ── Wire: controles do gráfico Análise por Sub-tópico ──
+  document.getElementById('def-subtopico-topn')?.addEventListener('change', function() {
+    _subtopicoTopN = parseInt(this.value, 10) || 0;
+    const _pg = document.getElementById('page'); if (_pg) renderDashboard(_pg);
+  });
+  document.getElementById('def-subtopico-semana')?.addEventListener('change', function() {
+    _subtopicoSemana = this.value;
+    const _pg = document.getElementById('page'); if (_pg) renderDashboard(_pg);
+  });
+  document.getElementById('def-subtopico-semana-clear')?.addEventListener('click', function() {
+    _subtopicoSemana = '';
+    const _pg = document.getElementById('page'); if (_pg) renderDashboard(_pg);
+  });
   document.querySelectorAll('.kpi-card').forEach(card => {
     card.removeEventListener('click', card._dashboardHandler);
     const handler = () => {
@@ -2857,7 +2941,7 @@ function renderNovoCadastro(container) {
   }
   const planosOpts = '<option value="">Selecione...</option>' + [...state.planos].sort((a,b)=>(a.titulo||'').localeCompare(b.titulo||'','pt-BR')).map(p=>'<option value="'+p.id+'">'+escHtml(p.titulo)+'</option>').join('');
   const respOpts = '<option value="">Selecione...</option>' + getResponsaveisAtivos().map(r=>'<option value="'+escHtml(r.nome)+'">'+escHtml(r.nome)+'</option>').join('');
-  container.innerHTML = `<div class="panel-body"><div class="form-row" style="grid-template-columns:1fr 1fr auto auto;gap:14px;"><div class="form-group"><label class="form-label">Plano</label><select class="form-control" id="nc-plano">${planosOpts}</select></div><div class="form-group"><label class="form-label">Sub-Tópico</label><select class="form-control" id="nc-subtopico"><option value="">Selecione o plano...</option></select></div><div class="form-group"><label class="form-label">Data de Abertura</label><input class="form-control" type="date" id="nc-data-abertura" value="${today()}"></div><div class="form-group" style="min-width:160px;"><label class="form-label">Responsável</label><select class="form-control" id="nc-responsavel">${respOpts}</select></div></div><div class="form-group" style="margin-top:14px;"><label class="form-label">Problema</label><textarea class="form-control" id="nc-problema" rows="2" placeholder="Descreva o problema detalhadamente..."></textarea></div><div id="nc-op-turno-row" style="display:none;"><div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;margin-bottom:8px;align-items:end;" id="nc-op-row-base"><div class="form-group" style="margin-bottom:0;"><label class="form-label">Operador</label><input class="form-control" id="nc-operador" placeholder="Nº operador"></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Data de Produção</label><input class="form-control" type="date" id="nc-data-producao"></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Turno</label><div style="display:flex;gap:10px;align-items:center;padding-top:6px;"><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t1" style="accent-color:var(--accent);"> T1</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t2" style="accent-color:var(--accent);"> T2</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t3" style="accent-color:var(--accent);"> T3</label></div></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Quantidade</label><input class="form-control" id="nc-quantidade" type="number" min="0" placeholder="Qtd."></div><div style="padding-bottom:2px;"><button type="button" class="btn btn-secondary btn-sm" id="nc-add-reincidencia" title="Adicionar linha de reincidência">➕</button></div></div><div id="nc-reincidencias-container"></div></div><div class="form-row" style="grid-template-columns:1fr auto auto;gap:14px;margin-bottom:14px;align-items:start;"><div class="form-group" style="margin-bottom:0;"><label class="form-label">Causa Raiz</label><textarea class="form-control" id="nc-causa" rows="2" placeholder="Causa raiz do problema..."></textarea></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Evidência do Problema</label><div id="nc-ev-btns"><button class="btn btn-secondary btn-sm" id="nc-ev-upload-btn">📎 Upload</button></div><div class="help-text">Máx. 5 MB</div><input type="file" id="nc-ev-file" accept="image/*,.pdf" style="display:none;"><div id="nc-ev-preview" style="margin-top:6px;"></div></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Reincidência</label><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;margin-top:8px;"><input type="checkbox" id="nc-reincidente" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"><span>Problema Reincidente?</span></label></div></div><details class="form-group" ${_editingProb?.notas ? 'open' : ''}><summary class="form-label" style="cursor:pointer;">Notas / Observações</summary><div style="margin-top:8px;"><div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap;"><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="bold" title="Negrito"><b>B</b></button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="italic" title="Itálico"><i>I</i></button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="underline" title="Sublinhado"><u>S</u></button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="insertUnorderedList" title="Lista">• Lista</button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="removeFormat" title="Limpar formatação">Limpar</button></div><div id="nc-notas" contenteditable="true" style="min-height:100px;max-height:320px;overflow-y:auto;border:1px solid var(--border2);border-radius:var(--radius);padding:10px;background:var(--bg3);font-size:13px;line-height:1.5;"></div><div class="help-text">Cole texto formatado ou imagens diretamente (Ctrl+V).</div></div></details><div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 10px;border-top:1px solid var(--border);padding-top:16px;flex-wrap:wrap;gap:8px;"><span style="font-family:var(--font-hd);font-size:16px;font-weight:700;">Ações Corretivas</span><div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-secondary btn-sm" onclick="_ncState.editingProblemaId=null; _ncState.editingCorretivaIdx=null; navigate(\'listagem\');">Cancelar</button><button class="btn btn-primary btn-sm" onclick="_ncSalvar()">💾 Salvar Ação</button><button class="btn btn-primary btn-sm" id="nc-add-corretiva">➕ Adicionar Ação</button></div></div><div id="nc-corretivas-container"><div style="text-align:center;padding:24px;color:var(--text3);">Nenhuma ação corretiva. Clique em Adicionar Ação para começar.</div></div><div class="modal-footer" id="nc-form-footer" style="padding: 20px 0 0 0; border-top: 1px solid var(--border); margin-top: 20px;"><button class="btn btn-secondary" id="nc-add-corretiva-rodape">➕ Adicionar Ação</button><span style="flex:1;"></span><button class="btn btn-secondary" onclick="_ncState.editingProblemaId=null; _ncState.editingCorretivaIdx=null; navigate(\'listagem\');">Cancelar</button><button class="btn btn-primary" onclick="_ncSalvar()">💾 Salvar Ação</button></div></div></div>`;
+  container.innerHTML = `<div class="panel-body"><div class="form-row" style="grid-template-columns:1fr 1fr auto auto;gap:14px;"><div class="form-group"><label class="form-label">Plano</label><select class="form-control" id="nc-plano">${planosOpts}</select></div><div class="form-group"><label class="form-label">Sub-Tópico</label><select class="form-control" id="nc-subtopico"><option value="">Selecione o plano...</option></select></div><div class="form-group"><label class="form-label">Data de Abertura</label><input class="form-control" type="date" id="nc-data-abertura" value="${today()}"></div><div class="form-group" style="min-width:160px;"><label class="form-label">Responsável</label><select class="form-control" id="nc-responsavel">${respOpts}</select></div></div><div class="form-group" style="margin-top:14px;"><label class="form-label">Problema</label><textarea class="form-control" id="nc-problema" rows="2" placeholder="Descreva o problema detalhadamente..."></textarea></div><div id="nc-op-turno-row" style="display:none;"><div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;margin-bottom:8px;align-items:end;" id="nc-op-row-base"><div class="form-group" style="margin-bottom:0;"><label class="form-label">Operador</label><input class="form-control" id="nc-operador" placeholder="Nº operador"></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Data de Produção</label><input class="form-control" type="date" id="nc-data-producao"></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Turno</label><div style="display:flex;gap:10px;align-items:center;padding-top:6px;"><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t1" style="accent-color:var(--accent);"> T1</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t2" style="accent-color:var(--accent);"> T2</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t3" style="accent-color:var(--accent);"> T3</label></div></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Quantidade</label><input class="form-control" id="nc-quantidade" type="number" min="0" placeholder="Qtd."></div><div style="padding-bottom:2px;"><button type="button" class="btn btn-secondary btn-sm" id="nc-add-reincidencia" title="Adicionar linha de reincidência">➕</button></div></div><div id="nc-reincidencias-container"></div></div><div class="form-row" style="grid-template-columns:1fr auto auto;gap:14px;margin-bottom:14px;align-items:start;"><div class="form-group" style="margin-bottom:0;"><label class="form-label">Causa Raiz</label><textarea class="form-control" id="nc-causa" rows="2" placeholder="Causa raiz do problema..."></textarea></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Evidência do Problema</label><div id="nc-ev-btns"><button class="btn btn-secondary btn-sm" id="nc-ev-upload-btn">📎 Upload</button></div><div class="help-text">Máx. 5 MB</div><input type="file" id="nc-ev-file" accept="image/*,.pdf" style="display:none;"><div id="nc-ev-preview" style="margin-top:6px;"></div></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Reincidência</label><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;margin-top:8px;"><input type="checkbox" id="nc-reincidente" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"><span>Problema Reincidente?</span></label></div></div><details class="form-group" ${_editingProb?.notas ? 'open' : ''}><summary class="form-label nc-notas-summary" style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;"><span class="nc-notas-marcador">▶</span>Notas / Observações</summary><div style="margin-top:8px;"><div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap;"><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="bold" title="Negrito"><b>B</b></button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="italic" title="Itálico"><i>I</i></button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="underline" title="Sublinhado"><u>S</u></button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="insertUnorderedList" title="Lista">• Lista</button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="removeFormat" title="Limpar formatação">Limpar</button></div><div id="nc-notas" contenteditable="true" style="min-height:100px;max-height:320px;overflow-y:auto;border:1px solid var(--border2);border-radius:var(--radius);padding:10px;background:var(--bg3);font-size:13px;line-height:1.5;"></div><div class="help-text">Cole texto formatado ou imagens diretamente (Ctrl+V).</div></div></details><div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 10px;border-top:1px solid var(--border);padding-top:16px;flex-wrap:wrap;gap:8px;"><span style="font-family:var(--font-hd);font-size:16px;font-weight:700;">Ações Corretivas</span><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn btn-secondary nc-btn-padrao" onclick="_ncState.editingProblemaId=null; _ncState.editingCorretivaIdx=null; navigate(\'listagem\');">Cancelar</button><button class="btn btn-primary nc-btn-padrao" id="nc-add-corretiva">➕ Adicionar Ação</button><button class="btn btn-primary nc-btn-padrao" onclick="_ncSalvar()">💾 Salvar Ação</button></div></div><div id="nc-corretivas-container"><div style="text-align:center;padding:24px;color:var(--text3);">Nenhuma ação corretiva. Clique em Adicionar Ação para começar.</div></div><div class="modal-footer" id="nc-form-footer" style="padding: 20px 0 0 0; border-top: 1px solid var(--border); margin-top: 20px;justify-content:flex-end;"><button class="btn btn-secondary nc-btn-padrao" onclick="_ncState.editingProblemaId=null; _ncState.editingCorretivaIdx=null; navigate(\'listagem\');">Cancelar</button><button class="btn btn-primary nc-btn-padrao" id="nc-add-corretiva-rodape">➕ Adicionar Ação</button><button class="btn btn-primary nc-btn-padrao" onclick="_ncSalvar()">💾 Salvar Ação</button></div></div></div>`;
   document.getElementById('nc-plano').addEventListener('change', _ncOnPlanoChange);
   // nc-cancelar e nc-salvar usam onclick inline no HTML; não existem como ids separados
   document.getElementById('nc-add-corretiva').addEventListener('click', _ncAddCorretiva);
@@ -3857,7 +3941,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.7', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.8', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
