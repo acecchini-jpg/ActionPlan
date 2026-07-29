@@ -317,7 +317,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.14</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.15</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -3001,6 +3001,7 @@ function renderNovoCadastro(container) {
   // ── v19.6: Notas / Observações (rich text + colar imagens) ──
   const ncNotas = document.getElementById('nc-notas');
   container.querySelectorAll('.nc-notas-cmd').forEach(btn => {
+    btn.addEventListener('mousedown', (e) => e.preventDefault()); // v19.15: evita perder o foco/seleção do contenteditable antes do execCommand rodar
     btn.addEventListener('click', () => { document.execCommand(btn.dataset.cmd, false, null); ncNotas.focus(); _ncFormSujo = true; });
   });
   ncNotas.addEventListener('paste', async (e) => {
@@ -3973,7 +3974,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.14', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.15', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
