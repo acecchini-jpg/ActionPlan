@@ -332,7 +332,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.12</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.13</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -471,7 +471,6 @@ let _pendingDeeplink   = null; // { probId, idx } aguardando dados carregarem //
 const _MODELO_LS_KEY = "curso1tema_modelo_xlsx_b64"; // localStorage key
 let _filtroPlanoAnalise = '';   // filtro ativo no Resumo para PDM
 let _filtroPlanoDashboard   = '';  // filtro ativo no Dashboard
-let _filtroSemanaAtividade  = '';  // semana selecionada no bloco Atividade (YYYY-Www)
 let _cursoSortCol           = '';  // coluna sort Curso 1 Tema
 let _cursoSortAsc           = true;
 let _dashModoContagem       = 'pecas'; // 'pecas' | 'ocorrencias' — compartilhado entre Turno, Operador e Sub-tópico
@@ -1108,9 +1107,34 @@ async function salvarUsuario() {
   }
 }
 
+// v19.13: modal customizado (o showConfirm genérico escapa HTML, não dava pra ter um link clicável)
+function _confirmarRemoverAcessoUsuario(nomeExibicao) {
+  return new Promise((resolve) => {
+    let overlay = document.getElementById('remover-usuario-modal');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.id = 'remover-usuario-modal';
+      document.body.appendChild(overlay);
+    }
+    overlay.innerHTML = `<div class="modal" style="max-width:440px;">
+      <div class="modal-header"><span>⚠️</span><span class="modal-title">Remover Acesso de "${escHtml(nomeExibicao)}"</span><button class="modal-close" id="ru-modal-close">✕</button></div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--text2);margin-bottom:10px;">Isso remove o perfil no ActionPlan — a pessoa passa a ter nível 5 (somente leitura) se entrar de novo.</p>
+        <p style="font-size:13px;color:var(--text2);">O login no Firebase (e-mail/senha) <strong>não é apagado por aqui</strong>. Se quiser liberar o e-mail de vez pra reuso, apague a conta em <a href="https://console.firebase.google.com/project/planodeacao-c6d12/authentication/users" target="_blank" rel="noopener" style="color:var(--accent);">Authentication → Users</a> do Firebase Console.</p>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" id="ru-modal-cancelar">Cancelar</button><button class="btn btn-danger" id="ru-modal-confirmar">Remover Acesso</button></div>
+    </div>`;
+    overlay.classList.add('open');
+    const _fechar = (v) => { overlay.classList.remove('open'); resolve(v); };
+    overlay.querySelector('#ru-modal-close').addEventListener('click', () => _fechar(false));
+    overlay.querySelector('#ru-modal-cancelar').addEventListener('click', () => _fechar(false));
+    overlay.querySelector('#ru-modal-confirmar').addEventListener('click', () => _fechar(true));
+  });
+}
 async function excluirUsuarioPerfil(uid, nomeExibicao) {
   if (!podeVer('config')) { toast('Acesso não permitido.', 'error'); return; }
-  if (!(await showConfirm(`Remover o acesso de "${nomeExibicao}"? O login no Firebase Auth NÃO é apagado (isso só é possível pelo Console do Firebase) — mas sem o perfil, o usuário passa a ter nível 5 (somente leitura) ao entrar.`))) return;
+  if (!(await _confirmarRemoverAcessoUsuario(nomeExibicao))) return;
   try {
     await db.collection('usuarios').doc(uid).delete();
     toast('Perfil removido — acesso rebaixado para nível 5.', 'success');
@@ -2341,7 +2365,7 @@ function _semanaAtualISO(){
   return `${d.getFullYear()}-W${String(w).padStart(2,'0')}`;
 }
 function _renderAtividadeSemana(){
-  const semStr=_filtroSemanaAtividade||_semanaAtualISO();
+  const semStr=_dashDefeitosSemana||_semanaAtualISO();
   const range=_semanaRange(semStr);
   if(!range) return '<div class="empty-state">Selecione uma semana</div>';
   const _af=_filtroPlanoDashboard?state.acoes.filter(a=>a.plano_id===_filtroPlanoDashboard):state.acoes;
@@ -2563,6 +2587,7 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
       ${_filtroPlanoDashboard ? `<span class="badge badge-yellow">${escHtml(state.planos.find(p=>p.id===_filtroPlanoDashboard)?.titulo||'')}</span>` : ''}
       ${(_filtroPlanoDashboard || _dashDefeitosSemana) ? `<button id="dash-limpar-filtro" class="btn btn-ghost btn-sm">✕ Limpar Filtros</button>` : ''}
     </div>
+    </div>
     <div class="kpi-grid">
       <div class="kpi-card" data-filter="total"><div class="kpi-value">${total}</div><div class="kpi-label">Total A.Corretivas</div></div>
       <div class="kpi-card" data-filter="em_aberto"><div class="kpi-value" style="color:var(--yellow)">${total-fechadas}</div><div class="kpi-label">Ações em Aberto</div></div>
@@ -2571,7 +2596,6 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
       <div class="kpi-card" data-filter="vencidas"><div class="kpi-value" style="color:var(--red)">${vencidas}</div><div class="kpi-label">Vencidas</div></div>
       <div class="kpi-card" data-filter="taxa"><div class="kpi-value" style="color:var(--yellow)">${taxa}%</div><div class="kpi-label">Taxa Fechamento</div></div>
       <div class="kpi-card" data-filter="sem_prazo"><div class="kpi-value" style="color:var(--text2)">${semPrazo}</div><div class="kpi-label">Sem Prazo Def.</div></div>
-    </div>
     </div>
     <div class="charts-grid">
       <div class="chart-panel"><div class="chart-title">Status Geral</div><div class="chart-wrap"><canvas id="chart-status"></canvas></div></div>
@@ -2615,13 +2639,10 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
         <span>📅</span>
         <span class="panel-title">Atividade na Semana</span>
         <div style="display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap;">
-          <label style="font-size:12px;color:var(--text2);">Semana:</label>
-          <input type="week" id="atividade-semana-inp" class="form-control" style="width:auto;"
-            value="${_filtroSemanaAtividade||_semanaAtualISO()}">
-          <span style="font-size:11px;color:var(--text3);">${(()=>{
-            const r=_semanaRange(_filtroSemanaAtividade||_semanaAtualISO());
+          <span style="font-size:12px;color:var(--text2);">Semana: <strong>${(()=>{
+            const r=_semanaRange(_dashDefeitosSemana||_semanaAtualISO());
             return r?r.start+' → '+r.end:'';
-          })()}</span>
+          })()}</strong></span>
         </div>
       </div>
       <div class="panel-body" style="padding:0;">${_renderAtividadeSemana()}</div>
@@ -2885,15 +2906,6 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
     _dashAgruparPor = this.value;
     const _pgEl = document.getElementById('page'); if (_pgEl) renderDashboard(_pgEl);
   });
-  // ── Wire: semana Atividade ──
-  const _semInp=document.getElementById('atividade-semana-inp');
-  if(_semInp){
-    if(!_filtroSemanaAtividade) _semInp.value=_semanaAtualISO();
-    _semInp.addEventListener('change',function(){
-      _filtroSemanaAtividade=this.value;
-      const _pg=document.getElementById('page'); if(_pg) renderDashboard(_pg);
-    });
-  }
   // ── Wire: controles unificados dos 3 gráficos de defeito (Turno/Operador/Sub-tópico) ──
   document.getElementById('dash-modo-contagem')?.addEventListener('change', function() {
     _dashModoContagem = this.value;
@@ -3968,7 +3980,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.12', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.13', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
@@ -4703,7 +4715,7 @@ async function _renderUsuariosPainel() {
         <td style="white-space:nowrap;">
           <button class="btn btn-ghost btn-xs usr-editar" data-uid="${escHtml(u.uid)}" title="Editar">✏️</button>
           <button class="btn btn-ghost btn-xs usr-reset" data-email="${escHtml(u.email||'')}" title="Enviar redefinição de senha">🔑</button>
-          <button class="btn btn-danger btn-xs usr-excluir" data-uid="${escHtml(u.uid)}" data-nome="${escHtml(u.nome||u.email||'')}" title="Remover perfil">🗑️</button>
+          <button class="btn btn-danger btn-xs usr-excluir" data-uid="${escHtml(u.uid)}" data-nome="${escHtml(u.nome||u.email||'')}" title="Remover Acesso">🗑️</button>
         </td>
       </tr>`).join('');
     tbody.querySelectorAll('.usr-editar').forEach(b => b.addEventListener('click', () => openUsuarioModal(b.dataset.uid)));
