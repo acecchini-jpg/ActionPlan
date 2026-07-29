@@ -81,9 +81,6 @@ body.dark-theme { --bg: #0d0f14; --bg2: #131720; --bg3: #1a2030; --border: #252d
   /* page padding smaller + bottom pad for bottom-nav */
   #page { padding: 12px 10px 72px; }
 
-  /* v19.12: o wrapper sticky do Dashboard precisa "vazar" a mesma quantidade do padding acima */
-  .dash-sticky-wrap { margin: -12px -10px 4px -10px; padding: 12px 10px 8px 10px; }
-
   /* Rodapé Salvar/Cancelar do Novo Cadastro sempre visível, acima da barra inferior */
   #nc-form-footer { position: sticky; bottom: 56px; background: var(--bg2); box-shadow: 0 -4px 10px rgba(0,0,0,.15); z-index: 10; padding-bottom: 12px !important; }
 
@@ -142,7 +139,6 @@ body.dark-theme { --bg: #0d0f14; --bg2: #131720; --bg3: #1a2030; --border: #252d
 @media (min-width: 769px) and (max-width: 1024px) {
   :root { --sidebar: 200px; }
   #page { padding: 16px; }
-  .dash-sticky-wrap { margin: -16px -16px 4px -16px; padding: 16px 16px 8px 16px; }
   .form-row.cols-3 { grid-template-columns: 1fr 1fr !important; }
   .charts-grid { grid-template-columns: 1fr !important; }
   .kpi-card { min-width: 140px; }
@@ -170,17 +166,6 @@ body.dark-theme { --bg: #0d0f14; --bg2: #131720; --bg3: #1a2030; --border: #252d
 .modelo-badge.ok  { background:rgba(16,185,129,.15); color:var(--green); border:1px solid rgba(16,185,129,.3); }
 .modelo-badge.nok { background:rgba(239,68,68,.15);  color:var(--red);   border:1px solid rgba(239,68,68,.3); }
 .modelo-badge:hover { opacity:.8; }
-
-/* ── Dashboard Sticky Header ── */
-.dash-sticky-wrap {
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  background: var(--bg);
-  margin: -24px -24px 4px -24px;
-  padding: 24px 24px 8px 24px;
-  border-bottom: 1px solid var(--border);
-}
 
 /* ── Curso de 1 Tema ── */
 .curso-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:12px; }
@@ -332,7 +317,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.13</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.14</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -360,6 +345,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
       <button id="logout-btn" class="btn btn-ghost btn-sm" title="Sair" style="display:none;">🚪 Sair</button>
       <button id="theme-toggle" title="Alternar tema (Shift+clique ou toque prolongado: Configurações)">🌓</button>
     </div>
+    <div id="dash-filter-fixed" style="display:none;flex-shrink:0;padding:12px 24px 0;background:var(--bg);"></div>
     <div id="page"></div>
   </div>
 </div>
@@ -1188,7 +1174,7 @@ async function navigate(page) {
   }
   if(page !== 'novo-cadastro') { _ncState.editingProblemaId = null; _ncState.editingCorretivaIdx = null; _ncState._novoId = null; } state.currentPage = page; document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page===page)); document.getElementById('page-title').textContent = pageTitles[page]||page; render();
 }
-function render() { if (typeof _updateVencidasBadge === 'function') setTimeout(_updateVencidasBadge, 0); if (typeof aplicarPermissoesUI === 'function') setTimeout(aplicarPermissoesUI, 0); if (window._updateBottomNav) window._updateBottomNav(state.currentPage); const el = document.getElementById('page'); const renders = { dashboard:renderDashboard, analise:renderAnalise, clientes:renderClientes, responsaveis:renderResponsaveis, planos:renderPlanos, subtopicos:renderSubtopicos, listagem:renderListagem, 'novo-cadastro':renderNovoCadastro, 'fazer-backup':renderFazerBackup, 'recuperar-backup':renderRecuperarBackup, presenca:renderPresenca, curso1tema:renderCurso1Tema, configuracoes:renderConfiguracoes }; el.innerHTML = ''; (renders[state.currentPage]||renderDashboard)(el); }
+function render() { if (typeof _updateVencidasBadge === 'function') setTimeout(_updateVencidasBadge, 0); if (typeof aplicarPermissoesUI === 'function') setTimeout(aplicarPermissoesUI, 0); if (window._updateBottomNav) window._updateBottomNav(state.currentPage); const _dashFilterEl = document.getElementById('dash-filter-fixed'); if (_dashFilterEl && state.currentPage !== 'dashboard') _dashFilterEl.style.display = 'none'; const el = document.getElementById('page'); const renders = { dashboard:renderDashboard, analise:renderAnalise, clientes:renderClientes, responsaveis:renderResponsaveis, planos:renderPlanos, subtopicos:renderSubtopicos, listagem:renderListagem, 'novo-cadastro':renderNovoCadastro, 'fazer-backup':renderFazerBackup, 'recuperar-backup':renderRecuperarBackup, presenca:renderPresenca, curso1tema:renderCurso1Tema, configuracoes:renderConfiguracoes }; el.innerHTML = ''; (renders[state.currentPage]||renderDashboard)(el); }
 
 // ==================== PÁGINAS BÁSICAS (Clientes, Planos, Subtópicos) ====================
 // (código mantido idêntico ao original, apenas para não quebrar o funcionamento)
@@ -1618,7 +1604,7 @@ document.getElementById('closeEditModal')?.addEventListener('click',()=>{ closeM
 let _pendingEvidFile = null;
 function openEvidencia(acaoId, field) { state.currentEvidenciaTarget = { acaoId, field }; _pendingEvidFile = null; document.getElementById('ev-preview').innerHTML = ''; openModal('evidencia-modal'); }
 function processEvidenciaFile(file) { if (!file) return; if (!file.type.startsWith('image/') && file.size > 600 * 1024) { toast('Arquivo muito grande! Limite PDF: 600KB.', 'error'); return; } _pendingEvidFile = file; const isImage = file.type.startsWith('image/'); if (isImage) { const reader = new FileReader(); reader.onload = ev => { document.getElementById('ev-preview').innerHTML = `<img src="${ev.target.result}" style="max-width:100%;max-height:200px;border-radius:4px;"><p style="font-size:11px;color:var(--text3);margin-top:4px">${escHtml(file.name)} · ${(file.size/1024).toFixed(1)} KB</p>`; }; reader.readAsDataURL(file); } else { document.getElementById('ev-preview').innerHTML = `<div style="padding:12px;background:var(--bg3);border-radius:4px;">📄 ${escHtml(file.name)} · ${(file.size/1024).toFixed(1)} KB</div>`; } }
-async function confirmEvidencia() { const { acaoId, field } = state.currentEvidenciaTarget || {}; if (!acaoId || !field) return; if (!_pendingEvidFile) { toast('Selecione um arquivo', 'warning'); return; } if (!_pendingEvidFile.type.startsWith('image/') && _pendingEvidFile.size > 5*1024*1024) { toast('Arquivo muito grande! Limite PDF: 5 MB.', 'error'); return; } const acao = state.acoes.find(a => a.id === acaoId); if (!acao) return; try { showLoading('Enviando arquivo…'); const _dataUrl = await compressImage(_pendingEvidFile); /* O3: comprime imagens, PDFs passam direto */ const _pasta = field.startsWith('ev_implantacao_') ? ('corretivas/'+acaoId) : ('evidencias/'+acaoId); const _prefixo = field.startsWith('ev_implantacao_') ? (field.split('_').pop()+'_') : ''; const downloadURL = await uploadToStorage(_pasta+'/'+_prefixo+uid()+_extFromDataUrl(_dataUrl), _dataUrl); let _urlAntiga = null; if (field.startsWith('ev_implantacao_')) { const idx = parseInt(field.split('_').pop()); if (acao.acoes_corretivas[idx]) { _urlAntiga = acao.acoes_corretivas[idx][field]; acao.acoes_corretivas[idx][field] = downloadURL; } } else { _urlAntiga = acao[field]; acao[field] = downloadURL; } closeModal('evidencia-modal'); await saveData('acoes', acaoId); if (isStorageUrl(_urlAntiga)) deleteFromStorage(_urlAntiga); /* v19.1.1: evita órfão no Storage ao substituir */ aplicarFiltrosETabela(); renderListagemIfNeeded(); toast('Evidência salva!', 'success'); _pendingEvidFile = null; } catch(e) { toast('Erro ao enviar evidência: ' + e.message, 'error'); } finally { hideLoading(); } }
+async function confirmEvidencia() { const { acaoId, field } = state.currentEvidenciaTarget || {}; if (!acaoId || !field) return; if (!_pendingEvidFile) { toast('Selecione um arquivo', 'warning'); return; } if (!_pendingEvidFile.type.startsWith('image/') && _pendingEvidFile.size > 5*1024*1024) { toast('Arquivo muito grande! Limite PDF: 5 MB.', 'error'); return; } const acao = state.acoes.find(a => a.id === acaoId); if (!acao) return; try { showLoading('Enviando arquivo…'); const _dataUrl = await compressImage(_pendingEvidFile); /* O3: comprime imagens, PDFs passam direto */ const _pasta = field.startsWith('ev_implantacao_') ? ('corretivas/'+acaoId) : ('evidencias/'+acaoId); const _prefixo = field.startsWith('ev_implantacao_') ? (field.split('_').pop()+'_') : ''; const downloadURL = await uploadToStorage(_pasta+'/'+_prefixo+uid()+_extFromDataUrl(_dataUrl), _dataUrl); let _urlAntiga = null; if (field.startsWith('ev_implantacao_')) { const idx = parseInt(field.split('_').pop()); if (acao.acoes_corretivas[idx]) { _urlAntiga = acao.acoes_corretivas[idx][field]; acao.acoes_corretivas[idx][field] = downloadURL; if (!acao.acoes_corretivas[idx].data_efetiva) acao.acoes_corretivas[idx].data_efetiva = today(); /* v19.14 */ } } else { _urlAntiga = acao[field]; acao[field] = downloadURL; } closeModal('evidencia-modal'); await saveData('acoes', acaoId); if (isStorageUrl(_urlAntiga)) deleteFromStorage(_urlAntiga); /* v19.1.1: evita órfão no Storage ao substituir */ aplicarFiltrosETabela(); renderListagemIfNeeded(); toast('Evidência salva!', 'success'); _pendingEvidFile = null; } catch(e) { toast('Erro ao enviar evidência: ' + e.message, 'error'); } finally { hideLoading(); } }
 function handleEvidenciaSelect(e) { processEvidenciaFile(e.target.files[0]); }
 function handleEvidenciaDrop(e) { processEvidenciaFile(e.dataTransfer.files[0]); }
 document.getElementById('closeEvidenciaModal')?.addEventListener('click',()=>closeModal('evidencia-modal')); document.getElementById('cancelEvidenciaBtn')?.addEventListener('click',()=>closeModal('evidencia-modal')); document.getElementById('confirmEvidenciaBtn')?.addEventListener('click',confirmEvidencia);
@@ -2423,6 +2409,7 @@ function renderDashboard(container){
   const _acoesDash  = _filtroPlanoDashboard ? state.acoes.filter(a=>a.plano_id===_filtroPlanoDashboard) : state.acoes;
   const _planosDash = _filtroPlanoDashboard ? state.planos.filter(p=>p.id===_filtroPlanoDashboard)      : state.planos;
   let total=0,fechadas=0,emAndamento=0,vencidas=0,semAcoes=0,semPrazo=0;
+  const cursosPendentes = state.cursos1tema.filter(c => c.statusCurso !== 'Finalizado').length; // v19.14
   const byResp={}; const byPlano={};
   // Inicializa byPlano com planos filtrados
   _planosDash.forEach(p=>{ byPlano[p.id]={titulo:p.titulo,pendentes:0,fechadas:0,vencidas:0,emAberto:0}; });
@@ -2562,8 +2549,10 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
   const _dashPlanoOpts = `<option value="">Todos os planos</option>`
     + state.planos.map(p=>`<option value="${escHtml(p.id)}" ${_filtroPlanoDashboard===p.id?'selected':''}>${escHtml(p.titulo)}</option>`).join('');
 
-  container.innerHTML=`
-    <div class="dash-sticky-wrap">
+  const _dashFilterFixedEl = document.getElementById('dash-filter-fixed');
+  if (_dashFilterFixedEl) {
+    _dashFilterFixedEl.style.display = 'block';
+    _dashFilterFixedEl.innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;padding:12px 16px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border);">
       <span style="font-size:13px;color:var(--text2);font-weight:600;">🔍 Filtrar por Plano:</span>
       <select id="dash-filtro-plano" class="form-control" style="width:auto;min-width:200px;">${_dashPlanoOpts}</select>
@@ -2586,8 +2575,10 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
       <span style="flex:1;"></span>
       ${_filtroPlanoDashboard ? `<span class="badge badge-yellow">${escHtml(state.planos.find(p=>p.id===_filtroPlanoDashboard)?.titulo||'')}</span>` : ''}
       ${(_filtroPlanoDashboard || _dashDefeitosSemana) ? `<button id="dash-limpar-filtro" class="btn btn-ghost btn-sm">✕ Limpar Filtros</button>` : ''}
-    </div>
-    </div>
+    </div>`;
+  }
+
+  container.innerHTML=`
     <div class="kpi-grid">
       <div class="kpi-card" data-filter="total"><div class="kpi-value">${total}</div><div class="kpi-label">Total A.Corretivas</div></div>
       <div class="kpi-card" data-filter="em_aberto"><div class="kpi-value" style="color:var(--yellow)">${total-fechadas}</div><div class="kpi-label">Ações em Aberto</div></div>
@@ -2596,6 +2587,7 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
       <div class="kpi-card" data-filter="vencidas"><div class="kpi-value" style="color:var(--red)">${vencidas}</div><div class="kpi-label">Vencidas</div></div>
       <div class="kpi-card" data-filter="taxa"><div class="kpi-value" style="color:var(--yellow)">${taxa}%</div><div class="kpi-label">Taxa Fechamento</div></div>
       <div class="kpi-card" data-filter="sem_prazo"><div class="kpi-value" style="color:var(--text2)">${semPrazo}</div><div class="kpi-label">Sem Prazo Def.</div></div>
+      <div class="kpi-card" data-filter="cursos_pendentes"><div class="kpi-value" style="color:var(--yellow)">${cursosPendentes}</div><div class="kpi-label">Curso 1 Tema Pend.</div></div>
     </div>
     <div class="charts-grid">
       <div class="chart-panel"><div class="chart-title">Status Geral</div><div class="chart-wrap"><canvas id="chart-status"></canvas></div></div>
@@ -2922,6 +2914,7 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
   document.querySelectorAll('.kpi-card').forEach(card => {
     card.removeEventListener('click', card._dashboardHandler);
     const handler = () => {
+      if (card.dataset.filter === 'cursos_pendentes') { navigate('curso1tema'); return; } // v19.14
       navigate('listagem');
       setTimeout(() => {
         const filterType = card.dataset.filter;
@@ -3208,7 +3201,7 @@ function _ncRenderCorretivas() {
   container.querySelectorAll('.nc-cr-efet').forEach(el=>el.addEventListener('change',()=>{ if(_ncState.acoes_corretivas[parseInt(el.dataset.idx)]) _ncState.acoes_corretivas[parseInt(el.dataset.idx)].data_efetiva=el.value; }));
   container.querySelectorAll('.nc-cr-prev').forEach(el=>el.addEventListener('change',()=>{ const i=parseInt(el.dataset.idx); const cr=_ncState.acoes_corretivas[i]; if(!cr) return; const nd=el.value, da=cr.data_prevista||''; if(da&&nd&&nd!==da){ if(!cr.followups) cr.followups=[]; cr.qtd_alteracoes_data=(cr.qtd_alteracoes_data||0)+1; cr.followups.push({id:uid(),data_followup:today(),responsavel:cr.responsavel||'Sistema',comentario:'Data alterada para '+formatDate(nd)}); } cr.data_prevista=nd; _ncRenderCorretivas(); }));
   container.querySelectorAll('.nc-ev-corr-btn').forEach(btn=>btn.addEventListener('click',()=>{ const fi=container.querySelector('.nc-ev-corr-file[data-idx="'+btn.dataset.idx+'"]'); if(fi) fi.click(); }));
-  container.querySelectorAll('.nc-ev-corr-file').forEach(fi=>fi.addEventListener('change',async e=>{ const i=parseInt(fi.dataset.idx); const file=e.target.files[0]; if(!file) return; if(!file.type.startsWith('image/') && file.size>5*1024*1024){toast('Arquivo muito grande! Limite PDF: 5 MB.','error');return;} try { showLoading('Enviando arquivo…'); const _du=await compressImage(file); const _probId = _ncState.editingProblemaId || _ncState._novoId || uid(); const _url = await uploadToStorage('corretivas/'+_probId+'/'+i+'_'+uid()+_extFromDataUrl(_du), _du); const _urlAntiga = _ncState._evidTmp[i]; _ncState._evidTmp[i]=_url; if (isStorageUrl(_urlAntiga)) deleteFromStorage(_urlAntiga); /* v19.1.1: evita órfão no Storage ao substituir */ _ncRenderCorretivas(); toast('Evidência carregada!','success'); } catch(err) { toast('Erro ao enviar evidência: ' + err.message, 'error'); } finally { hideLoading(); } }));
+  container.querySelectorAll('.nc-ev-corr-file').forEach(fi=>fi.addEventListener('change',async e=>{ const i=parseInt(fi.dataset.idx); const file=e.target.files[0]; if(!file) return; if(!file.type.startsWith('image/') && file.size>5*1024*1024){toast('Arquivo muito grande! Limite PDF: 5 MB.','error');return;} try { showLoading('Enviando arquivo…'); const _du=await compressImage(file); const _probId = _ncState.editingProblemaId || _ncState._novoId || uid(); const _url = await uploadToStorage('corretivas/'+_probId+'/'+i+'_'+uid()+_extFromDataUrl(_du), _du); const _urlAntiga = _ncState._evidTmp[i]; _ncState._evidTmp[i]=_url; if (isStorageUrl(_urlAntiga)) deleteFromStorage(_urlAntiga); /* v19.1.1: evita órfão no Storage ao substituir */ if (_ncState.acoes_corretivas[i] && !_ncState.acoes_corretivas[i].data_efetiva) _ncState.acoes_corretivas[i].data_efetiva = today(); /* v19.14 */ _ncRenderCorretivas(); toast('Evidência carregada!','success'); } catch(err) { toast('Erro ao enviar evidência: ' + err.message, 'error'); } finally { hideLoading(); } }));
   container.querySelectorAll('.nc-ev-view').forEach(btn=>btn.addEventListener('click',()=>{ const src=_ncState._evidTmp[parseInt(btn.dataset.idx)]; if(src) showEvidenciaModal(src); }));
   container.querySelectorAll('.nc-add-fu').forEach(btn=>btn.addEventListener('click',()=>{ _ncState._fuTarget={idx:parseInt(btn.dataset.idx)}; document.getElementById('fu-data').value=today(); const _fuSelNc=document.getElementById('fu-responsavel'); _fuSelNc.innerHTML='<option value="">Selecione...</option>'+getResponsaveisAtivos().map(r=>`<option value="${escHtml(r.nome)}">${escHtml(r.nome)}</option>`).join(''); _fuSelNc.value=''; document.getElementById('fu-comentario').value=''; openModal('followup-modal'); }));
   container.querySelectorAll('.nc-del-fu').forEach(btn=>btn.addEventListener('click',()=>{ const i=parseInt(btn.dataset.idx),fi=parseInt(btn.dataset.fuidx); if(_ncState.acoes_corretivas[i]) { _ncState.acoes_corretivas[i].followups.splice(fi,1); _ncRenderCorretivas(); } }));
@@ -3980,7 +3973,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.13', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.14', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
