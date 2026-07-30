@@ -319,7 +319,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.19</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.21</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -4025,7 +4025,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.19', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.21', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
@@ -4751,8 +4751,8 @@ function renderConfiguracoes(container) {
           <div class="panel" style="margin-bottom:0;">
             <div class="panel-header"><span>🚀</span><span class="panel-title" style="font-size:14px;">Migração de Fotos</span></div>
             <div class="panel-body" style="display:flex;flex-direction:column;gap:8px;">
-              <p style="font-size:11px;color:var(--text3);margin:0;">⚠️ Faça o Backup (com fotos) antes de migrar. Pode ser executado mais de uma vez — itens já migrados são pulados.</p>
               <button class="btn btn-secondary" id="cfg-migrar-fotos">🚀 Migrar para Storage</button>
+              <p style="font-size:11px;color:var(--text3);margin:0;">⚠️ Faça o Backup (com fotos) antes de migrar. Pode ser executado mais de uma vez — itens já migrados são pulados.</p>
               <div style="background:var(--bg3);border-radius:4px;height:8px;overflow:hidden;display:none;" id="migracao-progress-wrap"><div id="migracao-progress" style="background:var(--accent);height:100%;width:0%;transition:width .2s;"></div></div>
               <div id="migracao-status" style="font-size:12px;color:var(--text2);"></div>
             </div>
@@ -4760,16 +4760,16 @@ function renderConfiguracoes(container) {
           <div class="panel" style="margin-bottom:0;">
             <div class="panel-header"><span>⚡</span><span class="panel-title" style="font-size:14px;">Importar Fast Response</span></div>
             <div class="panel-body" style="display:flex;flex-direction:column;gap:8px;">
-              <p style="font-size:11px;color:var(--text3);margin:0;">⚠️ Cada importação <strong>apaga e recria do zero</strong> todos os problemas do Plano "Fast Response". A gestão é feita pela planilha, não pelo app. Faça um Backup antes da primeira execução.</p>
               <button class="btn btn-secondary" id="cfg-importar-fast-response">📥 Importar Planilha</button>
+              <p style="font-size:11px;color:var(--text3);margin:0;">⚠️ Cada importação <strong>apaga e recria do zero</strong> todos os problemas do Plano "Fast Response". A gestão é feita pela planilha, não pelo app. Faça um Backup antes da primeira execução.</p>
               <input type="file" id="fr-file-input" accept=".xlsx,.xlsm" style="display:none;">
             </div>
           </div>
           <div class="panel" style="margin-bottom:0;">
             <div class="panel-header"><span>🕐</span><span class="panel-title" style="font-size:14px;">Importar Turnos por Operador</span></div>
             <div class="panel-body" style="display:flex;flex-direction:column;gap:8px;">
-              <p style="font-size:11px;color:var(--text3);margin:0;">Carrega uma base inicial de operador → turno. Coluna A = código, Coluna B = turno (1, 2 ou 3). O sistema também aprende sozinho ao marcar turno no Novo Cadastro.</p>
               <button class="btn btn-secondary" id="cfg-importar-turnos">📥 Importar Planilha</button>
+              <p style="font-size:11px;color:var(--text3);margin:0;">Carrega uma base inicial de operador → turno. Coluna A = código, Coluna B = turno (1, 2 ou 3). O sistema também aprende sozinho ao marcar turno no Novo Cadastro.</p>
               <input type="file" id="turnos-file-input" accept=".xlsx,.xlsm" style="display:none;">
             </div>
           </div>
