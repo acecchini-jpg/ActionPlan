@@ -317,7 +317,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.15</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.16</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -463,7 +463,7 @@ let _dashModoContagem       = 'pecas'; // 'pecas' | 'ocorrencias' — compartilh
 let _dashDefeitosTopN       = 15;  // barras — compartilhado entre Operador e Sub-tópico (Turno não usa)
 let _dashDefeitosSemana     = ''; // filtro de semana — compartilhado entre Turno, Operador e Sub-tópico
 let _dashAgruparPor         = 'responsavel';  // 'responsavel' | 'departamento' — agrupamento dos 3 gráficos por responsável
-const state = { config: { ...DEFAULT_FIREBASE_CONFIG }, clientes: [], responsaveis: [], planos: [], subtopicos: [], acoes: [], presencas: [], cursos1tema: [], currentPage: 'dashboard', currentEvidenciaTarget: null, evidenciaDataURL: null, };
+const state = { config: { ...DEFAULT_FIREBASE_CONFIG }, clientes: [], responsaveis: [], planos: [], subtopicos: [], acoes: [], presencas: [], cursos1tema: [], operadores_turno: [], currentPage: 'dashboard', currentEvidenciaTarget: null, evidenciaDataURL: null, };
 
 // ==================== FUNÇÕES AUXILIARES (comuns) ====================
 function showLoading(msg) { const ld = document.getElementById('global-loading'); document.getElementById('loading-msg').textContent = msg; ld.classList.add('show'); }
@@ -472,6 +472,19 @@ function toast(msg, type) { const icons={success:'✅',error:'❌',info:'ℹ️'
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 function uid() { return Date.now().toString(36)+Math.random().toString(36).substr(2,6); }
+// v19.16: aprendizado de turno por operador — consulta e gravação
+function _turnoAprendido(codigo) {
+  const c = String(codigo || '').trim();
+  if (!c) return null;
+  const doc = state.operadores_turno.find(o => o.id === c);
+  return (doc && doc.turnos && doc.turnos.length) ? doc.turnos : null;
+}
+async function _aprenderTurnoOperador(codigo, turnos) {
+  const c = String(codigo || '').trim();
+  if (!c || !turnos || !turnos.length) return;
+  try { await db.collection('operadores_turno').doc(c).set({ turnos, atualizado_em: new Date().toISOString() }); }
+  catch(e) { console.warn('Erro ao aprender turno do operador:', c, e); }
+}
 // v19.3: numeroAcao pode ser um número sequencial normal OU um código externo (ex: '003G', Fast Response)
 function _numAcaoValido(v) { return v !== undefined && v !== null && v !== ''; }
 // v19.5: mantém a coleção 'indice_numeroacao' sincronizada — permite achar uma ação pelo
@@ -687,7 +700,7 @@ function desligarListeners() {
   _snapUnsubs.length = 0;
   _listenersLigados = false;
 }
-function setupRealtimeListeners() { showLoading('Sincronizando dados…'); const loaded = { clientes: false, responsaveis: false, planos: false, subtopicos: false, acoes: false, presencas: false, cursos1tema: false }; const initialRender = () => {
+function setupRealtimeListeners() { showLoading('Sincronizando dados…'); const loaded = { clientes: false, responsaveis: false, planos: false, subtopicos: false, acoes: false, presencas: false, cursos1tema: false, operadores_turno: false }; const initialRender = () => {
       if (Object.values(loaded).every(Boolean)) {
         hideLoading();
         render();
@@ -707,7 +720,7 @@ function setupRealtimeListeners() { showLoading('Sincronizando dados…'); const
           }, 150);
         }
       }
-    }; const cols = ['clientes', 'responsaveis', 'planos', 'subtopicos', 'acoes', 'presencas', 'cursos1tema']; cols.forEach(col => { const unsub = db.collection(col).onSnapshot(snap => { state[col] = snap.docs.map(d => ({ id: d.id, ...d.data() })); if (col === 'acoes') _migrateAcoes(); if (!loaded[col]) { loaded[col] = true; initialRender(); } else render(); }, err => { toast('Erro ' + col + ': ' + err.message, 'error'); if (!loaded[col]) { loaded[col] = true; initialRender(); } hideLoading(); }); _snapUnsubs.push(unsub); }); }
+    }; const cols = ['clientes', 'responsaveis', 'planos', 'subtopicos', 'acoes', 'presencas', 'cursos1tema', 'operadores_turno']; cols.forEach(col => { const unsub = db.collection(col).onSnapshot(snap => { state[col] = snap.docs.map(d => ({ id: d.id, ...d.data() })); if (col === 'acoes') _migrateAcoes(); if (!loaded[col]) { loaded[col] = true; initialRender(); } else render(); }, err => { toast('Erro ' + col + ': ' + err.message, 'error'); if (!loaded[col]) { loaded[col] = true; initialRender(); } hideLoading(); }); _snapUnsubs.push(unsub); }); }
 async function initFirebase() { const saved = localStorage.getItem('fb_config'); if (saved) try { const parsed = JSON.parse(saved); state.config = { ...DEFAULT_FIREBASE_CONFIG, ...parsed }; } catch(e) {} else localStorage.setItem('fb_config', JSON.stringify(DEFAULT_FIREBASE_CONFIG)); document.getElementById('cfg-apiKey').value = state.config.apiKey || ''; document.getElementById('cfg-authDomain').value = state.config.authDomain || ''; document.getElementById('cfg-projectId').value = state.config.projectId || ''; document.getElementById('cfg-storageBucket').value = state.config.storageBucket || ''; document.getElementById('cfg-messagingSenderId').value = state.config.messagingSenderId || ''; document.getElementById('cfg-appId').value = state.config.appId || ''; if (!state.config.apiKey || !state.config.projectId) { updateFirebaseStatus(false); toast('Configure o Firebase', 'warning'); return; } try { _snapUnsubs.forEach(fn => fn()); _snapUnsubs.length = 0; if (firebase.apps.length) await firebase.app().delete(); firebase.initializeApp(state.config); db = firebase.firestore(); updateFirebaseStatus(true); toast('Firebase conectado! Sincronização em tempo real ativa.', 'success'); if (firebase.auth && firebase.auth().currentUser) ligarListeners(); } catch(err) { console.error(err); updateFirebaseStatus(false); toast('Erro Firebase: ' + err.message, 'error'); db = null; } }
 async function saveConfig() { const cfg = { apiKey: document.getElementById('cfg-apiKey').value.trim(), authDomain: document.getElementById('cfg-authDomain').value.trim(), projectId: document.getElementById('cfg-projectId').value.trim(), storageBucket: document.getElementById('cfg-storageBucket').value.trim(), messagingSenderId: document.getElementById('cfg-messagingSenderId').value.trim(), appId: document.getElementById('cfg-appId').value.trim() }; localStorage.setItem('fb_config', JSON.stringify(cfg)); Object.assign(state.config, cfg); closeModal('config-modal'); await initFirebase(); await initAuth(); }
 
@@ -2998,6 +3011,16 @@ function renderNovoCadastro(container) {
     container.addEventListener('change', () => { _ncFormSujo = true; });
     container._ncDirtyBound = true;
   }
+  // ── v19.16: aprendizado de turno por operador — auto-preenche ao digitar o código (linha base) ──
+  document.getElementById('nc-operador')?.addEventListener('blur', function() {
+    const t1 = document.getElementById('nc-turno-t1'), t2 = document.getElementById('nc-turno-t2'), t3 = document.getElementById('nc-turno-t3');
+    if (!t1 || !t2 || !t3) return;
+    if (t1.checked || t2.checked || t3.checked) return; // não sobrescreve seleção manual já feita
+    const turnos = _turnoAprendido(this.value);
+    if (turnos) {
+      t1.checked = turnos.includes('T1'); t2.checked = turnos.includes('T2'); t3.checked = turnos.includes('T3');
+    }
+  });
   // ── v19.6: Notas / Observações (rich text + colar imagens) ──
   const ncNotas = document.getElementById('nc-notas');
   container.querySelectorAll('.nc-notas-cmd').forEach(btn => {
@@ -3155,6 +3178,17 @@ function _ncRenderReincidencias() {
 
   // Wire inputs
   cont.querySelectorAll('.nc-reinc-op').forEach(el => el.addEventListener('input', () => { _ncState.recorrencias[+el.dataset.idx].operador = el.value; }));
+  cont.querySelectorAll('.nc-reinc-op').forEach(el => el.addEventListener('blur', function() {
+    const idx = +this.dataset.idx;
+    const r = _ncState.recorrencias[idx];
+    if (r.turnos && r.turnos.length) return; // não sobrescreve seleção manual já feita
+    const turnos = _turnoAprendido(this.value);
+    if (turnos) {
+      r.turnos = [...turnos];
+      const t1 = cont.querySelector(`.nc-reinc-t1[data-idx="${idx}"]`), t2 = cont.querySelector(`.nc-reinc-t2[data-idx="${idx}"]`), t3 = cont.querySelector(`.nc-reinc-t3[data-idx="${idx}"]`);
+      if (t1) t1.checked = turnos.includes('T1'); if (t2) t2.checked = turnos.includes('T2'); if (t3) t3.checked = turnos.includes('T3');
+    }
+  }));
   cont.querySelectorAll('.nc-reinc-data').forEach(el => el.addEventListener('change', () => { _ncState.recorrencias[+el.dataset.idx].data_producao = el.value; }));
   cont.querySelectorAll('.nc-reinc-qtd').forEach(el => el.addEventListener('input', () => { _ncState.recorrencias[+el.dataset.idx].quantidade = el.value; }));
   ['t1','t2','t3'].forEach(t => {
@@ -3224,6 +3258,8 @@ async function _ncSalvar() {
   const notas=_sanitizarHtmlNotas(document.getElementById('nc-notas').innerHTML);
   if(!planoId){toast('Selecione um Plano','warning');return;} if(!problema){toast('Descreva o Problema','warning');return;}
   const plano=state.planos.find(p=>p.id===planoId); const nOpQtd=plano?.necessita_op_qtd||false; let operador='',quantidade='',data_producao='',turnos=[],recorrencias=[]; if(nOpQtd){operador=(document.getElementById('nc-operador')?.value||'').trim();quantidade=(document.getElementById('nc-quantidade')?.value||'').trim();data_producao=(document.getElementById('nc-data-producao')?.value||'').trim();if(document.getElementById('nc-turno-t1')?.checked) turnos.push('T1');if(document.getElementById('nc-turno-t2')?.checked) turnos.push('T2');if(document.getElementById('nc-turno-t3')?.checked) turnos.push('T3');recorrencias=[..._ncState.recorrencias];}
+  if (operador && turnos.length) _aprenderTurnoOperador(operador, turnos); // v19.16: fire-and-forget, não bloqueia o salvamento
+  recorrencias.forEach(r => { if (r.operador && r.turnos && r.turnos.length) _aprenderTurnoOperador(r.operador, r.turnos); });
   if (!_ncState.acoes_corretivas || _ncState.acoes_corretivas.length === 0) {
     toast('Adicione pelo menos 1 Ação Corretiva antes de salvar.', 'warning');
     return;
@@ -3974,7 +4010,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.15', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.16', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
@@ -4390,6 +4426,47 @@ function _frModal() {
   return overlay;
 }
 
+// v19.16: importação em lote da base inicial de operador → turno
+async function _importarTurnosOperador(file) {
+  if (!podeVer('config')) { toast('Acesso não permitido para o seu nível de usuário.', 'error'); return; }
+  showLoading('Lendo planilha…');
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf);
+    const ws = wb.worksheets[0];
+    if (!ws) { toast('Planilha vazia ou inválida.', 'error'); return; }
+
+    const porOperador = {}; // codigo -> Set de turnos ('T1'/'T2'/'T3')
+    let linhasLidas = 0, ignoradas = 0;
+    ws.eachRow((row) => {
+      const codigoRaw = _cellValor(row.getCell(1));
+      const turnoRaw = _cellValor(row.getCell(2));
+      if (codigoRaw == null && turnoRaw == null) return; // linha em branco
+      const codigo = String(codigoRaw || '').trim();
+      const turnoNum = String(turnoRaw || '').trim();
+      if (!codigo || !['1', '2', '3'].includes(turnoNum)) { ignoradas++; return; }
+      linhasLidas++;
+      if (!porOperador[codigo]) porOperador[codigo] = new Set();
+      porOperador[codigo].add('T' + turnoNum);
+    });
+
+    const codigos = Object.keys(porOperador);
+    if (!codigos.length) { toast('Nenhuma linha válida encontrada (esperado: Coluna A = código do operador, Coluna B = 1, 2 ou 3).', 'error'); return; }
+
+    let gravados = 0;
+    for (const codigo of codigos) {
+      await _aprenderTurnoOperador(codigo, [...porOperador[codigo]]);
+      gravados++;
+    }
+
+    toast(`Importação concluída: ${gravados} operador(es) gravado(s) (${linhasLidas} linha(s) lidas, ${ignoradas} ignorada(s)).`, ignoradas ? 'warning' : 'success');
+  } catch(e) {
+    toast('Erro ao importar turnos: ' + e.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
 async function _frIniciarImportacao(file) {
   if (!podeVer('config')) { toast('Acesso não permitido para o seu nível de usuário.', 'error'); return; }
   const plano = state.planos.find(p => (p.titulo || '').trim().toLowerCase() === 'fast response');
@@ -4664,6 +4741,14 @@ function renderConfiguracoes(container) {
             <input type="file" id="fr-file-input" accept=".xlsx,.xlsm" style="display:none;">
           </div>
         </div>
+        <div class="panel" style="margin-bottom:10px;">
+          <div class="panel-header"><span>🕐</span><span class="panel-title" style="font-size:14px;">Importar Turnos por Operador</span></div>
+          <div class="panel-body" style="display:flex;flex-direction:column;gap:8px;">
+            <p style="font-size:11px;color:var(--text3);margin:0;">Carrega uma base inicial de operador → turno. Planilha com Coluna A = código do operador, Coluna B = turno (1, 2 ou 3). O sistema também aprende sozinho: toda vez que um turno é marcado manualmente pra um operador no Novo Cadastro, essa associação fica salva e passa a ser sugerida automaticamente da próxima vez.</p>
+            <button class="btn btn-secondary" id="cfg-importar-turnos">📥 Importar Planilha de Turnos</button>
+            <input type="file" id="turnos-file-input" accept=".xlsx,.xlsm" style="display:none;">
+          </div>
+        </div>
         <div class="panel" style="margin-bottom:0;">
           <div class="panel-header"><span>👤</span><span class="panel-title" style="font-size:14px;">Usuários</span>
             <div class="panel-actions"><button class="btn btn-secondary btn-sm" id="cfg-historico-login">📜 Histórico de Login</button><button class="btn btn-primary btn-sm" id="cfg-novo-usuario">➕ Novo Usuário</button></div>
@@ -4690,6 +4775,8 @@ function renderConfiguracoes(container) {
   document.getElementById('cfg-migrar-fotos')?.addEventListener('click', _migrarFotosParaStorage);
   document.getElementById('cfg-importar-fast-response')?.addEventListener('click', () => document.getElementById('fr-file-input')?.click());
   document.getElementById('fr-file-input')?.addEventListener('change', (e) => { const file = e.target.files[0]; if (file) _frIniciarImportacao(file); e.target.value = ''; });
+  document.getElementById('cfg-importar-turnos')?.addEventListener('click', () => document.getElementById('turnos-file-input')?.click());
+  document.getElementById('turnos-file-input')?.addEventListener('change', (e) => { const file = e.target.files[0]; if (file) _importarTurnosOperador(file); e.target.value = ''; });
   _updateModeloBadge(); // reflete o estado atual do modelo (☁️/💾/❌) ao abrir a página
   const statusEl = document.getElementById('firebase-status-cfg');
   if (statusEl) statusEl.textContent = db ? '✅ Conectado' : '❌ Não conectado';
