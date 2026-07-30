@@ -319,7 +319,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.18</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.19</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -624,7 +624,7 @@ function showHistorico(problemaId) {
   if (!prob) { toast('Problema não encontrado.', 'warning'); return; }
   const hist = [...(prob.historico || [])].reverse(); // mais recente primeiro
   const _nomeCampo = c => {
-    const _m = { plano_id:'Plano', subtopico_id:'Sub-Tópico', data_abertura:'Data de Abertura', responsavel:'Responsável', problema:'Problema', causa:'Causa', reincidente:'Reincidente', acao_descricao:'Ação Corretiva', responsavel_acao:'Responsável da Ação', data_prevista:'Data Prevista', data_efetiva:'Data Efetiva' };
+    const _m = { plano_id:'Plano', subtopico_id:'Sub-Tópico', data_abertura:'Data de Abertura', responsavel:'Responsável', problema:'Problema', causa:'Causa', reincidente:'Reincidente', evidencia_problema:'Evidência do Problema', acao_descricao:'Ação Corretiva', responsavel_acao:'Responsável da Ação', data_prevista:'Data Prevista', data_efetiva:'Data Efetiva' };
     const _sufx = c.match(/\s*\(ação #\d+\)$/);
     const _base = _sufx ? c.replace(_sufx[0], '') : c;
     return (_m[_base] || _base) + (_sufx ? _sufx[0] : '');
@@ -634,6 +634,7 @@ function showHistorico(problemaId) {
     if (campo === 'plano_id') { const p = state.planos.find(x => x.id === v); return p ? p.titulo : v; }
     if (campo === 'subtopico_id') { const s = state.subtopicos.find(x => x.id === v); return s ? s.descricao : v; }
     if (campo === 'reincidente') return (v === true || v === 'true') ? 'Sim' : 'Não';
+    if (campo === 'evidencia_problema') return 'Foto anexada'; // v19.19: nunca mostra a URL bruta (fica enorme e sem sentido pro usuário)
     return String(v);
   };
   const _fmtData = iso => { try { const d = new Date(iso); return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}); } catch(e) { return iso; } };
@@ -3298,7 +3299,8 @@ async function _ncSalvar() {
         }
         // ── F2: Audit trail — registra mudanças de campos ──
         const _usr = (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) ? firebase.auth().currentUser.email : 'sistema';
-        const _audCampos = { plano_id: planoId, subtopico_id: subtId, data_abertura: dataAbertura, responsavel, problema, causa, reincidente };
+        const _novaEvidenciaProblema = _ncState.evidencia_problema != null ? _ncState.evidencia_problema : existente.evidencia_problema;
+        const _audCampos = { plano_id: planoId, subtopico_id: subtId, data_abertura: dataAbertura, responsavel, problema, causa, reincidente, evidencia_problema: _novaEvidenciaProblema };
         if (!existente.historico) existente.historico = [];
         Object.entries(_audCampos).forEach(([campo, novoVal]) => {
           const antigo = existente[campo];
@@ -4023,7 +4025,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.18', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.19', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
@@ -4741,8 +4743,8 @@ function renderConfiguracoes(container) {
           <div class="panel" style="margin-bottom:0;">
             <div class="panel-header"><span>📊</span><span class="panel-title" style="font-size:14px;">Modelo Excel (Curso 1 Tema)</span></div>
             <div class="panel-body" style="display:flex;flex-direction:column;gap:8px;">
+              <button class="btn btn-secondary" id="cfg-upload-modelo">📎 Carregar/Substituir</button>
               <span id="modelo-badge-config" class="modelo-badge nok">❌ Modelo Excel</span>
-              <button class="btn btn-secondary" id="cfg-upload-modelo">📎 Carregar/Substituir Modelo (.xlsx)</button>
               <input type="file" id="cfg-modelo-file-input" accept=".xlsx" style="display:none;">
             </div>
           </div>
@@ -4750,7 +4752,7 @@ function renderConfiguracoes(container) {
             <div class="panel-header"><span>🚀</span><span class="panel-title" style="font-size:14px;">Migração de Fotos</span></div>
             <div class="panel-body" style="display:flex;flex-direction:column;gap:8px;">
               <p style="font-size:11px;color:var(--text3);margin:0;">⚠️ Faça o Backup (com fotos) antes de migrar. Pode ser executado mais de uma vez — itens já migrados são pulados.</p>
-              <button class="btn btn-secondary" id="cfg-migrar-fotos">🚀 Migrar fotos para o Storage</button>
+              <button class="btn btn-secondary" id="cfg-migrar-fotos">🚀 Migrar para Storage</button>
               <div style="background:var(--bg3);border-radius:4px;height:8px;overflow:hidden;display:none;" id="migracao-progress-wrap"><div id="migracao-progress" style="background:var(--accent);height:100%;width:0%;transition:width .2s;"></div></div>
               <div id="migracao-status" style="font-size:12px;color:var(--text2);"></div>
             </div>
@@ -4759,7 +4761,7 @@ function renderConfiguracoes(container) {
             <div class="panel-header"><span>⚡</span><span class="panel-title" style="font-size:14px;">Importar Fast Response</span></div>
             <div class="panel-body" style="display:flex;flex-direction:column;gap:8px;">
               <p style="font-size:11px;color:var(--text3);margin:0;">⚠️ Cada importação <strong>apaga e recria do zero</strong> todos os problemas do Plano "Fast Response". A gestão é feita pela planilha, não pelo app. Faça um Backup antes da primeira execução.</p>
-              <button class="btn btn-secondary" id="cfg-importar-fast-response">📥 Importar Planilha Fast Response</button>
+              <button class="btn btn-secondary" id="cfg-importar-fast-response">📥 Importar Planilha</button>
               <input type="file" id="fr-file-input" accept=".xlsx,.xlsm" style="display:none;">
             </div>
           </div>
@@ -4767,7 +4769,7 @@ function renderConfiguracoes(container) {
             <div class="panel-header"><span>🕐</span><span class="panel-title" style="font-size:14px;">Importar Turnos por Operador</span></div>
             <div class="panel-body" style="display:flex;flex-direction:column;gap:8px;">
               <p style="font-size:11px;color:var(--text3);margin:0;">Carrega uma base inicial de operador → turno. Coluna A = código, Coluna B = turno (1, 2 ou 3). O sistema também aprende sozinho ao marcar turno no Novo Cadastro.</p>
-              <button class="btn btn-secondary" id="cfg-importar-turnos">📥 Importar Planilha de Turnos</button>
+              <button class="btn btn-secondary" id="cfg-importar-turnos">📥 Importar Planilha</button>
               <input type="file" id="turnos-file-input" accept=".xlsx,.xlsm" style="display:none;">
             </div>
           </div>
