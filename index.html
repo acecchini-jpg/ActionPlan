@@ -319,7 +319,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.21</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.22</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -493,9 +493,19 @@ async function _aprenderTurnoOperador(codigo, turnos) {
   if (!turnos || !turnos.length) return;
   const codigos = _splitCodigosOperador(codigo);
   for (const c of codigos) {
-    try { await db.collection('operadores_turno').doc(c).set({ turnos, atualizado_em: new Date().toISOString() }); }
+    try { await db.collection('operadores_turno').doc(c).set({ turnos, atualizado_em: new Date().toISOString() }, { merge: true }); } // v19.22: merge — não apaga nome/situação já cadastrados
     catch(e) { console.warn('Erro ao aprender turno do operador:', c, e); }
   }
+}
+// v19.22: monta "245-Antonio Marcos Cecchini - T1" (ou D/?/T1/T2) a partir do que foi aprendido
+function _comentarioOperador(codigo) {
+  const c = String(codigo || '').trim();
+  if (!c) return null;
+  const doc = state.operadores_turno.find(o => o.id === c);
+  if (!doc) return null;
+  const nome = doc.nome ? String(doc.nome).trim() : '';
+  const turnoStr = (doc.turnos && doc.turnos.length) ? doc.turnos.join('/') : (doc.situacao || '?');
+  return `${c}${nome ? '-' + nome : ''} - ${turnoStr}`;
 }
 // v19.3: numeroAcao pode ser um número sequencial normal OU um código externo (ex: '003G', Fast Response)
 function _numAcaoValido(v) { return v !== undefined && v !== null && v !== ''; }
@@ -2887,7 +2897,12 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
         data: { labels: _opLabels, datasets: [{ label: 'Defeitos', data: _opData,
           backgroundColor: '#f97316', borderRadius: 4 }] },
         options: { responsive: true, maintainAspectRatio: false, ...cd,
-          plugins: { ...cd.plugins, legend: { display: false } },
+          plugins: { ...cd.plugins, legend: { display: false },
+            tooltip: { callbacks: { afterLabel: (ctx) => {
+              const codigo = String(ctx.label || '').split(' ')[0]; // extrai o código antes do "[T1]"
+              const comentario = _comentarioOperador(codigo);
+              return comentario || '';
+            } } } },
           scales: { x: { ...cd.scales.x, ticks: { ...cd.scales.x.ticks, autoSkip: false, maxRotation: 60, minRotation: 30 } },
                     y: { ...cd.scales.y, beginAtZero: true, ticks: { ...cd.scales.y.ticks, precision: 0 } } } }
       });
@@ -3269,11 +3284,20 @@ document.addEventListener('click', function(e) {
 
 async function _ncSalvar() {
   const planoId=document.getElementById('nc-plano').value; const subtId=document.getElementById('nc-subtopico').value; const dataAbertura=document.getElementById('nc-data-abertura').value; const responsavel=document.getElementById('nc-responsavel').value; const problema=document.getElementById('nc-problema').value.trim(); const causa=document.getElementById('nc-causa').value.trim(); const reincidente=document.getElementById('nc-reincidente').checked;
-  const notas=_sanitizarHtmlNotas(document.getElementById('nc-notas').innerHTML);
+  let notas=_sanitizarHtmlNotas(document.getElementById('nc-notas').innerHTML);
   if(!planoId){toast('Selecione um Plano','warning');return;} if(!problema){toast('Descreva o Problema','warning');return;}
   const plano=state.planos.find(p=>p.id===planoId); const nOpQtd=plano?.necessita_op_qtd||false; let operador='',quantidade='',data_producao='',turnos=[],recorrencias=[]; if(nOpQtd){operador=(document.getElementById('nc-operador')?.value||'').trim();quantidade=(document.getElementById('nc-quantidade')?.value||'').trim();data_producao=(document.getElementById('nc-data-producao')?.value||'').trim();if(document.getElementById('nc-turno-t1')?.checked) turnos.push('T1');if(document.getElementById('nc-turno-t2')?.checked) turnos.push('T2');if(document.getElementById('nc-turno-t3')?.checked) turnos.push('T3');recorrencias=[..._ncState.recorrencias];}
   if (operador && turnos.length) _aprenderTurnoOperador(operador, turnos); // v19.16: fire-and-forget, não bloqueia o salvamento
   recorrencias.forEach(r => { if (r.operador && r.turnos && r.turnos.length) _aprenderTurnoOperador(r.operador, r.turnos); });
+  // v19.22: adiciona comentário "245-Nome - T1" nas Notas pra cada operador envolvido (base + reincidências), sem duplicar
+  { const _codigosEnvolvidos = new Set();
+    _splitCodigosOperador(operador).forEach(c => _codigosEnvolvidos.add(c));
+    recorrencias.forEach(r => _splitCodigosOperador(r.operador).forEach(c => _codigosEnvolvidos.add(c)));
+    _codigosEnvolvidos.forEach(c => {
+      const comentario = _comentarioOperador(c);
+      if (comentario && !notas.includes(escHtml(comentario))) notas += `<div>${escHtml(comentario)}</div>`;
+    });
+  }
   if (!_ncState.acoes_corretivas || _ncState.acoes_corretivas.length === 0) {
     toast('Adicione pelo menos 1 Ação Corretiva antes de salvar.', 'warning');
     return;
@@ -3310,6 +3334,7 @@ async function _ncSalvar() {
         });
         if (existente.historico.length > 200) existente.historico = existente.historico.slice(-200);
         const _corretivasAntesIdx = JSON.parse(JSON.stringify(existente.acoes_corretivas || [])); // v19.5: p/ sincronizar índice de nº de ação
+        const _subtopicoIdAntes = existente.subtopico_id; // v19.22: p/ detectar troca de sub-tópico e ressincronizar cursos vinculados
         Object.assign(existente, { plano_id: planoId, subtopico_id: subtId, data_abertura: dataAbertura, responsavel, problema, causa, notas, reincidente, evidencia_problema: _ncState.evidencia_problema != null ? _ncState.evidencia_problema : existente.evidencia_problema, acoes_corretivas: _corretivasOut, updated_at: new Date().toISOString(), updated_by: _userProfile?.email || 'sistema' });
         if (nOpQtd) {
           existente.operador = operador; existente.quantidade = quantidade;
@@ -3326,6 +3351,7 @@ async function _ncSalvar() {
         }
         await saveData('acoes', existente.id);
         await _sincronizarIndiceNumeroAcao(existente.id, existente.acoes_corretivas, _corretivasAntesIdx);
+        if (_subtopicoIdAntes !== subtId) await _ressincronizarCursosDoProblema(existente.id, subtId); // v19.22
         toast('Cadastro atualizado!','success');
       }
       _ncFormSujo = false;
@@ -3355,6 +3381,22 @@ async function _ncSalvar() {
 
 
 // ==================== AUTO-CREATE CURSO DE 1 TEMA (GP12) ====================
+// v19.22: ao mudar o sub-tópico de um problema, ressincroniza sub-tópico/cliente dos cursos já
+// gerados (sem apagar/recriar — preserva T1/T2/T3 e evidenciaCursoUrl já preenchidos)
+async function _ressincronizarCursosDoProblema(problemaId, novoSubtopicoId) {
+  const cursosVinculados = state.cursos1tema.filter(c => c.problema_id === problemaId);
+  if (!cursosVinculados.length) return;
+  const subtopico = state.subtopicos.find(s => s.id === novoSubtopicoId);
+  const subtopicoDescricao = subtopico ? subtopico.descricao : '';
+  const clienteId = subtopico ? subtopico.cliente_id : null;
+  const cliente = clienteId ? (state.clientes.find(c => c.id === clienteId)?.nome || '') : '';
+  for (const curso of cursosVinculados) {
+    curso.subtopico_id = novoSubtopicoId || '';
+    curso.subtopico_descricao = subtopicoDescricao;
+    curso.cliente = cliente;
+    try { await saveData('cursos1tema', curso.id); } catch(e) { console.warn('Erro ao ressincronizar curso:', curso.id, e); }
+  }
+}
 async function _autoCreateCurso1Tema(problema, plano, reincidenciaId) {
   if (!plano) return;
   const tituloPlano = (plano.titulo || '').toUpperCase();
@@ -4025,7 +4067,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.21', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.22', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
@@ -4464,27 +4506,34 @@ async function _importarTurnosOperador(file) {
     const ws = wb.worksheets[0];
     if (!ws) { toast('Planilha vazia ou inválida.', 'error'); return; }
 
-    const porOperador = {}; // codigo -> Set de turnos ('T1'/'T2'/'T3')
+    const porOperador = {}; // codigo -> { turnos: Set, situacao: 'D'|'?'|null, nome: string }
     let linhasLidas = 0, ignoradas = 0;
     ws.eachRow((row) => {
       const codigoRaw = _cellValor(row.getCell(1));
       const turnoRaw = _cellValor(row.getCell(2));
-      if (codigoRaw == null && turnoRaw == null) return; // linha em branco
+      const nomeRaw = _cellValor(row.getCell(3));
+      if (codigoRaw == null && turnoRaw == null && nomeRaw == null) return; // linha em branco
       const codigo = String(codigoRaw || '').trim();
-      const turnoNum = String(turnoRaw || '').trim();
-      if (!codigo || !['1', '2', '3'].includes(turnoNum)) { ignoradas++; return; }
+      const turnoTxt = String(turnoRaw || '').trim().toUpperCase();
+      const nome = String(nomeRaw || '').trim();
+      if (!codigo || !['1', '2', '3', 'D', '?'].includes(turnoTxt)) { ignoradas++; return; }
       linhasLidas++;
-      if (!porOperador[codigo]) porOperador[codigo] = new Set();
-      porOperador[codigo].add('T' + turnoNum);
+      if (!porOperador[codigo]) porOperador[codigo] = { turnos: new Set(), situacao: null, nome: '' };
+      if (['1', '2', '3'].includes(turnoTxt)) porOperador[codigo].turnos.add('T' + turnoTxt);
+      else porOperador[codigo].situacao = turnoTxt; // 'D' (demitido) ou '?' (não identificado)
+      if (nome) porOperador[codigo].nome = nome;
     });
 
     const codigos = Object.keys(porOperador);
-    if (!codigos.length) { toast('Nenhuma linha válida encontrada (esperado: Coluna A = código do operador, Coluna B = 1, 2 ou 3).', 'error'); return; }
+    if (!codigos.length) { toast('Nenhuma linha válida encontrada (esperado: Coluna A = código, Coluna B = 1/2/3/D/?, Coluna C = nome).', 'error'); return; }
 
     let gravados = 0;
     for (const codigo of codigos) {
-      await _aprenderTurnoOperador(codigo, [...porOperador[codigo]]);
-      gravados++;
+      const info = porOperador[codigo];
+      const dados = { turnos: [...info.turnos], situacao: info.situacao, atualizado_em: new Date().toISOString() };
+      if (info.nome) dados.nome = info.nome;
+      try { await db.collection('operadores_turno').doc(codigo).set(dados, { merge: true }); gravados++; }
+      catch(e) { console.warn('Erro ao gravar operador:', codigo, e); }
     }
 
     toast(`Importação concluída: ${gravados} operador(es) gravado(s) (${linhasLidas} linha(s) lidas, ${ignoradas} ignorada(s)).`, ignoradas ? 'warning' : 'success');
@@ -4769,7 +4818,7 @@ function renderConfiguracoes(container) {
             <div class="panel-header"><span>🕐</span><span class="panel-title" style="font-size:14px;">Importar Turnos por Operador</span></div>
             <div class="panel-body" style="display:flex;flex-direction:column;gap:8px;">
               <button class="btn btn-secondary" id="cfg-importar-turnos">📥 Importar Planilha</button>
-              <p style="font-size:11px;color:var(--text3);margin:0;">Carrega uma base inicial de operador → turno. Coluna A = código, Coluna B = turno (1, 2 ou 3). O sistema também aprende sozinho ao marcar turno no Novo Cadastro.</p>
+              <p style="font-size:11px;color:var(--text3);margin:0;">Carrega uma base inicial de operador → turno. Coluna A = código, Coluna B = turno (1, 2, 3, "D" se demitido ou "?" se não identificado), Coluna C = nome. O sistema também aprende sozinho ao marcar turno no Novo Cadastro.</p>
               <input type="file" id="turnos-file-input" accept=".xlsx,.xlsm" style="display:none;">
             </div>
           </div>
