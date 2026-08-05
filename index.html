@@ -321,7 +321,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.33</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.34</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -345,9 +345,9 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
       <div class="topbar-spacer"></div>
       <div id="firebase-status"><div class="status-dot" id="fb-dot"></div><span id="fb-label">Não configurado</span></div>
       <div id="modelo-status-wrap" style="display:none;"><span id="modelo-badge" class="modelo-badge nok">❌ Modelo Excel</span><input type="file" id="modelo-file-input" accept=".xlsx" style="display:none;"></div>
+      <button id="modo-auditoria-badge" style="display:none;font-size:18px;line-height:1;background:none;border:none;padding:0 6px;">🕵️</button>
       <span id="topbar-user" style="display:none;font-size:12px;color:var(--text2);white-space:nowrap;"></span>
       <button id="logout-btn" class="btn btn-ghost btn-sm" title="Sair" style="display:none;">🚪 Sair</button>
-      <span id="modo-auditoria-badge" title="Modo Auditoria ativo — ações vencidas ocultas" style="display:none;font-size:18px;line-height:1;">🕵️</span>
       <button id="theme-toggle" title="Alternar tema (Shift+clique ou toque prolongado: Configurações)">🌓</button>
     </div>
     <div id="dash-filter-fixed" style="display:none;flex-shrink:0;padding:12px 24px 0;background:var(--bg);"></div>
@@ -1193,7 +1193,16 @@ document.getElementById('saveUsuarioBtn')?.addEventListener('click', salvarUsuar
 function updateFirebaseStatus(ok) { const dot = document.getElementById('fb-dot'), lbl = document.getElementById('fb-label'); dot.className = 'status-dot ' + (ok ? 'ok' : 'err'); lbl.textContent = ok ? 'Firestore Realtime ✓' : 'Não configurado'; }
 
 // ==================== TEMA ====================
-function initTheme() { const savedTheme = localStorage.getItem('theme'); if(savedTheme === 'dark') document.body.classList.add('dark-theme'); else if(savedTheme === 'light') document.body.classList.remove('dark-theme'); else if(window.matchMedia('(prefers-color-scheme: dark)').matches) document.body.classList.add('dark-theme'); const btn = document.getElementById('theme-toggle'); btn.addEventListener('click', (event) => { if ((event.shiftKey || event._longPress) && podeVer('config')) { navigate('configuracoes'); return; } document.body.classList.toggle('dark-theme'); localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light'); }); }
+function initTheme() { const savedTheme = localStorage.getItem('theme'); if(savedTheme === 'dark') document.body.classList.add('dark-theme'); else if(savedTheme === 'light') document.body.classList.remove('dark-theme'); else if(window.matchMedia('(prefers-color-scheme: dark)').matches) document.body.classList.add('dark-theme'); const btn = document.getElementById('theme-toggle'); btn.addEventListener('click', (event) => { if ((event.shiftKey || event._longPress) && podeVer('config')) { navigate('configuracoes'); return; } document.body.classList.toggle('dark-theme'); localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light'); });
+  document.getElementById('modo-auditoria-badge')?.addEventListener('click', async () => {
+    if (!podeVer('config')) { toast('Acesso não permitido para o seu nível de usuário.', 'error'); return; }
+    if (!(await showConfirm('Desativar o Modo Auditoria? As ações vencidas voltam a aparecer para todos.'))) return;
+    try {
+      await db.collection('config_sistema').doc('geral').set({ modo_auditoria: false, atualizado_em: new Date().toISOString(), atualizado_por: _userProfile?.email || 'sistema' }, { merge: true });
+      toast('Modo Auditoria desativado.', 'success');
+    } catch(e) { toast('Erro ao desativar modo auditoria: ' + e.message, 'error'); }
+  });
+}
 
 // ==================== NAVEGAÇÃO ====================
 const _pageTitlesBase = { clientes:'Clientes', responsaveis:'Responsáveis', planos:'Planos de Ação', subtopicos:'Sub-Tópicos', listagem:'Listagem Geral', dashboard:'Dashboard', analise:'Análise — Resumo PDM', 'novo-cadastro':'Cadastro de Problemas', 'fazer-backup':'Fazer Backup', 'recuperar-backup':'Recuperar Backup', presenca:'Controle de Presença', 'curso1tema':'Curso de 1 Tema', 'configuracoes':'Configurações' };
@@ -4089,7 +4098,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.33', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.34', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
