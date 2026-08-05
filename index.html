@@ -184,9 +184,11 @@ body.dark-theme { --bg: #0d0f14; --bg2: #131720; --bg3: #1a2030; --border: #252d
 @media print {
   #sidebar, #topbar, .filters-bar, .panel-actions, .btn, .modal,
   #sidebar-overlay, .bnav-wrap { display:none!important; }
+  html, body { height:auto!important; overflow:visible!important; }
   body { background:#fff!important; color:#000!important; font-family:Arial,sans-serif; margin:0; padding:0; }
-  #app { display:block!important; }
-  #page { display:block!important; padding:0!important; margin:0!important; background:#fff!important; }
+  #app { display:block!important; height:auto!important; overflow:visible!important; }
+  #main { display:block!important; height:auto!important; overflow:visible!important; }
+  #page { display:block!important; height:auto!important; overflow:visible!important; padding:0!important; margin:0!important; background:#fff!important; }
   .panel { box-shadow:none!important; border:none!important; border-radius:0!important; margin:0!important; padding:0!important; }
   .panel-header { border-bottom:2px solid #333!important; padding:4px 0 6px!important; background:#fff!important; color:#000!important; }
   .panel-title { font-size:14px!important; font-weight:bold!important; color:#000!important; }
@@ -200,7 +202,10 @@ body.dark-theme { --bg: #0d0f14; --bg2: #131720; --bg3: #1a2030; --border: #252d
   .badge { background:#eee!important; color:#000!important; border:1px solid #999!important; }
   .followup-row, .empty-state { display:none!important; }
   a { color:#000!important; text-decoration:none!important; }
-  #page::before { content:'ActionPlan — Listagem de Ações Corretivas'; display:block; font-size:13px; font-weight:bold; margin-bottom:6px; padding-bottom:4px; border-bottom:1px solid #333; }
+  body:not(.printing-relatorio) #page::before { content:'ActionPlan — Listagem de Ações Corretivas'; display:block; font-size:13px; font-weight:bold; margin-bottom:6px; padding-bottom:4px; border-bottom:1px solid #333; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
+  thead { display: table-header-group; }
+  @page { margin: 10mm; }
 }
 /* ── END RESPONSIVE ==================== */
 /* ── v19.1.3: cosméticos da Listagem Geral ── */
@@ -323,7 +328,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.35</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.36</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -1234,7 +1239,7 @@ async function navigate(page) {
   }
   if(page !== 'novo-cadastro') { _ncState.editingProblemaId = null; _ncState.editingCorretivaIdx = null; _ncState._novoId = null; } state.currentPage = page; document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page===page)); document.getElementById('page-title').textContent = pageTitles[page]||page; render();
 }
-function render() { if (typeof _updateVencidasBadge === 'function') setTimeout(_updateVencidasBadge, 0); if (typeof aplicarPermissoesUI === 'function') setTimeout(aplicarPermissoesUI, 0); if (window._updateBottomNav) window._updateBottomNav(state.currentPage); const _dashFilterEl = document.getElementById('dash-filter-fixed'); if (_dashFilterEl && state.currentPage !== 'dashboard') _dashFilterEl.style.display = 'none'; const _auditBadge = document.getElementById('modo-auditoria-badge'); if (_auditBadge) _auditBadge.style.display = state.modoAuditoria ? 'inline-block' : 'none'; const el = document.getElementById('page'); const renders = { dashboard:renderDashboard, analise:renderAnalise, clientes:renderClientes, responsaveis:renderResponsaveis, planos:renderPlanos, subtopicos:renderSubtopicos, listagem:renderListagem, 'novo-cadastro':renderNovoCadastro, 'fazer-backup':renderFazerBackup, 'recuperar-backup':renderRecuperarBackup, presenca:renderPresenca, curso1tema:renderCurso1Tema, configuracoes:renderConfiguracoes, 'relatorio-pdf':renderRelatorioPDF }; el.innerHTML = ''; (renders[state.currentPage]||renderDashboard)(el); }
+function render() { if (typeof _updateVencidasBadge === 'function') setTimeout(_updateVencidasBadge, 0); if (typeof aplicarPermissoesUI === 'function') setTimeout(aplicarPermissoesUI, 0); if (window._updateBottomNav) window._updateBottomNav(state.currentPage); const _dashFilterEl = document.getElementById('dash-filter-fixed'); if (_dashFilterEl && state.currentPage !== 'dashboard') _dashFilterEl.style.display = 'none'; const _auditBadge = document.getElementById('modo-auditoria-badge'); if (_auditBadge) _auditBadge.style.display = state.modoAuditoria ? 'inline-block' : 'none'; document.body.classList.toggle('printing-relatorio', state.currentPage === 'relatorio-pdf'); const el = document.getElementById('page'); const renders = { dashboard:renderDashboard, analise:renderAnalise, clientes:renderClientes, responsaveis:renderResponsaveis, planos:renderPlanos, subtopicos:renderSubtopicos, listagem:renderListagem, 'novo-cadastro':renderNovoCadastro, 'fazer-backup':renderFazerBackup, 'recuperar-backup':renderRecuperarBackup, presenca:renderPresenca, curso1tema:renderCurso1Tema, configuracoes:renderConfiguracoes, 'relatorio-pdf':renderRelatorioPDF }; el.innerHTML = ''; (renders[state.currentPage]||renderDashboard)(el); }
 
 // ==================== PÁGINAS BÁSICAS (Clientes, Planos, Subtópicos) ====================
 // (código mantido idêntico ao original, apenas para não quebrar o funcionamento)
@@ -1811,6 +1816,8 @@ function renderRelatorioPDF(container) {
   }
 
   const _statusCor = { 'EM ANDAMENTO':'#3b82f6', 'FECHADO':'#10b981', 'VENCIDO':'#ef4444' };
+  const mostrarColSubtopico = !p.subtopicoId; // v19.36: só aparece como coluna se nenhum Sub-Tópico específico foi selecionado (senão já está no título)
+  const totalColunas = mostrarColSubtopico ? 8 : 7;
 
   container.innerHTML = `
     <div class="panel" style="max-width:1100px;margin:0 auto;">
@@ -1835,10 +1842,10 @@ function renderRelatorioPDF(container) {
           <table style="width:100%;border-collapse:collapse;font-size:11px;">
             <thead>
               <tr style="background:#e8e8e8;">
-                <th style="border:1px solid #999;padding:5px 6px;text-align:left;">Nº Ação</th>
-                <th style="border:1px solid #999;padding:5px 6px;text-align:left;">Sub-Tópico</th>
-                <th style="border:1px solid #999;padding:5px 6px;text-align:left;">Foto</th>
+                ${mostrarColSubtopico ? '<th style="border:1px solid #999;padding:5px 6px;text-align:left;">Sub-Tópico</th>' : ''}
                 <th style="border:1px solid #999;padding:5px 6px;text-align:left;">Problema</th>
+                <th style="border:1px solid #999;padding:5px 6px;text-align:left;">Foto</th>
+                <th style="border:1px solid #999;padding:5px 6px;text-align:left;">Nº Ação</th>
                 <th style="border:1px solid #999;padding:5px 6px;text-align:left;">Ação</th>
                 <th style="border:1px solid #999;padding:5px 6px;text-align:left;">Responsável</th>
                 <th style="border:1px solid #999;padding:5px 6px;text-align:left;">Prazo</th>
@@ -1848,17 +1855,17 @@ function renderRelatorioPDF(container) {
             <tbody>
               ${linhas.length ? linhas.map(l => `
                 <tr>
-                  <td style="border:1px solid #ccc;padding:5px 6px;">${escHtml(l.numeroAcao)}</td>
-                  ${l._mostrarSubtopico ? `<td style="border:1px solid #ccc;padding:5px 6px;vertical-align:top;" rowspan="${l._spanSubtopico}">${escHtml(l.subtopicoDescricao)}</td>` : ''}
-                  ${l._mostrarProblema ? `<td style="border:1px solid #ccc;padding:5px 6px;vertical-align:top;text-align:center;" rowspan="${l._spanProblema}">${(p.incluirFotos && l.fotoUrl) ? `<img src="${escHtml(l.fotoUrl)}" style="max-width:60px;max-height:60px;object-fit:cover;">` : '—'}</td>` : ''}
+                  ${(mostrarColSubtopico && l._mostrarSubtopico) ? `<td style="border:1px solid #ccc;padding:5px 6px;vertical-align:top;" rowspan="${l._spanSubtopico}">${escHtml(l.subtopicoDescricao)}</td>` : ''}
                   ${l._mostrarProblema ? `<td style="border:1px solid #ccc;padding:5px 6px;vertical-align:top;" rowspan="${l._spanProblema}">${escHtml(l.problemaTexto)}</td>` : ''}
+                  ${l._mostrarProblema ? `<td style="border:1px solid #ccc;padding:5px 6px;vertical-align:top;text-align:center;" rowspan="${l._spanProblema}">${(p.incluirFotos && l.fotoUrl) ? `<img src="${escHtml(l.fotoUrl)}" style="max-width:60px;max-height:60px;object-fit:cover;">` : '—'}</td>` : ''}
+                  <td style="border:1px solid #ccc;padding:5px 6px;">${escHtml(l.numeroAcao)}</td>
                   <td style="border:1px solid #ccc;padding:5px 6px;">${escHtml(l.acaoDescricao)}</td>
                   <td style="border:1px solid #ccc;padding:5px 6px;">${escHtml(l.responsavel)}</td>
                   <td style="border:1px solid #ccc;padding:5px 6px;white-space:nowrap;">${formatDate(l.prazo)}</td>
                   <td style="border:1px solid #ccc;padding:5px 6px;white-space:nowrap;"><span style="color:${_statusCor[l.status]||'#333'};font-weight:700;">${escHtml(l.status)}</span></td>
                 </tr>
-                ${(p.incluirFollowups && l.followups.length) ? `<tr><td style="border:1px solid #ccc;padding:4px 6px 4px 20px;background:#f7f7f7;" colspan="5"><strong style="font-size:10px;">Follow-ups:</strong><br>${l.followups.map(f=>`<span style="font-size:10px;">${formatDate(f.data_followup)} — ${escHtml(f.responsavel||'')}: ${escHtml(f.comentario||'')}</span>`).join('<br>')}</td></tr>` : ''}
-              `).join('') : `<tr><td colspan="8" style="border:1px solid #ccc;padding:16px;text-align:center;color:#666;">Nenhuma ação encontrada para os filtros selecionados.</td></tr>`}
+                ${(p.incluirFollowups && l.followups.length) ? `<tr><td style="border:1px solid #ccc;padding:4px 6px 4px 20px;background:#f7f7f7;" colspan="${totalColunas}"><strong style="font-size:10px;">Follow-ups:</strong><br>${l.followups.map(f=>`<span style="font-size:10px;">${formatDate(f.data_followup)} — ${escHtml(f.responsavel||'')}: ${escHtml(f.comentario||'')}</span>`).join('<br>')}</td></tr>` : ''}
+              `).join('') : `<tr><td colspan="${totalColunas}" style="border:1px solid #ccc;padding:16px;text-align:center;color:#666;">Nenhuma ação encontrada para os filtros selecionados.</td></tr>`}
             </tbody>
           </table>
         </div>
@@ -4249,7 +4256,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.35', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.36', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
