@@ -321,7 +321,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.31</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.33</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -342,12 +342,12 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
   <div id="main">
     <div id="sidebar-overlay"></div><div id="topbar"><button id="hamburger" title="Menu">☰</button>
       <span class="page-title" id="page-title">Dashboard</span>
-      <span id="modo-auditoria-badge" style="display:none;font-size:11px;font-weight:700;background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.4);border-radius:4px;padding:3px 8px;margin-left:10px;letter-spacing:.5px;">🕵️ MODO AUDITORIA</span>
       <div class="topbar-spacer"></div>
       <div id="firebase-status"><div class="status-dot" id="fb-dot"></div><span id="fb-label">Não configurado</span></div>
       <div id="modelo-status-wrap" style="display:none;"><span id="modelo-badge" class="modelo-badge nok">❌ Modelo Excel</span><input type="file" id="modelo-file-input" accept=".xlsx" style="display:none;"></div>
       <span id="topbar-user" style="display:none;font-size:12px;color:var(--text2);white-space:nowrap;"></span>
       <button id="logout-btn" class="btn btn-ghost btn-sm" title="Sair" style="display:none;">🚪 Sair</button>
+      <span id="modo-auditoria-badge" title="Modo Auditoria ativo — ações vencidas ocultas" style="display:none;font-size:18px;line-height:1;">🕵️</span>
       <button id="theme-toggle" title="Alternar tema (Shift+clique ou toque prolongado: Configurações)">🌓</button>
     </div>
     <div id="dash-filter-fixed" style="display:none;flex-shrink:0;padding:12px 24px 0;background:var(--bg);"></div>
@@ -2681,7 +2681,7 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
       </div>
     </div>
 
-    <div class="panel" style="margin-top:20px;">
+    ${state.modoAuditoria ? '' : `<div class="panel" style="margin-top:20px;">
       <div class="panel-header" style="flex-wrap:wrap;gap:10px;">
         <span>📅</span>
         <span class="panel-title">Atividade na Semana</span>
@@ -2693,7 +2693,7 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
         </div>
       </div>
       <div class="panel-body" style="padding:0;">${_renderAtividadeSemana()}</div>
-    </div>
+    </div>`}
 
     <div class="panel" style="margin-top:20px;">
       <div class="panel-header"><span>📉</span><span class="panel-title">Tendência — Últimas 8 Semanas</span></div>
@@ -4089,7 +4089,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.31', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.33', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
