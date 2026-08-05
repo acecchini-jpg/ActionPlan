@@ -14,7 +14,7 @@
 <style id="theme-styles">
 :root { --bg: #f5f7fa; --bg2: #ffffff; --bg3: #f0f2f5; --border: #d1d5db; --border2: #cbd5e1; --accent: #f97316; --accent2: #fb923c; --accent-dim: #fed7aa; --text: #1e293b; --text2: #475569; --text3: #64748b; --green: #10b981; --red: #ef4444; --yellow: #f59e0b; --blue: #3b82f6; --radius: 6px; --sidebar: 240px; --font-hd: 'Barlow Condensed', sans-serif; --font-body: 'Barlow', sans-serif; --font-mono: 'JetBrains Mono', monospace; }
 body.dark-theme { --bg: #0d0f14; --bg2: #131720; --bg3: #1a2030; --border: #252d3d; --border2: #2e3a50; --text: #e2e8f0; --text2: #94a3b8; --text3: #64748b; --accent-dim: #7c3a12; }
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}html,body{height:100%;overflow:hidden}body{font-family:var(--font-body);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;transition:background 0.3s, color 0.2s}button{cursor:pointer;font-family:var(--font-body)}input,select,textarea{font-family:var(--font-body)}a{color:inherit;text-decoration:none}::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:var(--bg2)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}::-webkit-scrollbar-thumb:hover{background:var(--accent)}#app{display:flex;height:100vh;overflow:hidden}#sidebar{width:var(--sidebar);min-width:var(--sidebar);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width .3s;z-index:50;}.sidebar-logo{padding:20px 16px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}.sidebar-logo .logo-icon{width:32px;height:32px;background:var(--accent);border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--font-hd);font-size:18px;font-weight:800;color:#000;flex-shrink:0;}.logo-version{font-size:10px;font-weight:700;color:var(--accent);background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.3);border-radius:3px;padding:1px 5px;margin-left:6px;vertical-align:middle;letter-spacing:.5px;}.sidebar-logo .logo-text{font-family:var(--font-hd);font-size:18px;font-weight:700;letter-spacing:.5px}.sidebar-logo .logo-text span{color:var(--accent)}.sidebar-nav{flex:1;overflow-y:auto;padding:8px 0}.nav-section{padding:16px 16px 4px;font-family:var(--font-hd);font-size:10px;font-weight:700;letter-spacing:2px;color:var(--text3);text-transform:uppercase}.nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;transition:background .15s,color .15s;border-left:3px solid transparent;color:var(--text2);font-size:13.5px;white-space:nowrap;overflow:hidden;}.nav-item:hover{background:var(--bg3);color:var(--text)}.nav-item.active{background:var(--bg3);color:var(--accent);border-left-color:var(--accent)}.nav-item .nav-icon{width:18px;text-align:center;font-size:15px;flex-shrink:0}.sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);}.config-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:3px;background:var(--accent-dim);color:var(--accent2);font-size:10px;font-weight:600;cursor:pointer;}.config-badge:hover{background:var(--accent);color:#000}#main{flex:1;display:flex;flex-direction:column;overflow:hidden}#topbar{height:52px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:16px;flex-shrink:0;}.page-title{font-family:var(--font-hd);font-size:20px;font-weight:700;letter-spacing:.5px}.topbar-spacer{flex:1}#firebase-status{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2)}.status-dot{width:8px;height:8px;border-radius:50%;background:var(--text3)}.status-dot.ok{background:var(--green);box-shadow:0 0 6px var(--green)}.status-dot.err{background:var(--red);box-shadow:0 0 6px var(--red)}#theme-toggle{cursor:pointer;font-size:20px;padding:0 8px;border-radius:50%;background:var(--bg3);border:none;color:var(--text);width:32px;height:32px;display:flex;align-items:center;justify-content:center;}#theme-toggle:hover{background:var(--border);}#page{flex:1;overflow-y:auto;padding:24px}.panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px}.panel-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}.panel-title{font-family:var(--font-hd);font-size:16px;font-weight:700;letter-spacing:.5px}.panel-body{padding:18px}.panel-actions{margin-left:auto;display:flex;gap:8px}.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius);border:none;font-size:13px;font-weight:600;transition:all .15s;white-space:nowrap;}.btn-primary{background:var(--accent);color:#000}.btn-primary:hover{background:var(--accent2)}.btn-secondary{background:var(--bg3);color:var(--text);border:1px solid var(--border2)}.btn-secondary:hover{background:var(--border);color:var(--text)}.btn-danger{background:#7f1d1d;color:var(--red);border:1px solid #991b1b}.btn-danger:hover{background:var(--red);color:#fff}.btn-ghost{background:transparent;color:var(--text2);border:1px solid transparent}.btn-ghost:hover{background:var(--bg3);color:var(--text);border-color:var(--border)}.btn-sm{padding:4px 10px;font-size:12px}.btn-xs{padding:3px 7px;font-size:11px}.form-group{margin-bottom:14px}.form-label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}.form-control{width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-size:13px;transition:border .15s;}.form-control:focus{outline:none;border-color:var(--accent)}.form-row{display:grid;gap:14px}.form-row.cols-2{grid-template-columns:1fr 1fr}.form-row.cols-3{grid-template-columns:1fr 1fr 1fr}.form-row.cols-6{grid-template-columns:repeat(6,1fr)}.form-row.cols-7{grid-template-columns:repeat(7,1fr)}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px}thead tr{background:var(--bg3)}th{padding:9px 12px;text-align:left;font-family:var(--font-hd);font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap;}td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle}tr:hover td{background:rgba(249,115,22,.04)}.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap;}.badge-green{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3)}.badge-red{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}.badge-yellow{background:rgba(245,158,11,.15);color:var(--yellow);border:1px solid rgba(245,158,11,.3)}.badge-blue{background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.3)}.badge-gray{background:rgba(100,116,139,.15);color:var(--text3);border:1px solid rgba(100,116,139,.3)}.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center;padding:20px;}.modal-overlay.open{display:flex}.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);width:100%;max-width:640px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;}.modal-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}.modal-title{font-family:var(--font-hd);font-size:18px;font-weight:700}.modal-close{margin-left:auto;background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1}.modal-close:hover{color:var(--text)}.modal-body{flex:1;overflow-y:auto;padding:20px}.modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}#toast-container{position:fixed;top:20px;right:20px;z-index:2000;display:flex;flex-direction:column;gap:8px}.toast{padding:12px 16px;border-radius:var(--radius);font-size:13px;font-weight:500;min-width:260px;display:flex;align-items:center;gap:10px;animation:slideIn .25s ease;border-left:4px solid;}.toast.success{background:#052e16;border-color:var(--green);color:var(--green)}.toast.error{background:#450a0a;border-color:var(--red);color:var(--red)}.toast.info{background:#1e3a5f;border-color:var(--blue);color:var(--blue)}.toast.warning{background:#451a03;border-color:var(--yellow);color:var(--yellow)}@keyframes slideIn{from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1}}.spinner{width:18px;height:18px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}@keyframes spin{to{transform:rotate(360deg)}}#global-loading{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:900;align-items:center;justify-content:center;}#global-loading.show{display:flex}.loading-box{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:24px 32px;display:flex;align-items:center;gap:14px;font-weight:600}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}html,body{height:100%;overflow:hidden}body{font-family:var(--font-body);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;transition:background 0.3s, color 0.2s}button{cursor:pointer;font-family:var(--font-body)}input,select,textarea{font-family:var(--font-body)}a{color:inherit;text-decoration:none}::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:var(--bg2)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}::-webkit-scrollbar-thumb:hover{background:var(--accent)}#app{display:flex;height:100vh;overflow:hidden}#sidebar{width:var(--sidebar);min-width:var(--sidebar);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width .3s;z-index:50;}.sidebar-logo{padding:20px 16px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}.sidebar-logo .logo-icon{width:32px;height:32px;background:var(--accent);border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--font-hd);font-size:18px;font-weight:800;color:#000;flex-shrink:0;}.logo-version{font-size:10px;font-weight:700;color:var(--accent);background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.3);border-radius:3px;padding:1px 5px;margin-left:6px;vertical-align:middle;letter-spacing:.5px;}.sidebar-logo .logo-text{font-family:var(--font-hd);font-size:18px;font-weight:700;letter-spacing:.5px}.sidebar-logo .logo-text span{color:var(--accent)}.sidebar-nav{flex:1;overflow-y:auto;padding:8px 0}.nav-section{padding:16px 16px 4px;font-family:var(--font-hd);font-size:10px;font-weight:700;letter-spacing:2px;color:var(--text3);text-transform:uppercase}.nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;transition:background .15s,color .15s;border-left:3px solid transparent;color:var(--text2);font-size:13.5px;white-space:nowrap;overflow:hidden;}.nav-item:hover{background:var(--bg3);color:var(--text)}.nav-item.active{background:var(--bg3);color:var(--accent);border-left-color:var(--accent)}.nav-item .nav-icon{width:18px;text-align:center;font-size:15px;flex-shrink:0}.sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);}.config-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:3px;background:var(--accent-dim);color:var(--accent2);font-size:10px;font-weight:600;cursor:pointer;}.config-badge:hover{background:var(--accent);color:#000}#main{flex:1;display:flex;flex-direction:column;overflow:hidden}#topbar{height:52px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:16px;flex-shrink:0;}.page-title{font-family:var(--font-hd);font-size:20px;font-weight:700;letter-spacing:.5px}.topbar-spacer{flex:1}#firebase-status{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2)}.status-dot{width:8px;height:8px;border-radius:50%;background:var(--text3)}.status-dot.ok{background:var(--green);box-shadow:0 0 6px var(--green)}.status-dot.err{background:var(--red);box-shadow:0 0 6px var(--red)}#theme-toggle{cursor:pointer;font-size:20px;padding:0 8px;border-radius:50%;background:var(--bg3);border:none;color:var(--text);width:32px;height:32px;display:flex;align-items:center;justify-content:center;}#theme-toggle:hover{background:var(--border);}#page{flex:1;overflow-y:auto;padding:24px}.panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px}.panel-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}.panel-title{font-family:var(--font-hd);font-size:16px;font-weight:700;letter-spacing:.5px}.panel-body{padding:18px}.panel-actions{margin-left:auto;display:flex;gap:8px}.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius);border:none;font-size:13px;font-weight:600;transition:all .15s;white-space:nowrap;}.btn-primary{background:var(--accent);color:#000}.btn-primary:hover{background:var(--accent2)}.btn-secondary{background:var(--bg3);color:var(--text);border:1px solid var(--border2)}.btn-secondary:hover{background:var(--border);color:var(--text)}.btn-danger{background:#7f1d1d;color:var(--red);border:1px solid #991b1b}.btn-danger:hover{background:var(--red);color:#fff}.btn-ghost{background:transparent;color:var(--text2);border:1px solid transparent}.btn-ghost:hover{background:var(--bg3);color:var(--text);border-color:var(--border)}.btn-sm{padding:4px 10px;font-size:12px}.btn-xs{padding:3px 7px;font-size:11px}.form-group{margin-bottom:14px}.form-label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}.form-control{width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-size:13px;transition:border .15s;}.form-control:focus{outline:none;border-color:var(--accent)}.form-row{display:grid;gap:14px}.form-row.cols-2{grid-template-columns:1fr 1fr}.form-row.cols-3{grid-template-columns:1fr 1fr 1fr}.form-row.cols-4{grid-template-columns:repeat(4,1fr)}.form-row.cols-6{grid-template-columns:repeat(6,1fr)}.form-row.cols-7{grid-template-columns:repeat(7,1fr)}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px}thead tr{background:var(--bg3)}th{padding:9px 12px;text-align:left;font-family:var(--font-hd);font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap;}td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle}tr:hover td{background:rgba(249,115,22,.04)}.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap;}.badge-green{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3)}.badge-red{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}.badge-yellow{background:rgba(245,158,11,.15);color:var(--yellow);border:1px solid rgba(245,158,11,.3)}.badge-blue{background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.3)}.badge-gray{background:rgba(100,116,139,.15);color:var(--text3);border:1px solid rgba(100,116,139,.3)}.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center;padding:20px;}.modal-overlay.open{display:flex}.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);width:100%;max-width:640px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;}.modal-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}.modal-title{font-family:var(--font-hd);font-size:18px;font-weight:700}.modal-close{margin-left:auto;background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1}.modal-close:hover{color:var(--text)}.modal-body{flex:1;overflow-y:auto;padding:20px}.modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}#toast-container{position:fixed;top:20px;right:20px;z-index:2000;display:flex;flex-direction:column;gap:8px}.toast{padding:12px 16px;border-radius:var(--radius);font-size:13px;font-weight:500;min-width:260px;display:flex;align-items:center;gap:10px;animation:slideIn .25s ease;border-left:4px solid;}.toast.success{background:#052e16;border-color:var(--green);color:var(--green)}.toast.error{background:#450a0a;border-color:var(--red);color:var(--red)}.toast.info{background:#1e3a5f;border-color:var(--blue);color:var(--blue)}.toast.warning{background:#451a03;border-color:var(--yellow);color:var(--yellow)}@keyframes slideIn{from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1}}.spinner{width:18px;height:18px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}@keyframes spin{to{transform:rotate(360deg)}}#global-loading{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:900;align-items:center;justify-content:center;}#global-loading.show{display:flex}.loading-box{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:24px 32px;display:flex;align-items:center;gap:14px;font-weight:600}
 
 /* CORREÇÃO 1: Dashboard cards lado a lado com rolagem horizontal */
 .kpi-grid { display: flex; flex-wrap: nowrap; gap: 14px; overflow-x: auto; margin-bottom: 20px; padding-bottom: 4px; }
@@ -92,6 +92,7 @@ body.dark-theme { --bg: #0d0f14; --bg2: #131720; --bg3: #1a2030; --border: #252d
   /* grids collapse to single column */
   .form-row.cols-2,
   .form-row.cols-3,
+  .form-row.cols-4,
   .form-row.cols-6,
   .form-row.cols-7,
   .form-row[style*='grid-template-columns'] { grid-template-columns: 1fr !important; }
@@ -142,6 +143,7 @@ body.dark-theme { --bg: #0d0f14; --bg2: #131720; --bg3: #1a2030; --border: #252d
   :root { --sidebar: 200px; }
   #page { padding: 16px; }
   .form-row.cols-3 { grid-template-columns: 1fr 1fr !important; }
+  .form-row.cols-4 { grid-template-columns: 1fr 1fr !important; }
   .form-row.cols-6 { grid-template-columns: 1fr 1fr 1fr !important; }
   .form-row.cols-7 { grid-template-columns: 1fr 1fr 1fr !important; }
   .charts-grid { grid-template-columns: 1fr !important; }
@@ -194,7 +196,7 @@ body.dark-theme { --bg: #0d0f14; --bg2: #131720; --bg3: #1a2030; --border: #252d
   thead th { background:#e8e8e8!important; color:#000!important; border:1px solid #999!important; padding:3px 4px!important; font-weight:bold!important; word-break:break-word; }
   tbody td { border:1px solid #ccc!important; padding:2px 4px!important; vertical-align:top; word-break:break-word; }
   tbody tr:nth-child(even) td { background:#f9f9f9!important; }
-  td:last-child, th:last-child { display:none!important; }
+  #tabela-acoes td:last-child, #tabela-acoes th:last-child { display:none!important; }
   .badge { background:#eee!important; color:#000!important; border:1px solid #999!important; }
   .followup-row, .empty-state { display:none!important; }
   a { color:#000!important; text-decoration:none!important; }
@@ -321,7 +323,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.34</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.35</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -470,7 +472,7 @@ let _dashModoContagem       = 'pecas'; // 'pecas' | 'ocorrencias' — compartilh
 let _dashDefeitosTopN       = 15;  // barras — compartilhado entre Operador e Sub-tópico (Turno não usa)
 let _dashDefeitosSemana     = ''; // filtro de semana — compartilhado entre Turno, Operador e Sub-tópico
 let _dashAgruparPor         = 'responsavel';  // 'responsavel' | 'departamento' — agrupamento dos 3 gráficos por responsável
-const state = { config: { ...DEFAULT_FIREBASE_CONFIG }, clientes: [], responsaveis: [], planos: [], subtopicos: [], acoes: [], presencas: [], cursos1tema: [], operadores_turno: [], currentPage: 'dashboard', currentEvidenciaTarget: null, evidenciaDataURL: null, modoAuditoria: false, };
+const state = { config: { ...DEFAULT_FIREBASE_CONFIG }, clientes: [], responsaveis: [], planos: [], subtopicos: [], acoes: [], presencas: [], cursos1tema: [], operadores_turno: [], currentPage: 'dashboard', currentEvidenciaTarget: null, evidenciaDataURL: null, modoAuditoria: false, logoEmpresaUrl: null, };
 
 // ==================== FUNÇÕES AUXILIARES (comuns) ====================
 function showLoading(msg) { const ld = document.getElementById('global-loading'); document.getElementById('loading-msg').textContent = msg; ld.classList.add('show'); }
@@ -752,6 +754,7 @@ function setupRealtimeListeners() { showLoading('Sincronizando dados…'); const
     // v19.31: modo auditoria — documento único, sincronizado globalmente (afeta todo mundo vendo o app, não só quem ativou)
     const _unsubAuditoria = db.collection('config_sistema').doc('geral').onSnapshot(doc => {
       state.modoAuditoria = doc.exists ? (doc.data().modo_auditoria === true) : false;
+      state.logoEmpresaUrl = doc.exists ? (doc.data().logo_empresa_url || null) : null; // v19.35
       render();
     }, err => console.warn('Erro ao sincronizar modo auditoria:', err));
     _snapUnsubs.push(_unsubAuditoria);
@@ -1231,7 +1234,7 @@ async function navigate(page) {
   }
   if(page !== 'novo-cadastro') { _ncState.editingProblemaId = null; _ncState.editingCorretivaIdx = null; _ncState._novoId = null; } state.currentPage = page; document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page===page)); document.getElementById('page-title').textContent = pageTitles[page]||page; render();
 }
-function render() { if (typeof _updateVencidasBadge === 'function') setTimeout(_updateVencidasBadge, 0); if (typeof aplicarPermissoesUI === 'function') setTimeout(aplicarPermissoesUI, 0); if (window._updateBottomNav) window._updateBottomNav(state.currentPage); const _dashFilterEl = document.getElementById('dash-filter-fixed'); if (_dashFilterEl && state.currentPage !== 'dashboard') _dashFilterEl.style.display = 'none'; const _auditBadge = document.getElementById('modo-auditoria-badge'); if (_auditBadge) _auditBadge.style.display = state.modoAuditoria ? 'inline-block' : 'none'; const el = document.getElementById('page'); const renders = { dashboard:renderDashboard, analise:renderAnalise, clientes:renderClientes, responsaveis:renderResponsaveis, planos:renderPlanos, subtopicos:renderSubtopicos, listagem:renderListagem, 'novo-cadastro':renderNovoCadastro, 'fazer-backup':renderFazerBackup, 'recuperar-backup':renderRecuperarBackup, presenca:renderPresenca, curso1tema:renderCurso1Tema, configuracoes:renderConfiguracoes }; el.innerHTML = ''; (renders[state.currentPage]||renderDashboard)(el); }
+function render() { if (typeof _updateVencidasBadge === 'function') setTimeout(_updateVencidasBadge, 0); if (typeof aplicarPermissoesUI === 'function') setTimeout(aplicarPermissoesUI, 0); if (window._updateBottomNav) window._updateBottomNav(state.currentPage); const _dashFilterEl = document.getElementById('dash-filter-fixed'); if (_dashFilterEl && state.currentPage !== 'dashboard') _dashFilterEl.style.display = 'none'; const _auditBadge = document.getElementById('modo-auditoria-badge'); if (_auditBadge) _auditBadge.style.display = state.modoAuditoria ? 'inline-block' : 'none'; const el = document.getElementById('page'); const renders = { dashboard:renderDashboard, analise:renderAnalise, clientes:renderClientes, responsaveis:renderResponsaveis, planos:renderPlanos, subtopicos:renderSubtopicos, listagem:renderListagem, 'novo-cadastro':renderNovoCadastro, 'fazer-backup':renderFazerBackup, 'recuperar-backup':renderRecuperarBackup, presenca:renderPresenca, curso1tema:renderCurso1Tema, configuracoes:renderConfiguracoes, 'relatorio-pdf':renderRelatorioPDF }; el.innerHTML = ''; (renders[state.currentPage]||renderDashboard)(el); }
 
 // ==================== PÁGINAS BÁSICAS (Clientes, Planos, Subtópicos) ====================
 // (código mantido idêntico ao original, apenas para não quebrar o funcionamento)
@@ -1718,6 +1721,153 @@ function _atualizarSubResponsavelPorPlano() {
   respSelEl.value = [...respSelEl.options].some(o => o.value === respValorAtual) ? respValorAtual : '';
 }
 function _sortListagem(col) { if(_listagemSort.col===col) _listagemSort.asc=!_listagemSort.asc; else { _listagemSort.col=col; _listagemSort.asc=true; } aplicarFiltrosETabela(); }
+// v19.35: modal de opções do Relatório PDF (Plano, Sub-Tópico opcional, fotos/follow-ups opcionais)
+let _relatorioParams = null;
+function _abrirModalRelatorioPDF() {
+  let overlay = document.getElementById('relatorio-pdf-modal');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'relatorio-pdf-modal';
+    document.body.appendChild(overlay);
+  }
+  const planosOpts = [...state.planos].sort((a,b)=>(a.titulo||'').localeCompare(b.titulo||'','pt-BR')).map(p=>`<option value="${p.id}">${escHtml(p.titulo)}</option>`).join('');
+  overlay.innerHTML = `<div class="modal" style="max-width:460px;">
+    <div class="modal-header"><span>🖨️</span><span class="modal-title">Gerar Relatório PDF</span><button class="modal-close" id="rp-modal-close">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Plano *</label><select class="form-control" id="rp-plano"><option value="">Selecione...</option>${planosOpts}</select></div>
+      <div class="form-group"><label class="form-label">Sub-Tópico</label><select class="form-control" id="rp-subtopico"><option value="">Todos os sub-tópicos do Plano</option></select></div>
+      <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;"><input type="checkbox" id="rp-fotos" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);"> Incluir fotos das evidências</label></div>
+      <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;"><input type="checkbox" id="rp-followups" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);"> Incluir follow-ups de cada ação</label></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" id="rp-modal-cancelar">Cancelar</button><button class="btn btn-primary" id="rp-modal-gerar">📄 Gerar Relatório</button></div>
+  </div>`;
+  overlay.classList.add('open');
+  const _fechar = () => overlay.classList.remove('open');
+  overlay.querySelector('#rp-modal-close').addEventListener('click', _fechar);
+  overlay.querySelector('#rp-modal-cancelar').addEventListener('click', _fechar);
+  overlay.querySelector('#rp-plano').addEventListener('change', function() {
+    const subSel = overlay.querySelector('#rp-subtopico');
+    const subs = state.subtopicos.filter(s => s.plano_id === this.value).sort((a,b)=>(a.descricao||'').localeCompare(b.descricao||'','pt-BR'));
+    subSel.innerHTML = '<option value="">Todos os sub-tópicos do Plano</option>' + subs.map(s=>`<option value="${s.id}">${escHtml(s.descricao)}</option>`).join('');
+  });
+  overlay.querySelector('#rp-modal-gerar').addEventListener('click', () => {
+    const planoId = overlay.querySelector('#rp-plano').value;
+    if (!planoId) { toast('Selecione um Plano', 'warning'); return; }
+    _relatorioParams = {
+      planoId,
+      subtopicoId: overlay.querySelector('#rp-subtopico').value,
+      incluirFotos: overlay.querySelector('#rp-fotos').checked,
+      incluirFollowups: overlay.querySelector('#rp-followups').checked
+    };
+    _fechar();
+    state.currentPage = 'relatorio-pdf';
+    render();
+  });
+}
+function renderRelatorioPDF(container) {
+  const p = _relatorioParams;
+  if (!p || !p.planoId) { state.currentPage = 'listagem'; render(); return; }
+  const plano = state.planos.find(pl => pl.id === p.planoId);
+  if (!plano) { toast('Plano não encontrado.', 'error'); state.currentPage = 'listagem'; render(); return; }
+  const cliente = state.clientes.find(c => c.id === plano.cliente_id);
+
+  // Monta uma linha por ação corretiva
+  let linhas = [];
+  state.acoes
+    .filter(prob => prob.plano_id === p.planoId && (!p.subtopicoId || prob.subtopico_id === p.subtopicoId))
+    .forEach(prob => {
+      const subtopico = state.subtopicos.find(s => s.id === prob.subtopico_id);
+      (prob.acoes_corretivas || []).forEach(cr => {
+        const status = calcStatusAcao(cr);
+        if (state.modoAuditoria && status === 'VENCIDO') return; // v19.35: relatório também respeita o modo auditoria
+        linhas.push({
+          problemaId: prob.id,
+          subtopicoDescricao: subtopico ? subtopico.descricao : '—',
+          problemaTexto: prob.problema || '—',
+          fotoUrl: prob.evidencia_problema || null,
+          numeroAcao: _numAcaoValido(cr.numeroAcao) ? String(cr.numeroAcao) : '—',
+          acaoDescricao: cr.acao_descricao || '—',
+          responsavel: cr.responsavel || '—',
+          prazo: cr.data_prevista || '',
+          status,
+          followups: cr.followups || []
+        });
+      });
+    });
+
+  linhas.sort((a, b) => {
+    const s = a.subtopicoDescricao.localeCompare(b.subtopicoDescricao, 'pt-BR');
+    if (s !== 0) return s;
+    if (a.problemaId !== b.problemaId) return a.problemaTexto.localeCompare(b.problemaTexto, 'pt-BR');
+    return 0;
+  });
+
+  for (let i = 0; i < linhas.length; i++) {
+    linhas[i]._mostrarSubtopico = (i === 0 || linhas[i].subtopicoDescricao !== linhas[i-1].subtopicoDescricao);
+    if (linhas[i]._mostrarSubtopico) { let n = 1; while (i+n < linhas.length && linhas[i+n].subtopicoDescricao === linhas[i].subtopicoDescricao) n++; linhas[i]._spanSubtopico = n; }
+    linhas[i]._mostrarProblema = (i === 0 || linhas[i].problemaId !== linhas[i-1].problemaId);
+    if (linhas[i]._mostrarProblema) { let n = 1; while (i+n < linhas.length && linhas[i+n].problemaId === linhas[i].problemaId) n++; linhas[i]._spanProblema = n; }
+  }
+
+  const _statusCor = { 'EM ANDAMENTO':'#3b82f6', 'FECHADO':'#10b981', 'VENCIDO':'#ef4444' };
+
+  container.innerHTML = `
+    <div class="panel" style="max-width:1100px;margin:0 auto;">
+      <div class="panel-body">
+        <div style="display:flex;gap:10px;margin-bottom:16px;">
+          <button class="btn btn-secondary btn-sm" id="rp-voltar">← Voltar</button>
+          <button class="btn btn-primary btn-sm" id="rp-imprimir">🖨️ Imprimir / Salvar PDF</button>
+        </div>
+        <div id="rp-conteudo" style="background:#fff;color:#000;padding:24px;border:1px solid #ccc;">
+          <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #333;padding-bottom:10px;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:16px;">
+              ${state.logoEmpresaUrl ? `<img src="${escHtml(state.logoEmpresaUrl)}" style="max-height:60px;max-width:200px;object-fit:contain;">` : ''}
+              <div>
+                <div style="font-size:22px;font-weight:800;">Plano de Ações</div>
+                <div style="font-size:14px;">${escHtml(plano.titulo)}${cliente ? ' (' + escHtml(cliente.nome) + ')' : ''}${p.subtopicoId ? ' — ' + escHtml(state.subtopicos.find(s=>s.id===p.subtopicoId)?.descricao || '') : ''}</div>
+              </div>
+            </div>
+            <div style="text-align:right;font-size:12px;">
+              <strong>Data Atualização:</strong><br>${formatDate(today())}
+            </div>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:11px;">
+            <thead>
+              <tr style="background:#e8e8e8;">
+                <th style="border:1px solid #999;padding:5px 6px;text-align:left;">Nº Ação</th>
+                <th style="border:1px solid #999;padding:5px 6px;text-align:left;">Sub-Tópico</th>
+                <th style="border:1px solid #999;padding:5px 6px;text-align:left;">Foto</th>
+                <th style="border:1px solid #999;padding:5px 6px;text-align:left;">Problema</th>
+                <th style="border:1px solid #999;padding:5px 6px;text-align:left;">Ação</th>
+                <th style="border:1px solid #999;padding:5px 6px;text-align:left;">Responsável</th>
+                <th style="border:1px solid #999;padding:5px 6px;text-align:left;">Prazo</th>
+                <th style="border:1px solid #999;padding:5px 6px;text-align:left;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${linhas.length ? linhas.map(l => `
+                <tr>
+                  <td style="border:1px solid #ccc;padding:5px 6px;">${escHtml(l.numeroAcao)}</td>
+                  ${l._mostrarSubtopico ? `<td style="border:1px solid #ccc;padding:5px 6px;vertical-align:top;" rowspan="${l._spanSubtopico}">${escHtml(l.subtopicoDescricao)}</td>` : ''}
+                  ${l._mostrarProblema ? `<td style="border:1px solid #ccc;padding:5px 6px;vertical-align:top;text-align:center;" rowspan="${l._spanProblema}">${(p.incluirFotos && l.fotoUrl) ? `<img src="${escHtml(l.fotoUrl)}" style="max-width:60px;max-height:60px;object-fit:cover;">` : '—'}</td>` : ''}
+                  ${l._mostrarProblema ? `<td style="border:1px solid #ccc;padding:5px 6px;vertical-align:top;" rowspan="${l._spanProblema}">${escHtml(l.problemaTexto)}</td>` : ''}
+                  <td style="border:1px solid #ccc;padding:5px 6px;">${escHtml(l.acaoDescricao)}</td>
+                  <td style="border:1px solid #ccc;padding:5px 6px;">${escHtml(l.responsavel)}</td>
+                  <td style="border:1px solid #ccc;padding:5px 6px;white-space:nowrap;">${formatDate(l.prazo)}</td>
+                  <td style="border:1px solid #ccc;padding:5px 6px;white-space:nowrap;"><span style="color:${_statusCor[l.status]||'#333'};font-weight:700;">${escHtml(l.status)}</span></td>
+                </tr>
+                ${(p.incluirFollowups && l.followups.length) ? `<tr><td style="border:1px solid #ccc;padding:4px 6px 4px 20px;background:#f7f7f7;" colspan="5"><strong style="font-size:10px;">Follow-ups:</strong><br>${l.followups.map(f=>`<span style="font-size:10px;">${formatDate(f.data_followup)} — ${escHtml(f.responsavel||'')}: ${escHtml(f.comentario||'')}</span>`).join('<br>')}</td></tr>` : ''}
+              `).join('') : `<tr><td colspan="8" style="border:1px solid #ccc;padding:16px;text-align:center;color:#666;">Nenhuma ação encontrada para os filtros selecionados.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('rp-voltar')?.addEventListener('click', () => { state.currentPage = 'listagem'; render(); });
+  document.getElementById('rp-imprimir')?.addEventListener('click', () => window.print());
+}
 function renderListagem(container) {
   // ── CORREÇÃO 1: Proteção contra container nulo/undefined ──
   if (!container) { console.warn('[renderListagem] container não encontrado no DOM — abortando.'); return; }
@@ -1731,7 +1881,7 @@ function renderListagem(container) {
   const responsavelOpts = `<option value="">Todos os responsáveis</option>` + Array.from(responsaveisSet).sort((a,b)=>a.localeCompare(b,'pt-BR')).map(r=>`<option value="${escHtml(r)}">${escHtml(r)}</option>`).join('');
   const statusOpts = `<option value="">Todos os status</option><option value="EM ANDAMENTO">Em Andamento</option><option value="VENCIDO">Vencido</option><option value="FECHADO">Fechado</option><option value="SEM_PRAZO">Sem Prazo</option>`;
   // ── CORREÇÃO 2: O id do container da tabela é "listagem-tbody" — confirmado e correto ──
-  container.innerHTML = `<div class="panel"><div class="panel-body"><div class="filters-bar" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;"><select id="filtro-plano" class="form-control" style="width:auto;">${planosOpts}</select><select id="filtro-subtopico" class="form-control" style="width:auto;">${subtopicosOpts}</select><select id="filtro-responsavel" class="form-control" style="width:auto;">${responsavelOpts}</select><select id="filtro-status" class="form-control" style="width:auto;">${statusOpts}</select><input type="search" id="filtro-busca" class="form-control" placeholder="🔍 Buscar..." style="min-width:180px;flex:1;max-width:360px;"><button id="limpar-filtros" class="btn btn-ghost btn-sm">✕ Limpar</button><button id="expandir-tudo-followups" class="btn btn-ghost btn-sm" title="Expandir todos os follow-ups">⬇️ Expandir tudo</button><button id="colapsar-tudo-followups" class="btn btn-ghost btn-sm" title="Recolher todos os follow-ups">⬆️ Colapsar tudo</button><span style="flex:1;"></span><button id="btn-importar-followups-lote" class="btn btn-ghost btn-sm" title="Importar Follow-ups em Lote (Excel: Número da Ação, Data, Responsável, Comentário)" style="font-size:15px;padding:4px 8px;">➕📥</button><button id="btn-excel-listagem" class="btn btn-ghost btn-sm" title="Exportar para Excel" style="font-size:15px;padding:4px 8px;">📥</button><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;white-space:nowrap;"><input type="checkbox" id="filtro-exibir-fechados" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"> Exibir Fechados</label></div><div class="table-wrap"><table id="tabela-acoes"><thead><tr><th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-plano">Plano</th><th style="min-width:58px;text-align:center;cursor:pointer;user-select:none;" id="lh-num">Nº Ação</th><th style="min-width:140px;cursor:pointer;user-select:none;" id="lh-subtopico">Sub-Tópico</th><th style="min-width:180px;cursor:pointer;user-select:none;" id="lh-problema">Problema</th><th style="min-width:60px;">Evidência</th><th style="min-width:200px;cursor:pointer;user-select:none;" id="lh-acao">Ação Corretiva</th><th style="min-width:130px;cursor:pointer;user-select:none;" id="lh-responsavel">Responsável</th><th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-abertura">Ocorrência</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-prazo">Prazo</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-fup">Último FUP</th><th style="min-width:60px;cursor:pointer;user-select:none;" id="lh-idade">Idade</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-status">Status</th><th style="min-width:160px;">Ações</th></tr></thead><tbody id="listagem-tbody"></tbody></table></div></div></div>`;
+  container.innerHTML = `<div class="panel"><div class="panel-body"><div class="filters-bar" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;"><select id="filtro-plano" class="form-control" style="width:auto;">${planosOpts}</select><select id="filtro-subtopico" class="form-control" style="width:auto;">${subtopicosOpts}</select><select id="filtro-responsavel" class="form-control" style="width:auto;">${responsavelOpts}</select><select id="filtro-status" class="form-control" style="width:auto;">${statusOpts}</select><input type="search" id="filtro-busca" class="form-control" placeholder="🔍 Buscar..." style="min-width:180px;flex:1;max-width:360px;"><button id="limpar-filtros" class="btn btn-ghost btn-sm">✕ Limpar</button><button id="expandir-tudo-followups" class="btn btn-ghost btn-sm" title="Expandir todos os follow-ups">⬇️ Expandir tudo</button><button id="colapsar-tudo-followups" class="btn btn-ghost btn-sm" title="Recolher todos os follow-ups">⬆️ Colapsar tudo</button><span style="flex:1;"></span><button id="btn-importar-followups-lote" class="btn btn-ghost btn-sm" title="Importar Follow-ups em Lote (Excel: Número da Ação, Data, Responsável, Comentário)" style="font-size:15px;padding:4px 8px;">➕📥</button><button id="btn-excel-listagem" class="btn btn-ghost btn-sm" title="Exportar para Excel" style="font-size:15px;padding:4px 8px;">📥</button><button id="btn-relatorio-pdf" class="btn btn-ghost btn-sm" title="Gerar Relatório PDF do Plano" style="font-size:15px;padding:4px 8px;">🖨️</button><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;white-space:nowrap;"><input type="checkbox" id="filtro-exibir-fechados" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"> Exibir Fechados</label></div><div class="table-wrap"><table id="tabela-acoes"><thead><tr><th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-plano">Plano</th><th style="min-width:58px;text-align:center;cursor:pointer;user-select:none;" id="lh-num">Nº Ação</th><th style="min-width:140px;cursor:pointer;user-select:none;" id="lh-subtopico">Sub-Tópico</th><th style="min-width:180px;cursor:pointer;user-select:none;" id="lh-problema">Problema</th><th style="min-width:60px;">Evidência</th><th style="min-width:200px;cursor:pointer;user-select:none;" id="lh-acao">Ação Corretiva</th><th style="min-width:130px;cursor:pointer;user-select:none;" id="lh-responsavel">Responsável</th><th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-abertura">Ocorrência</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-prazo">Prazo</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-fup">Último FUP</th><th style="min-width:60px;cursor:pointer;user-select:none;" id="lh-idade">Idade</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-status">Status</th><th style="min-width:160px;">Ações</th></tr></thead><tbody id="listagem-tbody"></tbody></table></div></div></div>`;
   // ── PERSISTÊNCIA DOS FILTROS DA LISTAGEM (localStorage) ──
   const _LS_FILTROS_KEY = 'listagem_filtros_v1';
   function _salvarFiltrosListagem() {
@@ -1859,6 +2009,7 @@ function renderListagem(container) {
     } catch(e) { toast('Erro ao gerar Excel: ' + e.message, 'error'); }
     finally { hideLoading(); _forcarTabelaCompleta = false; aplicarFiltrosETabela(); }
   });
+  document.getElementById('btn-relatorio-pdf')?.addEventListener('click', () => _abrirModalRelatorioPDF());
   document.getElementById('btn-importar-followups-lote')?.addEventListener('click', () => {
     if (!podeVer('config')) { toast('Acesso não permitido para o seu nível de usuário.', 'error'); return; }
     const input = document.createElement('input');
@@ -4098,7 +4249,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.34', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.35', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
@@ -4805,7 +4956,7 @@ function renderConfiguracoes(container) {
       <div class="panel-header"><span>⚙️</span><span class="panel-title">Configurações</span></div>
       <div class="panel-body">
         <p style="color:var(--text2);font-size:13px;margin-bottom:16px;">Área restrita a usuários nível 1. Acesso via Shift+clique no botão de tema (🌓).</p>
-        <div class="form-row cols-7" style="margin-bottom:10px;">
+        <div class="form-row cols-4" style="margin-bottom:10px;">
           <div class="panel" style="margin-bottom:0;">
             <div class="panel-header"><span>💾</span><span class="panel-title" style="font-size:14px;">Backup</span></div>
             <div class="panel-body" style="display:flex;flex-direction:column;gap:8px;">
@@ -4863,6 +5014,15 @@ function renderConfiguracoes(container) {
               <p style="font-size:11px;color:var(--text3);margin:0;">Oculta todas as ações vencidas da Listagem e do Dashboard. Vale para <strong>todos</strong> os usuários vendo o sistema, não só quem ativou.</p>
             </div>
           </div>
+          <div class="panel" style="margin-bottom:0;">
+            <div class="panel-header"><span>🏢</span><span class="panel-title" style="font-size:14px;">Logo da Empresa</span></div>
+            <div class="panel-body" style="display:flex;flex-direction:column;gap:8px;">
+              <button class="btn btn-secondary" id="cfg-upload-logo">📎 Carregar/Substituir</button>
+              ${state.logoEmpresaUrl ? `<img src="${escHtml(state.logoEmpresaUrl)}" style="max-height:40px;max-width:100%;object-fit:contain;">` : '<span style="font-size:11px;color:var(--text3);">Nenhum logo carregado</span>'}
+              <input type="file" id="logo-empresa-file-input" accept="image/*" style="display:none;">
+              <p style="font-size:11px;color:var(--text3);margin:0;">Usado no cabeçalho do Relatório PDF do Plano de Ações.</p>
+            </div>
+          </div>
         </div>
         <div class="panel" style="margin-bottom:0;">
           <div class="panel-header"><span>👤</span><span class="panel-title" style="font-size:14px;">Usuários</span>
@@ -4880,6 +5040,23 @@ function renderConfiguracoes(container) {
   document.getElementById('cfg-novo-usuario')?.addEventListener('click', () => openUsuarioModal(null));
   document.getElementById('cfg-historico-login')?.addEventListener('click', abrirHistoricoLoginModal);
   document.getElementById('cfg-upload-modelo')?.addEventListener('click', () => document.getElementById('cfg-modelo-file-input')?.click());
+  document.getElementById('cfg-upload-logo')?.addEventListener('click', () => document.getElementById('logo-empresa-file-input')?.click());
+  document.getElementById('logo-empresa-file-input')?.addEventListener('change', async function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast('Selecione um arquivo de imagem válido.', 'warning'); return; }
+    if (!podeVer('config')) { toast('Acesso não permitido para o seu nível de usuário.', 'error'); return; }
+    try {
+      showLoading('Enviando logo…');
+      const _du = await compressImage(file);
+      const _urlAntiga = state.logoEmpresaUrl;
+      const _url = await uploadToStorage('config/logo_' + uid() + _extFromDataUrl(_du), _du);
+      await db.collection('config_sistema').doc('geral').set({ logo_empresa_url: _url, atualizado_em: new Date().toISOString(), atualizado_por: _userProfile?.email || 'sistema' }, { merge: true });
+      if (isStorageUrl(_urlAntiga)) deleteFromStorage(_urlAntiga); // v19.35: evita órfão no Storage ao substituir
+      toast('Logo atualizado!', 'success');
+    } catch(err) { toast('Erro ao enviar logo: ' + err.message, 'error'); }
+    finally { hideLoading(); e.target.value = ''; }
+  });
   document.getElementById('cfg-modelo-file-input')?.addEventListener('change', async function(e) {
     const file = e.target.files[0];
     if (!file) return;
