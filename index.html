@@ -328,7 +328,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.38</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.39</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -1888,7 +1888,7 @@ function renderListagem(container) {
   const responsavelOpts = `<option value="">Todos os responsáveis</option>` + Array.from(responsaveisSet).sort((a,b)=>a.localeCompare(b,'pt-BR')).map(r=>`<option value="${escHtml(r)}">${escHtml(r)}</option>`).join('');
   const statusOpts = `<option value="">Todos os status</option><option value="EM ANDAMENTO">Em Andamento</option><option value="VENCIDO">Vencido</option><option value="FECHADO">Fechado</option><option value="SEM_PRAZO">Sem Prazo</option>`;
   // ── CORREÇÃO 2: O id do container da tabela é "listagem-tbody" — confirmado e correto ──
-  container.innerHTML = `<div class="panel"><div class="panel-body"><div class="filters-bar" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;"><select id="filtro-plano" class="form-control" style="width:auto;">${planosOpts}</select><select id="filtro-subtopico" class="form-control" style="width:auto;">${subtopicosOpts}</select><select id="filtro-responsavel" class="form-control" style="width:auto;">${responsavelOpts}</select><select id="filtro-status" class="form-control" style="width:auto;">${statusOpts}</select><input type="search" id="filtro-busca" class="form-control" placeholder="🔍 Buscar..." style="min-width:180px;flex:1;max-width:360px;"><button id="limpar-filtros" class="btn btn-ghost btn-sm">✕ Limpar</button><span id="listagem-contador" style="font-size:12px;color:var(--text2);white-space:nowrap;align-self:center;"></span><button id="expandir-tudo-followups" class="btn btn-ghost btn-sm" title="Expandir todos os follow-ups">⬇️ Expandir tudo</button><button id="colapsar-tudo-followups" class="btn btn-ghost btn-sm" title="Recolher todos os follow-ups">⬆️ Colapsar tudo</button><span style="flex:1;"></span><button id="btn-importar-followups-lote" class="btn btn-ghost btn-sm" title="Importar Follow-ups em Lote (Excel: Número da Ação, Data, Responsável, Comentário)" style="font-size:15px;padding:4px 8px;">➕📥</button><button id="btn-excel-listagem" class="btn btn-ghost btn-sm" title="Exportar para Excel" style="font-size:15px;padding:4px 8px;">📥</button><button id="btn-relatorio-pdf" class="btn btn-ghost btn-sm" title="Gerar Relatório PDF do Plano" style="font-size:15px;padding:4px 8px;">🖨️</button><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;white-space:nowrap;"><input type="checkbox" id="filtro-exibir-fechados" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"> Exibir Fechados</label></div><div class="table-wrap"><table id="tabela-acoes"><thead><tr><th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-plano">Plano</th><th style="min-width:58px;text-align:center;cursor:pointer;user-select:none;" id="lh-num">Nº Ação</th><th style="min-width:140px;cursor:pointer;user-select:none;" id="lh-subtopico">Sub-Tópico</th><th style="min-width:180px;cursor:pointer;user-select:none;" id="lh-problema">Problema</th><th style="min-width:60px;">Evidência</th><th style="min-width:200px;cursor:pointer;user-select:none;" id="lh-acao">Ação Corretiva</th><th style="min-width:130px;cursor:pointer;user-select:none;" id="lh-responsavel">Responsável</th><th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-abertura">Ocorrência</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-prazo">Prazo</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-fup">Último FUP</th><th style="min-width:60px;cursor:pointer;user-select:none;" id="lh-idade">Idade</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-status">Status</th><th style="min-width:160px;">Ações</th></tr></thead><tbody id="listagem-tbody"></tbody></table></div></div></div>`;
+  container.innerHTML = `<div class="panel"><div class="panel-body"><div class="filters-bar" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;"><select id="filtro-plano" class="form-control" style="width:auto;">${planosOpts}</select><select id="filtro-subtopico" class="form-control" style="width:auto;">${subtopicosOpts}</select><select id="filtro-responsavel" class="form-control" style="width:auto;">${responsavelOpts}</select><select id="filtro-status" class="form-control" style="width:auto;">${statusOpts}</select><input type="search" id="filtro-busca" class="form-control" placeholder="🔍 Buscar..." style="min-width:180px;flex:1;max-width:360px;"><button id="limpar-filtros" class="btn btn-ghost btn-sm">✕ Limpar</button><span id="listagem-contador" style="font-size:12px;color:var(--text2);white-space:nowrap;align-self:center;"></span><button id="expandir-tudo-followups" class="btn btn-ghost btn-sm" title="Expandir todos os follow-ups" style="font-size:15px;padding:4px 8px;">⬇️</button><button id="colapsar-tudo-followups" class="btn btn-ghost btn-sm" title="Recolher todos os follow-ups" style="font-size:15px;padding:4px 8px;">⬆️</button><span style="flex:1;"></span><button id="btn-importar-followups-lote" class="btn btn-ghost btn-sm" title="Importar Follow-ups em Lote (Excel: Número da Ação, Data, Responsável, Comentário)" style="font-size:15px;padding:4px 8px;">➕📥</button><button id="btn-excel-listagem" class="btn btn-ghost btn-sm" title="Exportar para Excel" style="font-size:15px;padding:4px 8px;">📥</button><button id="btn-relatorio-pdf" class="btn btn-ghost btn-sm" title="Gerar Relatório PDF do Plano" style="font-size:15px;padding:4px 8px;">🖨️</button><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;white-space:nowrap;"><input type="checkbox" id="filtro-exibir-fechados" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"> Exibir Fechados</label></div><div class="table-wrap"><table id="tabela-acoes"><thead><tr><th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-plano">Plano</th><th style="min-width:58px;text-align:center;cursor:pointer;user-select:none;" id="lh-num">Nº Ação</th><th style="min-width:140px;cursor:pointer;user-select:none;" id="lh-subtopico">Sub-Tópico</th><th style="min-width:180px;cursor:pointer;user-select:none;" id="lh-problema">Problema</th><th style="min-width:60px;">Evidência</th><th style="min-width:200px;cursor:pointer;user-select:none;" id="lh-acao">Ação Corretiva</th><th style="min-width:130px;cursor:pointer;user-select:none;" id="lh-responsavel">Responsável</th><th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-abertura">Ocorrência</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-prazo">Prazo</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-fup">Último FUP</th><th style="min-width:60px;cursor:pointer;user-select:none;" id="lh-idade">Idade</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-status">Status</th><th style="min-width:160px;">Ações</th></tr></thead><tbody id="listagem-tbody"></tbody></table></div></div></div>`;
   // ── PERSISTÊNCIA DOS FILTROS DA LISTAGEM (localStorage) ──
   const _LS_FILTROS_KEY = 'listagem_filtros_v1';
   function _salvarFiltrosListagem() {
@@ -2146,7 +2146,7 @@ function aplicarFiltrosETabela() {
       _html += `<tr id="row-carregar-mais"><td colspan="12" style="text-align:center;padding:10px;"><button class="btn btn-secondary btn-sm" id="btn-carregar-mais-listagem">⬇️ Carregar mais (${_restantes} restante${_restantes===1?'':'s'})</button></td></tr>`;
     }
     tbody.innerHTML = _html;
-    if(_contadorEl) _contadorEl.textContent = _restantes > 0 ? `Mostrando ${_linhasExibir.length} de ${_totalFiltradas} ações` : `${_totalFiltradas} ação${_totalFiltradas===1?'':'ões'}`;
+    if(_contadorEl) _contadorEl.textContent = _restantes > 0 ? `Mostrando ${_linhasExibir.length} de ${_totalFiltradas} ações` : `${_totalFiltradas} ${_totalFiltradas===1?'ação':'ações'}`;
     document.getElementById('btn-carregar-mais-listagem')?.addEventListener('click', () => { _listPageCount++; aplicarFiltrosETabela(); });
   }
   // v19.0.4: aplicarFiltrosETabela() redesenha a tbody fora do fluxo de render() (toggle de
@@ -3184,7 +3184,7 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
 
 
 // ==================== CADASTRO DE PROBLEMAS ====================
-const _ncState = { acoes_corretivas: [], evidencia_problema: null, _evidTmp: {}, _fuTarget: null, _fuEditTarget: null, editingProblemaId: null, editingCorretivaIdx: null, recorrencias: [] };
+const _ncState = { acoes_corretivas: [], evidencia_problema: null, _evidenciaAlterada: false, _evidTmp: {}, _fuTarget: null, _fuEditTarget: null, editingProblemaId: null, editingCorretivaIdx: null, recorrencias: [] };
 let _ncFormSujo = false; // v19.6: true quando há alterações não salvas no formulário de Novo Cadastro
 
 function renderNovoCadastro(container) {
@@ -3193,11 +3193,12 @@ function renderNovoCadastro(container) {
   if (_editingProb) {
     _ncState.acoes_corretivas = JSON.parse(JSON.stringify(_editingProb.acoes_corretivas || []));
     _ncState.evidencia_problema = _editingProb.evidencia_problema || null;
+    _ncState._evidenciaAlterada = false; // v19.39: reseta ao abrir — só vira true se o usuário mexer de fato
     _ncState._evidTmp = {};
     _ncState.openedUpdatedAt = _editingProb.updated_at || null; // v19.0 (0.5): checagem otimista
     (_editingProb.acoes_corretivas || []).forEach((cr, i) => { if (cr['ev_implantacao_' + i]) _ncState._evidTmp[i] = cr['ev_implantacao_' + i]; });
   } else {
-    _ncState.acoes_corretivas = []; _ncState.evidencia_problema = null; _ncState._evidTmp = {};
+    _ncState.acoes_corretivas = []; _ncState.evidencia_problema = null; _ncState._evidTmp = {}; _ncState._evidenciaAlterada = false;
     _ncState.recorrencias = [];
     if (!_ncState._novoId) _ncState._novoId = uid(); // v19.1: id estável para a pasta do Storage antes de salvar
   }
@@ -3335,6 +3336,7 @@ function _ncAtualizarBotaoEvProblema() {
         if (!(await showConfirm('Remover a evidência (foto) deste problema?'))) return;
         if (isStorageUrl(_ncState.evidencia_problema)) deleteFromStorage(_ncState.evidencia_problema);
         _ncState.evidencia_problema = null;
+        _ncState._evidenciaAlterada = true; // v19.39
         const _prev = document.getElementById('nc-ev-preview'); if (_prev) _prev.innerHTML = '';
         _ncAtualizarBotaoEvProblema();
         _ncFormSujo = true;
@@ -3357,7 +3359,7 @@ async function _ncProcessEvProblema(file) {
     const _probId = _ncState.editingProblemaId || _ncState._novoId || uid();
     const downloadURL = await uploadToStorage('evidencias/'+_probId+'/'+uid()+_extFromDataUrl(_dataUrl), _dataUrl);
     const _urlAntiga = _ncState.evidencia_problema; // v19.1.1: evita órfão no Storage ao substituir
-    { const ev = { target: { result: downloadURL } }; _ncState.evidencia_problema = ev.target.result; const isImg = file.type.startsWith('image/'); document.getElementById('nc-ev-preview').innerHTML = isImg ? '<img src="'+ev.target.result+'" style="max-width:160px;max-height:90px;border-radius:4px;border:1px solid var(--border2);">' : '<div style="padding:6px;background:var(--bg3);border-radius:4px;font-size:11px;">📄 '+escHtml(file.name)+'</div>'; _ncAtualizarBotaoEvProblema(); toast('Evidência carregada!','success'); }
+    { const ev = { target: { result: downloadURL } }; _ncState.evidencia_problema = ev.target.result; _ncState._evidenciaAlterada = true; const isImg = file.type.startsWith('image/'); document.getElementById('nc-ev-preview').innerHTML = isImg ? '<img src="'+ev.target.result+'" style="max-width:160px;max-height:90px;border-radius:4px;border:1px solid var(--border2);">' : '<div style="padding:6px;background:var(--bg3);border-radius:4px;font-size:11px;">📄 '+escHtml(file.name)+'</div>'; _ncAtualizarBotaoEvProblema(); toast('Evidência carregada!','success'); }
     if (isStorageUrl(_urlAntiga)) deleteFromStorage(_urlAntiga);
   } catch(e) {
     toast('Erro ao enviar evidência: ' + e.message, 'error');
@@ -3525,7 +3527,7 @@ async function _ncSalvar() {
         }
         // ── F2: Audit trail — registra mudanças de campos ──
         const _usr = (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) ? firebase.auth().currentUser.email : 'sistema';
-        const _novaEvidenciaProblema = _ncState.evidencia_problema != null ? _ncState.evidencia_problema : existente.evidencia_problema;
+        const _novaEvidenciaProblema = _ncState._evidenciaAlterada ? _ncState.evidencia_problema : existente.evidencia_problema;
         const _audCampos = { plano_id: planoId, subtopico_id: subtId, data_abertura: dataAbertura, responsavel, problema, causa, reincidente, evidencia_problema: _novaEvidenciaProblema };
         if (!existente.historico) existente.historico = [];
         Object.entries(_audCampos).forEach(([campo, novoVal]) => {
@@ -3537,7 +3539,7 @@ async function _ncSalvar() {
         if (existente.historico.length > 200) existente.historico = existente.historico.slice(-200);
         const _corretivasAntesIdx = JSON.parse(JSON.stringify(existente.acoes_corretivas || [])); // v19.5: p/ sincronizar índice de nº de ação
         const _subtopicoIdAntes = existente.subtopico_id; // v19.22: p/ detectar troca de sub-tópico e ressincronizar cursos vinculados
-        Object.assign(existente, { plano_id: planoId, subtopico_id: subtId, data_abertura: dataAbertura, responsavel, problema, causa, notas, reincidente, evidencia_problema: _ncState.evidencia_problema != null ? _ncState.evidencia_problema : existente.evidencia_problema, acoes_corretivas: _corretivasOut, updated_at: new Date().toISOString(), updated_by: _userProfile?.email || 'sistema' });
+        Object.assign(existente, { plano_id: planoId, subtopico_id: subtId, data_abertura: dataAbertura, responsavel, problema, causa, notas, reincidente, evidencia_problema: _ncState._evidenciaAlterada ? _ncState.evidencia_problema : existente.evidencia_problema, acoes_corretivas: _corretivasOut, updated_at: new Date().toISOString(), updated_by: _userProfile?.email || 'sistema' });
         if (nOpQtd) {
           existente.operador = operador; existente.quantidade = quantidade;
           existente.data_producao = data_producao; existente.turnos = turnos;
@@ -4271,7 +4273,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.38', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.39', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
