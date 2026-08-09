@@ -328,7 +328,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.42</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.43</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -4305,7 +4305,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.42', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.43', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
@@ -4325,28 +4325,35 @@ function renderFazerBackup(container) {
 
       const alvos = [];
       payload.acoes.forEach(prob => {
-        if (isStorageUrl(prob.evidencia_problema)) alvos.push({ obj: prob, campo: 'evidencia_problema' });
+        const plano = state.planos.find(p => p.id === prob.plano_id);
+        const desc = `${plano ? plano.titulo : 'Plano ?'} — ${(prob.problema || 'Problema sem descrição').substring(0, 60)}`;
+        if (isStorageUrl(prob.evidencia_problema)) alvos.push({ obj: prob, campo: 'evidencia_problema', desc });
         (prob.acoes_corretivas || []).forEach((cr, idx) => {
           const campo = 'ev_implantacao_' + idx;
-          if (isStorageUrl(cr[campo])) alvos.push({ obj: cr, campo });
+          if (isStorageUrl(cr[campo])) alvos.push({ obj: cr, campo, desc: desc + ' (evidência de fechamento)' });
         });
       });
       payload.cursos1tema.forEach(c => {
-        if (isStorageUrl(c.evidenciaCursoUrl)) alvos.push({ obj: c, campo: 'evidenciaCursoUrl' });
-        if (isStorageUrl(c.evidencia_problema)) alvos.push({ obj: c, campo: 'evidencia_problema' }); // v19.41: estava faltando — mesma lacuna já corrigida na migração
+        const descC = `Curso 1 Tema — ${(c.subtopico_descricao || c.problema_descricao || 'sem descrição').substring(0, 60)}`;
+        if (isStorageUrl(c.evidenciaCursoUrl)) alvos.push({ obj: c, campo: 'evidenciaCursoUrl', desc: descC });
+        if (isStorageUrl(c.evidencia_problema)) alvos.push({ obj: c, campo: 'evidencia_problema', desc: descC + ' (cópia do problema)' }); // v19.41: estava faltando — mesma lacuna já corrigida na migração
       });
 
       let falhas = 0;
+      const falhasDetalhe = []; // v19.43: guarda descrição de cada falha pra listar no aviso final
       for (let i = 0; i < alvos.length; i++) {
         try {
           alvos[i].obj[alvos[i].campo] = await _fetchUrlToDataUrl(alvos[i].obj[alvos[i].campo]);
-        } catch(e) { falhas++; /* CORS ausente ou rede — mantém a URL nesse campo e segue */ }
+        } catch(e) { falhas++; falhasDetalhe.push(alvos[i].desc); }
         if (bar) bar.style.width = Math.round(((i + 1) / Math.max(alvos.length, 1)) * 100) + '%';
         if (typeof window._resetarTimerInatividade === 'function') window._resetarTimerInatividade();
       }
       if (btnEl) btnEl.disabled = false;
       if (barWrap) barWrap.style.display = 'none';
-      if (falhas > 0) await showConfirm(`⚠️ ${falhas} foto(s) não puderam ser baixadas ao gerar este backup (queda de rede ou limite temporário do Storage) — ficaram com o link em vez da imagem embutida. O backup foi gerado normalmente com o restante. Se quiser garantir 100% das fotos, gere o backup de novo agora.`, { icon:'⚠️', title:'Fotos não baixadas', okText:'Entendi', cancelText:'Entendi', danger:false });
+      if (falhas > 0) {
+        const lista = falhasDetalhe.map(d => `• ${d}`).join('\n');
+        await showConfirm(`⚠️ ${falhas} foto(s) não puderam ser baixadas ao gerar este backup — ficaram com o link em vez da imagem embutida:\n\n${lista}\n\nO backup foi gerado normalmente com o restante. Gere de novo se quiser garantir 100%.`, { icon:'⚠️', title:'Fotos não baixadas', okText:'Entendi', cancelText:'Entendi', danger:false });
+      }
     }
 
     const json = JSON.stringify(payload, null, 2);
