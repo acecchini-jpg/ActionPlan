@@ -328,7 +328,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.44</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.45</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -646,6 +646,33 @@ function showConfirm(message, opts) {
     overlay.querySelector('#app-confirm-no').addEventListener('click', () => done(false));
     overlay.addEventListener('click', e => { if (e.target === overlay) done(false); });
     document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { document.removeEventListener('keydown', esc); done(false); } });
+  });
+}
+
+// v19.45: showAlert — aviso de reconhecimento único (um botão só), sem o truque de duplicar texto no showConfirm
+function showAlert(message, opts) {
+  return new Promise(resolve => {
+    const o = opts || {};
+    let overlay = document.getElementById('app-alert-overlay');
+    if (overlay) overlay.remove();
+    overlay = document.createElement('div');
+    overlay.id = 'app-alert-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML = `
+      <div class="panel" style="width:min(420px,95vw);margin:0;box-shadow:0 8px 32px rgba(0,0,0,.4);">
+        <div class="panel-header"><span>${o.icon || 'ℹ️'}</span><span class="panel-title">${escHtml(o.title || 'Aviso')}</span></div>
+        <div class="panel-body">
+          <p style="font-size:13px;color:var(--text1);white-space:pre-line;margin-bottom:18px;">${escHtml(message)}</p>
+          <div style="display:flex;justify-content:flex-end;">
+            <button class="btn btn-primary" id="app-alert-ok">${escHtml(o.okText || 'Entendi')}</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const done = () => { overlay.remove(); resolve(true); };
+    overlay.querySelector('#app-alert-ok').addEventListener('click', done);
+    overlay.addEventListener('click', e => { if (e.target === overlay) done(); });
+    document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape' || e.key === 'Enter') { document.removeEventListener('keydown', esc); done(); } });
   });
 }
 
@@ -4305,7 +4332,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.44', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.45', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
@@ -4379,7 +4406,7 @@ function renderFazerBackup(container) {
       if (barWrap) barWrap.style.display = 'none';
       if (falhas > 0) {
         const lista = falhasDetalhe.map(d => `• ${d}`).join('\n');
-        await showConfirm(`⚠️ ${falhas} foto(s) não puderam ser baixadas ao gerar este backup — ficaram com o link em vez da imagem embutida:\n\n${lista}\n\nO backup foi gerado normalmente com o restante. Gere de novo se quiser garantir 100%.`, { icon:'⚠️', title:'Fotos não baixadas', okText:'Entendi', cancelText:'Entendi', danger:false });
+        await showAlert(`⚠️ ${falhas} foto(s) não puderam ser baixadas ao gerar este backup — ficaram com o link em vez da imagem embutida:\n\n${lista}\n\nO backup foi gerado normalmente com o restante. Gere de novo se quiser garantir 100%.`, { icon:'⚠️', title:'Fotos não baixadas' });
       }
     }
 
