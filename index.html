@@ -328,7 +328,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.47</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.48</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -2637,8 +2637,8 @@ function _renderAtividadeSemana(){
         if(dataOcorr && dataOcorr<range.start && (!dataFech || dataFech>=range.start)) pendInicio++;
         // 2) Adicionadas NA semana (pela data de Ocorrência do problema — mesmo critério já usado hoje)
         if(_inRange(dataOcorr,range)) addS++;
-        // 3) Fechadas NA semana
-        if(dataFech && _inRange(dataFech,range)) fechS++;
+        // 3) Fechadas NA semana (precisa ter Data de Ocorrência válida, senão quebra a soma com Pendentes/Fechamento)
+        if(dataOcorr && dataFech && _inRange(dataFech,range)) fechS++;
         // 4) Com follow-up NA semana (conta 1 por ação, não por follow-up)
         if((cr.followups||[]).some(fu=>_inRange(fu.data_followup||fu.data||'',range))) fupS++;
         // 5) Pendentes no FIM da semana: já existia até o fim da semana e ainda não tinha sido fechada até lá
@@ -2655,9 +2655,9 @@ function _renderAtividadeSemana(){
       +`<td style="text-align:center;font-size:11px;color:var(--text3);" title="Ações que já existiam antes do início da semana selecionada e ainda não tinham sido fechadas">${hi(pendInicio)}</td>`
       +`<td style="text-align:center">${hi(addS,'#3b82f6')}</td>`
       +`<td style="text-align:center">${hi(fechS,'#22c55e')}</td>`
-      +`<td style="text-align:center">${hi(fupS,'var(--accent)')}</td>`
       +`<td style="text-align:center" title="Ações ainda pendentes no fim da semana selecionada (Domingo)">${hi(pendFim)}</td>`
       +`<td style="text-align:center" title="Das pendentes no fim da semana, quantas já estavam com prazo vencido até lá">${hi(vencFim,vencFim>0?'var(--red)':null)}</td>`
+      +`<td style="text-align:center">${hi(fupS,'var(--accent)')}</td>`
       +`<td style="text-align:center">${txH}</td></tr>`;
   }).join('');
   return '<div class="table-wrap"><table>'
@@ -2666,9 +2666,9 @@ function _renderAtividadeSemana(){
     +'<th style="text-align:center;font-size:11px;" title="Quantidade de ações abertas no início da semana selecionada">Fechamento<br>Sem. Anterior</th>'
     +'<th style="text-align:center;font-size:11px;">Adicionadas<br>na Semana</th>'
     +'<th style="text-align:center;font-size:11px;">Fechadas<br>na Semana</th>'
-    +'<th style="text-align:center;font-size:11px;">c/ Follow-up<br>na Semana</th>'
     +'<th style="text-align:center;font-size:11px;">Pendentes</th>'
     +'<th style="text-align:center;font-size:11px;">Vencidas</th>'
+    +'<th style="text-align:center;font-size:11px;">c/ Follow-up<br>na Semana</th>'
     +'<th style="text-align:center;font-size:11px;">Taxa Reunião<br>na Semana</th>'
     +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
@@ -4320,7 +4320,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.47', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.48', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
