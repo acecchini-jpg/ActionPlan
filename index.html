@@ -328,7 +328,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.48</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.50</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -1246,6 +1246,14 @@ function initTheme() { const savedTheme = localStorage.getItem('theme'); if(save
       toast('Modo Auditoria desativado.', 'success');
     } catch(e) { toast('Erro ao desativar modo auditoria: ' + e.message, 'error'); }
   });
+
+  // v19.50: ESC fecha a evidência em consulta, ou sai da tela de edição de ação (Novo Cadastro)
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const imgModal = document.getElementById('image-modal');
+    if (imgModal && imgModal.classList.contains('open')) { closeModal('image-modal'); return; }
+    if (state.currentPage === 'novo-cadastro') { navigate('listagem'); return; }
+  });
 }
 
 // ==================== NAVEGAÇÃO ====================
@@ -1924,7 +1932,7 @@ function renderListagem(container) {
   const responsavelOpts = `<option value="">Todos os responsáveis</option>` + Array.from(responsaveisSet).sort((a,b)=>a.localeCompare(b,'pt-BR')).map(r=>`<option value="${escHtml(r)}">${escHtml(r)}</option>`).join('');
   const statusOpts = `<option value="">Todos os status</option><option value="EM ANDAMENTO">Em Andamento</option><option value="VENCIDO">Vencido</option><option value="FECHADO">Fechado</option><option value="SEM_PRAZO">Sem Prazo</option>`;
   // ── CORREÇÃO 2: O id do container da tabela é "listagem-tbody" — confirmado e correto ──
-  container.innerHTML = `<div class="panel"><div class="panel-body"><div class="filters-bar" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;"><select id="filtro-plano" class="form-control" style="width:auto;">${planosOpts}</select><select id="filtro-subtopico" class="form-control" style="width:auto;">${subtopicosOpts}</select><select id="filtro-responsavel" class="form-control" style="width:auto;">${responsavelOpts}</select><select id="filtro-status" class="form-control" style="width:auto;">${statusOpts}</select><input type="search" id="filtro-busca" class="form-control" placeholder="🔍 Buscar..." style="min-width:180px;flex:1;max-width:360px;"><button id="limpar-filtros" class="btn btn-ghost btn-sm">✕ Limpar</button><span id="listagem-contador" style="font-size:12px;color:var(--text2);white-space:nowrap;align-self:center;"></span><span style="flex:1;"></span><button id="btn-importar-followups-lote" class="btn btn-ghost btn-sm" title="Importar Follow-ups em Lote (Excel: Número da Ação, Data, Responsável, Comentário)" style="font-size:15px;padding:4px 8px;">➕📥</button><button id="btn-excel-listagem" class="btn btn-ghost btn-sm" title="Exportar para Excel" style="font-size:15px;padding:4px 8px;">📥</button><button id="expandir-tudo-followups" class="btn btn-ghost btn-sm" title="Expandir todos os follow-ups" style="font-size:15px;padding:4px 8px;">⬇️</button><button id="colapsar-tudo-followups" class="btn btn-ghost btn-sm" title="Recolher todos os follow-ups" style="font-size:15px;padding:4px 8px;">⬆️</button><button id="btn-relatorio-pdf" class="btn btn-ghost btn-sm" title="Gerar Relatório PDF do Plano" style="font-size:15px;padding:4px 8px;">🖨️</button><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;white-space:nowrap;"><input type="checkbox" id="filtro-exibir-fechados" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"> Exibir Fechados</label></div><div class="table-wrap"><table id="tabela-acoes"><thead><tr><th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-plano">Plano</th><th style="min-width:58px;text-align:center;cursor:pointer;user-select:none;" id="lh-num">Nº Ação</th><th style="min-width:140px;cursor:pointer;user-select:none;" id="lh-subtopico">Sub-Tópico</th><th style="min-width:180px;cursor:pointer;user-select:none;" id="lh-problema">Problema</th><th style="min-width:60px;">Evidência</th><th style="min-width:200px;cursor:pointer;user-select:none;" id="lh-acao">Ação Corretiva</th><th style="min-width:130px;cursor:pointer;user-select:none;" id="lh-responsavel">Responsável</th><th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-abertura">Ocorrência</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-prazo">Prazo</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-fup">Último FUP</th><th style="min-width:60px;cursor:pointer;user-select:none;" id="lh-idade">Idade</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-status">Status</th><th style="min-width:160px;">Ações</th></tr></thead><tbody id="listagem-tbody"></tbody></table></div></div></div>`;
+  container.innerHTML = `<div class="panel"><div class="panel-body"><div class="filters-bar" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;"><select id="filtro-plano" class="form-control" style="width:auto;">${planosOpts}</select><select id="filtro-subtopico" class="form-control" style="width:auto;">${subtopicosOpts}</select><select id="filtro-responsavel" class="form-control" style="width:auto;">${responsavelOpts}</select><select id="filtro-status" class="form-control" style="width:auto;">${statusOpts}</select><input type="search" id="filtro-busca" class="form-control" placeholder="🔍 Buscar... (#327 = só pelo nº)" title="Digite #327 para buscar exatamente pelo número da ação, ou só texto para buscar no conteúdo" style="min-width:180px;flex:1;max-width:360px;"><button id="limpar-filtros" class="btn btn-ghost btn-sm">✕ Limpar</button><span id="listagem-contador" style="font-size:12px;color:var(--text2);white-space:nowrap;align-self:center;"></span><span style="flex:1;"></span><button id="btn-importar-followups-lote" class="btn btn-ghost btn-sm" title="Importar Follow-ups em Lote (Excel: Número da Ação, Data, Responsável, Comentário)" style="font-size:15px;padding:4px 8px;">➕📥</button><button id="btn-excel-listagem" class="btn btn-ghost btn-sm" title="Exportar para Excel" style="font-size:15px;padding:4px 8px;">📥</button><button id="expandir-tudo-followups" class="btn btn-ghost btn-sm" title="Expandir todos os follow-ups" style="font-size:15px;padding:4px 8px;">⬇️</button><button id="colapsar-tudo-followups" class="btn btn-ghost btn-sm" title="Recolher todos os follow-ups" style="font-size:15px;padding:4px 8px;">⬆️</button><button id="btn-relatorio-pdf" class="btn btn-ghost btn-sm" title="Gerar Relatório PDF do Plano" style="font-size:15px;padding:4px 8px;">🖨️</button><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;white-space:nowrap;"><input type="checkbox" id="filtro-exibir-fechados" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"> Exibir Fechados</label></div><div class="table-wrap"><table id="tabela-acoes"><thead><tr><th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-plano">Plano</th><th style="min-width:58px;text-align:center;cursor:pointer;user-select:none;" id="lh-num">Nº Ação</th><th style="min-width:140px;cursor:pointer;user-select:none;" id="lh-subtopico">Sub-Tópico</th><th style="min-width:180px;cursor:pointer;user-select:none;" id="lh-problema">Problema</th><th style="min-width:60px;">Evidência</th><th style="min-width:200px;cursor:pointer;user-select:none;" id="lh-acao">Ação Corretiva</th><th style="min-width:130px;cursor:pointer;user-select:none;" id="lh-responsavel">Responsável</th><th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-abertura">Ocorrência</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-prazo">Prazo</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-fup">Último FUP</th><th style="min-width:60px;cursor:pointer;user-select:none;" id="lh-idade">Idade</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-status">Status</th><th style="min-width:160px;">Ações</th></tr></thead><tbody id="listagem-tbody"></tbody></table></div></div></div>`;
   // ── PERSISTÊNCIA DOS FILTROS DA LISTAGEM (localStorage) ──
   const _LS_FILTROS_KEY = 'listagem_filtros_v1';
   function _salvarFiltrosListagem() {
@@ -2151,11 +2159,18 @@ function aplicarFiltrosETabela() {
       else if (filtroStatus && status !== filtroStatus) continue;
       if(!filtroExibirFechados && status === 'FECHADO') continue;
       if (filtroBusca) {
-        const _hay = [prob.problema||'', cr.acao_descricao||'', cr.responsavel||'',
-          plano?plano.titulo:'', subtopico?subtopico.descricao:'', subtopico?.codigo_subitem||'',
-          ...(cr.followups||[]).map(fu=>(fu.comentario||'')+' '+(fu.responsavel||'')),
-        ].join(' ').toLowerCase();
-        if (!_hay.includes(filtroBusca)) continue;
+        if (filtroBusca.startsWith('#')) {
+          // v19.50: "#327" busca exclusivamente pelo número da ação (exato), não pelo conteúdo
+          const alvo = filtroBusca.slice(1);
+          if (!alvo || !_numAcaoValido(cr.numeroAcao) || String(cr.numeroAcao).toLowerCase() !== alvo) continue;
+        } else {
+          const _hay = [prob.problema||'', cr.acao_descricao||'', cr.responsavel||'',
+            plano?plano.titulo:'', subtopico?subtopico.descricao:'', subtopico?.codigo_subitem||'',
+            _numAcaoValido(cr.numeroAcao)?String(cr.numeroAcao):'',
+            ...(cr.followups||[]).map(fu=>(fu.comentario||'')+' '+(fu.responsavel||'')),
+          ].join(' ').toLowerCase();
+          if (!_hay.includes(filtroBusca)) continue;
+        }
       }
       const problemaCell = `<span>${escHtml(prob.problema?.substring(0,80) || '—')}</span>`;
       let evidenciaCellHtml = '—';
@@ -2631,7 +2646,10 @@ function _renderAtividadeSemana(){
       const dataOcorr=prob.data_abertura||'';
       (prob.acoes_corretivas||[]).forEach(cr=>{
         if((cr.responsavel||'')!==resp) return;
-        const dataFech=cr.data_efetiva||'';
+        // v19.49: defesa contra dado inválido (fechamento registrado ANTES da ocorrência — erro de digitação)
+        // nesse caso trata como se ainda estivesse em aberto, pra não quebrar a soma da semana
+        const dataFechBruta=cr.data_efetiva||'';
+        const dataFech=(dataFechBruta && dataOcorr && dataFechBruta<dataOcorr)?'':dataFechBruta;
         const dataPrev=cr.data_prevista||'';
         // 1) Pendentes no INÍCIO da semana: já existia antes da semana começar e ainda não tinha sido fechada
         if(dataOcorr && dataOcorr<range.start && (!dataFech || dataFech>=range.start)) pendInicio++;
@@ -3098,9 +3116,13 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
     const _subLabels = _subEntries.map(e => e[0]);
     const _subData   = _subEntries.map(e => e[1]);
 
-    const _hasTurnoData = _turnoData.some(v => v > 0) || _dashDefeitosSemana !== '';
-    const _hasOpData    = _opData.some(v => v > 0) || _dashDefeitosSemana !== '';
-    const _hasSubData   = _subData.some(v => v > 0) || _dashDefeitosSemana !== '';
+    // v19.50: se um Plano específico estiver selecionado e ele não usa Operador/Turno, esconde os 3 gráficos
+    // de vez (antes ficavam em branco quando havia filtro de semana ativo, mesmo sem nenhum dado possível)
+    const _planoSelDash = _filtroPlanoDashboard ? state.planos.find(p => p.id === _filtroPlanoDashboard) : null;
+    const _planoNaoUsaOperador = _planoSelDash && !_planoSelDash.necessita_op_qtd;
+    const _hasTurnoData = !_planoNaoUsaOperador && (_turnoData.some(v => v > 0) || _dashDefeitosSemana !== '');
+    const _hasOpData    = !_planoNaoUsaOperador && (_opData.some(v => v > 0) || _dashDefeitosSemana !== '');
+    const _hasSubData   = !_planoNaoUsaOperador && (_subData.some(v => v > 0) || _dashDefeitosSemana !== '');
     const _pTurno = document.getElementById('panel-def-turno');
     const _pOp    = document.getElementById('panel-def-operador');
     const _pSub   = document.getElementById('panel-def-subtopico');
@@ -4320,7 +4342,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.48', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.50', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
