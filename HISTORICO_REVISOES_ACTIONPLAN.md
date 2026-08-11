@@ -124,6 +124,70 @@ Sistema de gestão de planos de ação, ações corretivas e Curso de 1 Tema par
 - Planilha de turnos por operador passa a aceitar "D" (demitido) e "?" (não identificado), além de uma coluna de nome.
 - Comentário automático "245-Nome - T1" adicionado às Notas do problema quando há operador identificado, e no *mouse-over* do gráfico "Defeitos por Operador".
 
+# v19.23 – v19.27 — Código do Sub-tópico e ajustes de Listagem
+
+- Nova coluna "Emissão" no Curso de 1 Tema — descoberta de que já existia `criado_em` desde sempre (equivalente ao campo `data_emissao` criado por engano nessa faixa de versões, removido em seguida).
+- Novo campo **Código(s) do Subitem** no cadastro de Sub-Tópico (múltiplos códigos separados por `/`), com busca integrada na Listagem Geral (`#codigo` ou o próprio número) e coluna própria (depois movida só para a tela de cadastro de Sub-tópicos, com quebra de linha forçada a cada `/`).
+- Scripts de exportação/importação em lote dos códigos de sub-tópico (planilha).
+- Coluna "Abertura" renomeada para "Ocorrência" (Listagem e Curso 1 Tema).
+- Coluna calculada "Idade" corrigida para nunca mostrar valor negativo.
+- Ordenação por clique no cabeçalho da tabela de Sub-Tópicos.
+
+# v19.31 – v19.34 — Modo Auditoria
+
+- Novo **Modo Auditoria**: checkbox em Configurações, sincronizado globalmente via Firestore (afeta todos os usuários vendo o app no momento, não só quem ativou) — oculta todas as ações vencidas da Listagem e do Dashboard.
+- Indicador visual no topbar (ícone 🕵️, clicável para desativar direto, restrito a quem tem permissão).
+- Painel "Atividade na Semana" oculto por completo enquanto o modo está ativo (evita vazar informação de vencidas por ali).
+
+# v19.35 – v19.36 — Relatório PDF do Plano de Ações
+
+- Novo espaço em Configurações para upload do logo da empresa.
+- Botão dedicado na Listagem (🖨️, ao lado do Excel) que abre um modal de opções (Plano, Sub-Tópico opcional, incluir fotos, incluir follow-ups) e gera uma tela formatada — pronta para impressão/"Salvar como PDF" pelo navegador, replicando um modelo de referência fornecido pelo usuário (logo, título, cabeçalho do Plano/Cliente, tabela com Sub-Tópico e Problema mesclados verticalmente por grupo).
+- Correção de causa raiz real: `html`, `body`, `#app`, `#main` e `#page` tinham `overflow:hidden`/altura travada em `100vh`, impedindo a paginação da impressão além da primeira página — corrigido liberando `overflow`/`height` de toda a cadeia de containers durante a impressão.
+
+# v19.37 – v19.39 — Evidência do problema: de obrigatória a alerta, e bug real de exclusão
+
+- Campo de evidência do problema passou por 3 fases: obrigatório (bloqueava salvar) → alerta de confirmação (pergunta mas não bloqueia) → indicador "(recomendado)" removido do rótulo.
+- Shift+clique (nível 1) no botão de visualizar evidência permite removê-la (ex: enviada por engano).
+- **Bug real descoberto e corrigido**: a exclusão de evidência definia o campo como `null`, mas a lógica de salvamento testava `!= null` para decidir se devia gravar a mudança — como `null != null` é falso, a exclusão nunca persistia de verdade (o arquivo sumia do Storage, mas o link quebrado continuava no Firestore). Corrigido com uma flag dedicada (`_evidenciaAlterada`) em vez de inferir pela igualdade a `null`.
+- Contador de itens filtrados na Listagem Geral ("Mostrando X de Y ações"), com correção de bug de pluralização ("açãoões" → "ações").
+- Botões "Expandir/Colapsar Follow-ups" convertidos para ícone único, sem texto.
+
+# v19.40 — Notificação por e-mail (mailto) e clique na linha
+
+- Botão "✉️ Notificar" em cada ação corretiva do Novo Cadastro (só quando o problema já foi salvo) — monta um `mailto:` com assunto, corpo e link direto da ação, usando o e-mail cadastrado do responsável. Sem confirmação, sem rastreamento de "já notificado" — decisão deliberada do usuário para manter simples.
+- Clicar em qualquer parte de uma linha da Listagem (fora dos botões) abre a edição, igual ao lápis.
+
+# v19.41 – v19.45 — Backup com fotos: robustez e correção de UI reaproveitada
+
+- Nova tentativa automática (retry com espera crescente) ao baixar cada foto do Storage durante o backup "com fotos" — investigação com dados reais mostrou um padrão de "quebra numa hora específica e nunca recupera" (rede/limite temporário), não CORS.
+- Aviso de "fotos não baixadas" trocado de toast passageiro para modal persistente, listando **quais** problemas/cursos específicos falharam (não só a contagem).
+- Backup "com fotos" passa a também baixar e embutir imagens coladas dentro do campo Notas (antes só cobria evidência de problema/fechamento/curso).
+- Nova função `showAlert()` — aviso de reconhecimento com um único botão de verdade, substituindo o truque de usar `showConfirm()` com `okText`/`cancelText` iguais (que sempre renderizava dois botões duplicados).
+
+# v19.46 – v19.50 — Limpeza de UI e correções no Dashboard
+
+- Vários ajustes pontuais: texto "(recomendado)" removido, botão de notificar com texto ao lado do ícone, engrenagem redundante removida da tela de Curso 1 Tema.
+- **Bug real corrigido**: gráficos "Pendências/Fechadas/Vencidas por Responsável" mostravam responsáveis com zero atividades — causa: inicialização de mapas auxiliares criava a chave do responsável mesmo sem nenhum valor de verdade.
+- Painel "Atividade na Semana" refatorado para cálculo real baseado nas datas de corte da semana selecionada (Segunda a Domingo) — antes usava uma fórmula reversa que só funcionava para a semana atual. Identidade matemática (`Fechamento + Adicionadas − Fechadas = Pendentes`) validada com 5.000 simulações aleatórias e, depois, corrigida uma segunda vez ao encontrar um caso real de dado inválido (`data_efetiva` anterior à `data_abertura`) que quebrava a soma — fórmula agora resiliente a esse tipo de erro de digitação.
+- Busca por número exato da ação na Listagem (`#327`).
+- Tecla ESC fecha o visualizador de evidência ou sai da edição de ação (respeitando o aviso de alterações não salvas).
+- Os 3 gráficos de defeito (Turno/Operador/Sub-tópico) passam a ficar realmente ocultos — não só vazios — quando o Plano selecionado não exige Operador/Turno.
+
+# v19.51 – v19.53 — Classificação 6M e reorganização do Dashboard
+
+- Novo campo **Classificação 6M** no cadastro do problema (Máquina, Método, Mão de Obra, Medição, Material, Meio Ambiente), com scripts de exportação/importação em lote para classificar a base retroativamente.
+- Novo gráfico **Defeitos por Categoria (6M)** — disponível para qualquer Plano (diferente dos outros 3, que exigem Operador/Turno), contando por padrão 1 por problema; soma Quantidade de Peças quando esse modo está disponível.
+- Layout do Dashboard reorganizado: Defeitos por Turno + 6M na mesma linha, Defeitos por Operador + Sub-Tópico na linha de baixo (6M ocupa a linha inteira sozinho quando Turno está oculto).
+- Dropdown "Quantidade de Peças/Ocorrências" oculto por padrão (só aparece para Planos que exigem Operador/Quantidade), com "Ocorrências" como novo padrão.
+
 ---
 
-*Documento gerado a partir do histórico de conversas do projeto ActionPlan — cobre da fase inicial até a v19.22.*
+## Scripts utilitários de manutenção (rodados via Console do navegador)
+
+Ao longo dessas versões, diversos scripts avulsos foram criados para diagnóstico e correção em lote — sempre em modo `DRY_RUN` por padrão, reaproveitando funções já existentes no app quando possível:
+ressincronização de Cursos 1 Tema por sub-tópico, atualização retroativa de comentários de operador em Notas, exportação/importação de códigos de sub-tópico, detecção de evidências com link quebrado no Storage, diagnóstico de ações sem Data de Ocorrência, diagnóstico de planos órfãos, diagnóstico detalhado de atividade semanal por responsável, e exportação/importação em lote da Classificação 6M.
+
+---
+
+*Documento gerado a partir do histórico de conversas do projeto ActionPlan — cobre da fase inicial até a v19.53.*
