@@ -328,7 +328,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.55</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.57</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -1464,7 +1464,7 @@ function openSubtopicoModal(id) {
   const modal = document.createElement('div');
   modal.className = 'modal-overlay open';
   modal.id = 'temp-subtopico-modal';
-  modal.innerHTML = `<div class="modal"><div class="modal-header"><span>${_editingSubtopico ? '✏️' : '➕'}</span><span class="modal-title">${_editingSubtopico ? 'Editar' : 'Novo'} Sub-Tópico</span><button class="modal-close close-temp">✕</button></div><div class="modal-body"><div class="form-group"><label class="form-label">Descrição</label><input class="form-control" id="st-desc" value="${escHtml(desc)}"></div><div class="form-group"><label class="form-label">Código(s) do Subitem</label><input class="form-control" id="st-codigo" value="${escHtml(_editingSubtopico?.codigo_subitem || '')}" placeholder="Ex: 1234567xx ou 1234567xx/1234568xx"><div class="help-text">Vários códigos: separe por "/". Usado na busca da Listagem.</div></div><div class="form-group"><label class="form-label">Plano</label><select class="form-control" id="st-plano"><option value="">Selecione</option>${planosOpts}</select></div><div class="form-group" id="st-cliente-wrap"><label class="form-label">Cliente</label><select class="form-control" id="st-cliente" required><option value="">Selecione...</option>${clientesOpts}</select><div class="help-text" id="st-cliente-help"></div></div></div><div class="modal-footer"><button class="btn btn-secondary close-temp">Cancelar</button><button class="btn btn-primary" id="saveSubtopicoBtn">💾 Salvar</button></div></div>`;
+  modal.innerHTML = `<div class="modal"><div class="modal-header"><span>${_editingSubtopico ? '✏️' : '➕'}</span><span class="modal-title">${_editingSubtopico ? 'Editar' : 'Novo'} Sub-Tópico</span><button class="modal-close close-temp">✕</button></div><div class="modal-body"><div class="form-group"><label class="form-label">Sub-Tópico</label><input class="form-control" id="st-desc" value="${escHtml(desc)}"></div><div class="form-group"><label class="form-label">Descrição</label><textarea class="form-control" id="st-descricao-longa" rows="2" placeholder="Explicação/detalhe sobre este sub-tópico (aparece como dica ao passar o mouse)">${escHtml(_editingSubtopico?.descricao_longa || '')}</textarea></div><div class="form-group"><label class="form-label">Código(s) do Subitem</label><input class="form-control" id="st-codigo" value="${escHtml(_editingSubtopico?.codigo_subitem || '')}" placeholder="Ex: 1234567xx ou 1234567xx/1234568xx"><div class="help-text">Vários códigos: separe por "/". Usado na busca da Listagem.</div></div><div class="form-group"><label class="form-label">Plano</label><select class="form-control" id="st-plano"><option value="">Selecione</option>${planosOpts}</select></div><div class="form-group" id="st-cliente-wrap"><label class="form-label">Cliente</label><select class="form-control" id="st-cliente" required><option value="">Selecione...</option>${clientesOpts}</select><div class="help-text" id="st-cliente-help"></div></div></div><div class="modal-footer"><button class="btn btn-secondary close-temp">Cancelar</button><button class="btn btn-primary" id="saveSubtopicoBtn">💾 Salvar</button></div></div>`;
   document.body.appendChild(modal);
 
   // ── Lógica de herança dinâmica do Cliente ──
@@ -1530,13 +1530,15 @@ function openSubtopicoModal(id) {
     if (!plano_id) { toast('Selecione um plano', 'warning'); return; }
     if (_ehTodos && !cliente_id) { toast('Selecione o cliente para este sub-tópico', 'warning'); return; }
     const codigo_subitem = document.getElementById('st-codigo').value.trim();
+    const descricao_longa = document.getElementById('st-descricao-longa').value.trim();
     if (_editingSubtopico) {
       _editingSubtopico.descricao  = desc;
       _editingSubtopico.plano_id   = plano_id;
       _editingSubtopico.cliente_id = cliente_id || null;
       _editingSubtopico.codigo_subitem = codigo_subitem;
+      _editingSubtopico.descricao_longa = descricao_longa;
     } else {
-      state.subtopicos.push({ id: uid(), descricao: desc, plano_id, cliente_id: cliente_id || null, codigo_subitem, ativo: true });
+      state.subtopicos.push({ id: uid(), descricao: desc, plano_id, cliente_id: cliente_id || null, codigo_subitem, descricao_longa, ativo: true });
     }
     const _nst = _editingSubtopico || state.subtopicos[state.subtopicos.length - 1];
     modal.remove();
@@ -2148,7 +2150,7 @@ function aplicarFiltrosETabela() {
           evidenciaCellHtml = `<span class="badge badge-gray" data-ev-id="${prob.id}" style="cursor:pointer;">📎 Arquivo</span>`;
         }
         linhasData.push({ sortKey: { plano: plano?plano.titulo:'', subtopico: subtopico?subtopico.descricao:'', problema: prob.problema||'', responsavel: '', prazo: '', fup: prob.data_abertura||'', num: '', acao: '', abertura: prob.data_abertura||'', idade: prob.data_abertura||'', status: 'SEM AÇÃO' },
-          html: `<tr id="row-${prob.id}-noaction" style="line-height:1.2;"><td style="padding:3px 8px;vertical-align:middle;">${plano ? escHtml(plano.titulo) : '—'}</td><td style="padding:3px 8px;vertical-align:middle;text-align:center;color:var(--text3);font-size:11px;">—</td><td style="padding:3px 8px;vertical-align:middle;">${subtopico ? escHtml(subtopico.descricao) : '—'}</td><td style="padding:3px 8px;vertical-align:middle;">${problemaCell}</td><td style="padding:3px 8px;vertical-align:middle;text-align:center;">${evidenciaCellHtml}</td><td style="padding:3px 8px;vertical-align:middle;"><span style="color:var(--text3);font-style:italic;font-size:11px;">Sem ação corretiva</span></td><td style="padding:3px 8px;vertical-align:middle;">—</td><td style="padding:3px 8px;vertical-align:middle;white-space:nowrap;">${formatDate(prob.data_abertura)}</td><td style="padding:3px 8px;vertical-align:middle;">—</td><td style="padding:3px 8px;vertical-align:middle;white-space:nowrap;color:var(--text2);">${formatDate(prob.data_abertura)}</td><td style="padding:3px 8px;vertical-align:middle;">${prob.data_abertura?Math.max(0,Math.floor((new Date()-new Date(prob.data_abertura))/864e5))+' d':'—'}</td><td style="padding:3px 8px;vertical-align:middle;"><span class="badge badge-gray">SEM AÇÃO</span></td><td style="padding:3px 8px;vertical-align:middle;"><div class="acao-buttons"><button class="btn btn-ghost btn-xs edit-acao" data-problema-id="${prob.id}" data-idx="-1" style="${(prob.historico||[]).length ? '' : 'color:var(--text3);opacity:.45;'}" title="Editar problema / Adicionar ação (Shift+clique: histórico)">✏️</button><button class="btn btn-danger btn-xs del-problema" data-problema-id="${prob.id}" title="Excluir problema (Shift+clique ou toque prolongado)">🗑️</button></div></td></tr>` });
+          html: `<tr id="row-${prob.id}-noaction" style="line-height:1.2;"><td style="padding:3px 8px;vertical-align:middle;">${plano ? escHtml(plano.titulo) : '—'}</td><td style="padding:3px 8px;vertical-align:middle;text-align:center;color:var(--text3);font-size:11px;">—</td><td style="padding:3px 8px;vertical-align:middle;" ${subtopico?.descricao_longa ? `title="${escHtml(subtopico.descricao_longa)}"` : ''}>${subtopico ? escHtml(subtopico.descricao) : '—'}</td><td style="padding:3px 8px;vertical-align:middle;">${problemaCell}</td><td style="padding:3px 8px;vertical-align:middle;text-align:center;">${evidenciaCellHtml}</td><td style="padding:3px 8px;vertical-align:middle;"><span style="color:var(--text3);font-style:italic;font-size:11px;">Sem ação corretiva</span></td><td style="padding:3px 8px;vertical-align:middle;">—</td><td style="padding:3px 8px;vertical-align:middle;white-space:nowrap;">${formatDate(prob.data_abertura)}</td><td style="padding:3px 8px;vertical-align:middle;">—</td><td style="padding:3px 8px;vertical-align:middle;white-space:nowrap;color:var(--text2);">${formatDate(prob.data_abertura)}</td><td style="padding:3px 8px;vertical-align:middle;">${prob.data_abertura?Math.max(0,Math.floor((new Date()-new Date(prob.data_abertura))/864e5))+' d':'—'}</td><td style="padding:3px 8px;vertical-align:middle;"><span class="badge badge-gray">SEM AÇÃO</span></td><td style="padding:3px 8px;vertical-align:middle;"><div class="acao-buttons"><button class="btn btn-ghost btn-xs edit-acao" data-problema-id="${prob.id}" data-idx="-1" style="${(prob.historico||[]).length ? '' : 'color:var(--text3);opacity:.45;'}" title="Editar problema / Adicionar ação (Shift+clique: histórico)">✏️</button><button class="btn btn-danger btn-xs del-problema" data-problema-id="${prob.id}" title="Excluir problema (Shift+clique ou toque prolongado)">🗑️</button></div></td></tr>` });
       }
     }
     for(let idx=0; idx < (prob.acoes_corretivas||[]).length; idx++) {
@@ -2182,7 +2184,7 @@ function aplicarFiltrosETabela() {
       const expanded = expandedFollowupRows.has(`${prob.id}_${idx}`);
       const followupRowId = `followup-${prob.id}-${idx}`;
       const followupsHtml = (cr.followups || []).map((fu, fIdx) => `<div style="display:flex; align-items:center; gap:5px; font-size:10px; margin-bottom:2px; padding-left:6px; border-left:2px solid var(--border);"><span style="white-space:nowrap; font-weight:bold;">📅 ${formatDate(fu.data_followup)} - 👤 ${escHtml(fu.responsavel)}:</span> <span style="flex:1;">${escHtml(fu.comentario)}</span> <button class="btn btn-ghost btn-xs edit-followup-list" data-acao-id="${prob.id}" data-corridx="${idx}" data-fuidx="${fIdx}">✏️</button> <button class="btn btn-ghost btn-xs remove-followup-list" data-acao-id="${prob.id}" data-corridx="${idx}" data-fuidx="${fIdx}">🗑️</button></div>`).join('') || '<div style="color:var(--text3); padding-left:20px;">Nenhum follow-up registrado.</div>';
-      linhasData.push({ sortKey: { plano: plano?plano.titulo:'', subtopico: subtopico?subtopico.descricao:'', problema: prob.problema||'', responsavel: cr.responsavel||'', abertura: prob.data_abertura||'', prazo: cr.data_prevista||'', fup: (()=>{ const _fus=(cr.followups||[]); if(!_fus.length) return prob.data_abertura||''; return _fus.reduce((mx,f)=>f.data_followup>mx?f.data_followup:mx,''); })(), num: _numAcaoValido(cr.numeroAcao)?String(cr.numeroAcao).padStart(6,'0'):'', acao: cr.acao_descricao||'', idade: prob.data_abertura||'', status: calcStatusAcao(cr) }, html: `<tr id="${rowId}" style="line-height:1.2;"><td style="padding:3px 8px;vertical-align:middle;">${plano ? escHtml(plano.titulo) : '—'}</td><td style="padding:3px 8px;vertical-align:middle;text-align:center;font-family:var(--font-hd);font-weight:800;color:var(--accent);font-size:16px;">${_numAcaoValido(cr.numeroAcao) ? cr.numeroAcao : '—'}</td><td style="padding:3px 8px;vertical-align:middle;">${subtopico ? escHtml(subtopico.descricao) : '—'}</td><td style="padding:3px 8px;vertical-align:middle;">${problemaCell}</td><td style="padding:3px 8px;vertical-align:middle;text-align:center;">${evidenciaCellHtml}</td><td style="padding:3px 8px;vertical-align:middle;">${escHtml(cr.acao_descricao?.substring(0,80) || '—')}</td><td style="padding:3px 8px;vertical-align:middle;">${escHtml(cr.responsavel || '—')}</td><td style="padding:3px 8px;vertical-align:middle;white-space:nowrap;">${formatDate(prob.data_abertura)}</td><td style="padding:3px 8px;vertical-align:middle;white-space:nowrap;"><div>${formatDate(cr.data_prevista)}${(cr.qtd_alteracoes_data||0)>0?` <span class="badge badge-yellow" title="Data alterada ${cr.qtd_alteracoes_data} vez(es)">🔄 ${cr.qtd_alteracoes_data}</span>`:''}</div></td><td style="padding:3px 8px;vertical-align:middle;white-space:nowrap;">${(()=>{ const _fus=(cr.followups||[]); if(!_fus.length) return formatDate(prob.data_abertura); const _lf=_fus.reduce((mx,f)=>f.data_followup>mx?f.data_followup:mx,''); return formatDate(_lf); })()}</td><td style="padding:3px 8px;vertical-align:middle;">${(()=>{const _i=prob.data_abertura?new Date(prob.data_abertura):null;const _f=cr.data_efetiva?new Date(cr.data_efetiva):new Date();return _i?Math.max(0,Math.floor((_f-_i)/864e5))+' d':'—';})()}</td><td style="padding:3px 8px;vertical-align:middle;">${statusBadge(status)}</td><td style="padding:3px 8px;vertical-align:middle;"><div class="acao-buttons"><button class="btn btn-ghost btn-xs edit-acao" data-problema-id="${prob.id}" data-idx="${idx}" style="${(prob.historico||[]).length ? '' : 'color:var(--text3);opacity:.45;'}" title="Editar ação (Shift+clique: histórico)">✏️</button><button class="btn btn-ghost btn-xs copy-link-acao" data-problema-id="${prob.id}" data-idx="${idx}" data-cr-id="${cr.id||''}" title="Copiar link direto para esta ação">🔗</button><button class="btn btn-ghost btn-xs toggle-followup" data-problema-id="${prob.id}" data-idx="${idx}" title="Ver follow-ups">💬 ${(cr.followups||[]).length}</button><button class="btn btn-ghost btn-xs add-followup-list" data-acao-id="${prob.id}" data-idx="${idx}" title="Adicionar follow-up">➕</button><button class="btn btn-danger btn-xs del-acao-list" data-problema-id="${prob.id}" data-idx="${idx}" title="Excluir ação corretiva (Shift+clique ou toque prolongado)">🗑️</button></div></td></tr>${expanded ? `<tr id="${followupRowId}" class="followup-row"><td colspan="12" style="padding:2px 8px;vertical-align:middle;background:var(--bg3);"><div style="padding:0;"><strong style="font-size:11px;">Follow-ups:</strong><div style="margin-top:2px;">${followupsHtml}</div></div></td></tr>` : ''}` });
+      linhasData.push({ sortKey: { plano: plano?plano.titulo:'', subtopico: subtopico?subtopico.descricao:'', problema: prob.problema||'', responsavel: cr.responsavel||'', abertura: prob.data_abertura||'', prazo: cr.data_prevista||'', fup: (()=>{ const _fus=(cr.followups||[]); if(!_fus.length) return prob.data_abertura||''; return _fus.reduce((mx,f)=>f.data_followup>mx?f.data_followup:mx,''); })(), num: _numAcaoValido(cr.numeroAcao)?String(cr.numeroAcao).padStart(6,'0'):'', acao: cr.acao_descricao||'', idade: prob.data_abertura||'', status: calcStatusAcao(cr) }, html: `<tr id="${rowId}" style="line-height:1.2;"><td style="padding:3px 8px;vertical-align:middle;">${plano ? escHtml(plano.titulo) : '—'}</td><td style="padding:3px 8px;vertical-align:middle;text-align:center;font-family:var(--font-hd);font-weight:800;color:var(--accent);font-size:16px;">${_numAcaoValido(cr.numeroAcao) ? cr.numeroAcao : '—'}</td><td style="padding:3px 8px;vertical-align:middle;" ${subtopico?.descricao_longa ? `title="${escHtml(subtopico.descricao_longa)}"` : ''}>${subtopico ? escHtml(subtopico.descricao) : '—'}</td><td style="padding:3px 8px;vertical-align:middle;">${problemaCell}</td><td style="padding:3px 8px;vertical-align:middle;text-align:center;">${evidenciaCellHtml}</td><td style="padding:3px 8px;vertical-align:middle;">${escHtml(cr.acao_descricao?.substring(0,80) || '—')}</td><td style="padding:3px 8px;vertical-align:middle;">${escHtml(cr.responsavel || '—')}</td><td style="padding:3px 8px;vertical-align:middle;white-space:nowrap;">${formatDate(prob.data_abertura)}</td><td style="padding:3px 8px;vertical-align:middle;white-space:nowrap;"><div>${formatDate(cr.data_prevista)}${(cr.qtd_alteracoes_data||0)>0?` <span class="badge badge-yellow" title="Data alterada ${cr.qtd_alteracoes_data} vez(es)">🔄 ${cr.qtd_alteracoes_data}</span>`:''}</div></td><td style="padding:3px 8px;vertical-align:middle;white-space:nowrap;">${(()=>{ const _fus=(cr.followups||[]); if(!_fus.length) return formatDate(prob.data_abertura); const _lf=_fus.reduce((mx,f)=>f.data_followup>mx?f.data_followup:mx,''); return formatDate(_lf); })()}</td><td style="padding:3px 8px;vertical-align:middle;">${(()=>{const _i=prob.data_abertura?new Date(prob.data_abertura):null;const _f=cr.data_efetiva?new Date(cr.data_efetiva):new Date();return _i?Math.max(0,Math.floor((_f-_i)/864e5))+' d':'—';})()}</td><td style="padding:3px 8px;vertical-align:middle;">${statusBadge(status)}</td><td style="padding:3px 8px;vertical-align:middle;"><div class="acao-buttons"><button class="btn btn-ghost btn-xs edit-acao" data-problema-id="${prob.id}" data-idx="${idx}" style="${(prob.historico||[]).length ? '' : 'color:var(--text3);opacity:.45;'}" title="Editar ação (Shift+clique: histórico)">✏️</button><button class="btn btn-ghost btn-xs copy-link-acao" data-problema-id="${prob.id}" data-idx="${idx}" data-cr-id="${cr.id||''}" title="Copiar link direto para esta ação">🔗</button><button class="btn btn-ghost btn-xs toggle-followup" data-problema-id="${prob.id}" data-idx="${idx}" title="Ver follow-ups">💬 ${(cr.followups||[]).length}</button><button class="btn btn-ghost btn-xs add-followup-list" data-acao-id="${prob.id}" data-idx="${idx}" title="Adicionar follow-up">➕</button><button class="btn btn-danger btn-xs del-acao-list" data-problema-id="${prob.id}" data-idx="${idx}" title="Excluir ação corretiva (Shift+clique ou toque prolongado)">🗑️</button></div></td></tr>${expanded ? `<tr id="${followupRowId}" class="followup-row"><td colspan="12" style="padding:2px 8px;vertical-align:middle;background:var(--bg3);"><div style="padding:0;"><strong style="font-size:11px;">Follow-ups:</strong><div style="margin-top:2px;">${followupsHtml}</div></div></td></tr>` : ''}` });
     }
   }
   linhasData.sort((a,b)=>{ const col=_listagemSort.col; const va=a.sortKey[col]||'', vb=b.sortKey[col]||''; let r; if(col==='num'){ r=parseInt(va||'0')-parseInt(vb||'0'); } else if(col==='idade'){ r=(va||'').localeCompare(vb||''); } else { r=va.localeCompare(vb,'pt-BR',{sensitivity:'base'}); } return _listagemSort.asc?r:-r; });
@@ -4006,6 +4008,12 @@ function renderCurso1Tema(container) {
       const curso = state.cursos1tema.find(c => c.id === cursoId);
       if (curso && curso.evidenciaCursoUrl) showEvidenciaModal(curso.evidenciaCursoUrl, [curso.subtopico_descricao, curso.problema_descricao].filter(Boolean).join(' · '));
     }
+    if (action === 'atualizar') {
+      await _ressincronizarCursoIndividual(cursoId);
+      const row = tbody.querySelector('tr[data-curso-id="' + cursoId + '"]');
+      const cursoAtualizado = state.cursos1tema.find(c => c.id === cursoId);
+      if (row && cursoAtualizado) { row.outerHTML = _renderCursoRow(cursoAtualizado); _rebindCursoUpload(cursoId); }
+    }
     if (action === 'excluir') {
       if (!(await showConfirm('Excluir este Curso de 1 Tema? Esta ação não pode ser desfeita.'))) return;
       const idx = state.cursos1tema.findIndex(c => c.id === cursoId);
@@ -4034,6 +4042,50 @@ function renderCurso1Tema(container) {
   }
 }
 
+// v19.56: ressincroniza um único Curso 1 Tema com os dados atuais do problema de origem —
+// botão manual (🔄) na Listagem, pra quando uma correção no problema não reflete sozinha no curso
+async function _ressincronizarCursoIndividual(cursoId) {
+  const curso = state.cursos1tema.find(c => c.id === cursoId);
+  if (!curso) { toast('Curso não encontrado.', 'error'); return; }
+  const problema = state.acoes.find(a => a.id === curso.problema_id);
+  if (!problema) { toast('O problema de origem deste curso não existe mais — não é possível atualizar.', 'error'); return; }
+
+  const plano = state.planos.find(p => p.id === problema.plano_id);
+  const subtopico = state.subtopicos.find(s => s.id === problema.subtopico_id);
+  const clienteId = subtopico ? (subtopico.cliente_id || plano?.cliente_id) : plano?.cliente_id;
+  const clienteObj = state.clientes.find(c => c.id === clienteId);
+
+  // Se for curso de uma reincidência específica, usa os dados DAQUELA reincidência (não do problema base)
+  let dataAbertura = problema.data_abertura || '';
+  let operador = problema.operador || '';
+  let quantidade = problema.quantidade || '';
+  if (curso._reincidencia_id) {
+    const reinc = (problema.recorrencias || []).find(r => r.id === curso._reincidencia_id);
+    if (reinc) {
+      dataAbertura = reinc.data_producao || dataAbertura;
+      operador = reinc.operador || operador;
+      quantidade = reinc.quantidade || quantidade;
+    }
+  }
+
+  curso.plano_id = problema.plano_id || curso.plano_id;
+  curso.plano_titulo = plano ? plano.titulo : curso.plano_titulo;
+  curso.subtopico_id = problema.subtopico_id || '';
+  curso.subtopico_descricao = subtopico ? subtopico.descricao : '';
+  curso.cliente = clienteObj ? clienteObj.nome : '';
+  curso.responsavel = problema.responsavel || '';
+  curso.data_abertura = dataAbertura;
+  curso.problema_descricao = (curso._reincidencia_id ? '(Reincidente) ' : '') + (problema.problema || '');
+  curso.quantidade = quantidade;
+  curso.evidencia_problema = problema.evidencia_problema || null;
+  curso.numero_operador = operador;
+
+  try {
+    await saveData('cursos1tema', curso.id);
+    toast('Curso atualizado com os dados mais recentes do problema.', 'success');
+  } catch(e) { toast('Erro ao atualizar: ' + e.message, 'error'); }
+}
+
 function _renderCursoRow(c) {
   const isF = c.statusCurso === 'Finalizado';
   const statusBadgeHtml = isF
@@ -4044,7 +4096,7 @@ function _renderCursoRow(c) {
        <button class="btn btn-ghost btn-xs" data-curso-action="upload-ev" data-id="${c.id}" title="Substituir">🔄</button>`
     : `<button class="btn btn-secondary btn-xs" data-curso-action="upload-ev" data-id="${c.id}" title="Enviar evidência">📎 Enviar</button>`;
   return `<tr data-curso-id="${escHtml(c.id)}">
-    <td><strong>${escHtml(c.subtopico_descricao)}</strong></td>
+    <td><strong ${(() => { const _s = state.subtopicos.find(s => s.id === c.subtopico_id); return _s?.descricao_longa ? `title="${escHtml(_s.descricao_longa)}"` : ''; })()}>${escHtml(c.subtopico_descricao)}</strong></td>
     <td style="max-width:200px;"><span title="${escHtml(c.problema_descricao)}">${escHtml((c.problema_descricao||'').substring(0,60))}${(c.problema_descricao||'').length>60?'…':''}</span></td>
     <td>${escHtml(c.responsavel||'—')}</td>
     <td style="white-space:nowrap;">${formatDate(c.data_abertura)}</td>
@@ -4058,7 +4110,7 @@ function _renderCursoRow(c) {
     </td>
     <td><button class="btn btn-primary btn-xs" data-curso-action="download-excel" data-id="${escHtml(c.id)}" title="Baixar Excel">⬇️ XLS</button></td>
     <td>${statusBadgeHtml}</td>
-    <td><button class="btn btn-ghost btn-xs" data-curso-action="excluir" data-id="${escHtml(c.id)}" title="Excluir" style="color:var(--red);">🗑️</button></td>
+    <td><button class="btn btn-ghost btn-xs" data-curso-action="atualizar" data-id="${escHtml(c.id)}" title="Atualizar com os dados mais recentes do problema (Defeito, Foto, Data, etc.)">🔄</button> <button class="btn btn-ghost btn-xs" data-curso-action="excluir" data-id="${escHtml(c.id)}" title="Excluir" style="color:var(--red);">🗑️</button></td>
   </tr>`;
 }
 
@@ -4412,7 +4464,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.55', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.57', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
