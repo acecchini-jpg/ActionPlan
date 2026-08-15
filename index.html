@@ -194,10 +194,10 @@ body.dark-theme { --bg: #0d0f14; --bg2: #131720; --bg3: #1a2030; --border: #252d
   .panel-title { font-size:14px!important; font-weight:bold!important; color:#000!important; }
   .panel-body { padding:0!important; }
   .table-wrap { overflow:visible!important; }
-  table { width:100%!important; border-collapse:collapse!important; font-size:8.5px!important; table-layout:fixed; }
-  thead th { background:#e8e8e8!important; color:#000!important; border:1px solid #999!important; padding:3px 4px!important; font-weight:bold!important; word-break:break-word; }
-  tbody td { border:1px solid #ccc!important; padding:2px 4px!important; vertical-align:top; word-break:break-word; }
-  tbody tr:nth-child(even) td { background:#f9f9f9!important; }
+  #tabela-acoes { width:100%!important; border-collapse:collapse!important; font-size:8.5px!important; table-layout:fixed; }
+  #tabela-acoes thead th { background:#e8e8e8!important; color:#000!important; border:1px solid #999!important; padding:3px 4px!important; font-weight:bold!important; word-break:break-word; }
+  #tabela-acoes tbody td { border:1px solid #ccc!important; padding:2px 4px!important; vertical-align:top; word-break:break-word; }
+  #tabela-acoes tbody tr:nth-child(even) td { background:#f9f9f9!important; }
   #tabela-acoes td:last-child, #tabela-acoes th:last-child { display:none!important; }
   .badge { background:#eee!important; color:#000!important; border:1px solid #999!important; }
   .followup-row, .empty-state { display:none!important; }
@@ -328,7 +328,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.57</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.59</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -4015,6 +4015,7 @@ function renderCurso1Tema(container) {
       if (row && cursoAtualizado) { row.outerHTML = _renderCursoRow(cursoAtualizado); _rebindCursoUpload(cursoId); }
     }
     if (action === 'excluir') {
+      if (!(e.shiftKey || e._longPress)) { toast('Shift+clique (ou toque prolongado) para excluir.', 'info'); return; }
       if (!(await showConfirm('Excluir este Curso de 1 Tema? Esta ação não pode ser desfeita.'))) return;
       const idx = state.cursos1tema.findIndex(c => c.id === cursoId);
       if (idx === -1) return;
@@ -4110,7 +4111,7 @@ function _renderCursoRow(c) {
     </td>
     <td><button class="btn btn-primary btn-xs" data-curso-action="download-excel" data-id="${escHtml(c.id)}" title="Baixar Excel">⬇️ XLS</button></td>
     <td>${statusBadgeHtml}</td>
-    <td><button class="btn btn-ghost btn-xs" data-curso-action="atualizar" data-id="${escHtml(c.id)}" title="Atualizar com os dados mais recentes do problema (Defeito, Foto, Data, etc.)">🔄</button> <button class="btn btn-ghost btn-xs" data-curso-action="excluir" data-id="${escHtml(c.id)}" title="Excluir" style="color:var(--red);">🗑️</button></td>
+    <td><button class="btn btn-ghost btn-xs" data-curso-action="atualizar" data-id="${escHtml(c.id)}" title="Atualizar com os dados mais recentes do problema (Defeito, Foto, Data, etc.)">🔄</button> <button class="btn btn-ghost btn-xs" data-curso-action="excluir" data-id="${escHtml(c.id)}" title="Excluir (Shift+clique ou toque prolongado)" style="color:var(--red);">🗑️</button></td>
   </tr>`;
 }
 
@@ -4464,7 +4465,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.57', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.59', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
@@ -5614,7 +5615,7 @@ window.navigate = navigate;
 // mobile/tablet, onde não existe tecla Shift. Dispara um clique sintético com a flag
 // _longPress, que os handlers já existentes checam junto de event.shiftKey.
 (function() {
-  const SELETOR_LONGO = '.del-problema, .del-acao-list, .edit-acao, #theme-toggle';
+  const SELETOR_LONGO = '.del-problema, .del-acao-list, .edit-acao, #theme-toggle, [data-curso-action="excluir"]';
   const LONG_PRESS_MS = 600;
   let _pressTimer = null, _pressFired = false;
   function _cancelarPressao() { clearTimeout(_pressTimer); _pressTimer = null; }
