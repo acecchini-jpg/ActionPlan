@@ -328,7 +328,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.60</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.61</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -2947,7 +2947,7 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
       <div class="panel-body"><div class="chart-wrap" style="height:260px;"><canvas id="chart-tendencia"></canvas></div></div>
     </div>`;
 
-  const cd={color:'#94a3b8',plugins:{legend:{labels:{color:'#94a3b8',font:{family:"'Barlow', sans-serif"}}}},scales:{x:{ticks:{color:'#64748b'},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#64748b'},grid:{color:'rgba(255,255,255,.05)'}}}};
+  const cd={color:'#94a3b8',layout:{padding:{top:22}},plugins:{legend:{labels:{color:'#94a3b8',font:{family:"'Barlow', sans-serif"}}}},scales:{x:{ticks:{color:'#64748b'},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#64748b'},grid:{color:'rgba(255,255,255,.05)'}}}};
   const ctxStatus=document.getElementById('chart-status')?.getContext('2d');   if(ctxStatus) _charts.status=new Chart(ctxStatus,{type:'doughnut',data:{labels:['Em Andamento','Fechadas','Vencidas','Sem Prazo'],datasets:[{data:[Math.max(0,emAndamento-semPrazo),fechadas,vencidas,semPrazo],backgroundColor:['#3b82f6','#22c55e','#ef4444','#64748b'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{
       ...cd.plugins,
       _datalabels:{ display: ctx=>ctx.dataset.data[ctx.dataIndex]>0,
@@ -4465,7 +4465,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.60', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.61', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
