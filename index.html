@@ -328,7 +328,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <!-- ==================== FIM v19.4: VISUALIZAÇÃO PÚBLICA ==================== -->
 <div id="app">
   <nav id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.61</span></div></div>
+    <div class="sidebar-logo"><div class="logo-icon">AP</div><div class="logo-text">Action<span>Plan</span><span class="logo-version">v19.63</span></div></div>
     <div class="sidebar-nav">
       <div class="nav-section">Análise</div>
       <div class="nav-item" data-page="dashboard"><span class="nav-icon">🎯</span><span>Dashboard</span></div>
@@ -3348,7 +3348,7 @@ function renderNovoCadastro(container) {
   }
   const planosOpts = '<option value="">Selecione...</option>' + [...state.planos].sort((a,b)=>(a.titulo||'').localeCompare(b.titulo||'','pt-BR')).map(p=>'<option value="'+p.id+'">'+escHtml(p.titulo)+'</option>').join('');
   const respOpts = '<option value="">Selecione...</option>' + getResponsaveisAtivos().map(r=>'<option value="'+escHtml(r.nome)+'">'+escHtml(r.nome)+'</option>').join('');
-  container.innerHTML = `<div class="panel-body"><div class="form-row" style="grid-template-columns:1fr 1fr auto auto;gap:14px;"><div class="form-group"><label class="form-label">Plano</label><select class="form-control" id="nc-plano">${planosOpts}</select></div><div class="form-group"><label class="form-label">Sub-Tópico</label><select class="form-control" id="nc-subtopico"><option value="">Selecione o plano...</option></select></div><div class="form-group"><label class="form-label">Data de Abertura</label><input class="form-control" type="date" id="nc-data-abertura" value="${today()}"></div><div class="form-group" style="min-width:160px;"><label class="form-label">Responsável</label><select class="form-control" id="nc-responsavel">${respOpts}</select></div></div><div class="form-group" style="margin-top:14px;"><label class="form-label">Problema</label><textarea class="form-control" id="nc-problema" rows="2" placeholder="Descreva o problema detalhadamente..."></textarea></div><div id="nc-op-turno-row" style="display:none;"><div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;margin-bottom:8px;align-items:end;" id="nc-op-row-base"><div class="form-group" style="margin-bottom:0;"><label class="form-label">Operador</label><input class="form-control" id="nc-operador" placeholder="Nº operador"></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Data de Produção</label><input class="form-control" type="date" id="nc-data-producao"></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Turno</label><div style="display:flex;gap:10px;align-items:center;padding-top:6px;"><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t1" style="accent-color:var(--accent);"> T1</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t2" style="accent-color:var(--accent);"> T2</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t3" style="accent-color:var(--accent);"> T3</label></div></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Quantidade</label><input class="form-control" id="nc-quantidade" type="number" min="0" placeholder="Qtd."></div><div style="padding-bottom:2px;"><button type="button" class="btn btn-secondary btn-sm" id="nc-add-reincidencia" title="Adicionar linha de reincidência">➕</button></div></div><div id="nc-reincidencias-container"></div></div><div class="form-row" style="grid-template-columns:1fr auto auto auto;gap:14px;margin-bottom:14px;align-items:start;"><div class="form-group" style="margin-bottom:0;"><label class="form-label">Causa Raiz</label><textarea class="form-control" id="nc-causa" rows="2" placeholder="Causa raiz do problema..."></textarea></div><div class="form-group" style="margin-bottom:0;min-width:150px;"><label class="form-label">Classificação 6M <span style="color:var(--red);">*</span></label><select class="form-control" id="nc-classificacao-6m"><option value="">Selecione...</option><option value="Máquina">Máquina</option><option value="Método">Método</option><option value="Mão de Obra">Mão de Obra</option><option value="Medição">Medição</option><option value="Material">Material</option><option value="Meio Ambiente">Meio Ambiente</option></select></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Evidência do Problema</label><div id="nc-ev-btns"><button class="btn btn-secondary btn-sm" id="nc-ev-upload-btn">📎 Upload</button></div><div class="help-text">Máx. 5 MB</div><input type="file" id="nc-ev-file" accept="image/*,.pdf" style="display:none;"><div id="nc-ev-preview" style="margin-top:6px;"></div></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Reincidência</label><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;margin-top:8px;"><input type="checkbox" id="nc-reincidente" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"><span>Problema Reincidente?</span></label></div></div><details class="form-group" ${_editingProb?.notas ? 'open' : ''}><summary class="form-label nc-notas-summary" style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;"><span class="nc-notas-marcador">▶</span>Notas / Observações</summary><div style="margin-top:8px;"><div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap;"><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="bold" title="Negrito"><b>B</b></button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="italic" title="Itálico"><i>I</i></button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="underline" title="Sublinhado"><u>S</u></button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="insertUnorderedList" title="Lista">• Lista</button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="removeFormat" title="Limpar formatação">Limpar</button></div><div id="nc-notas" contenteditable="true" style="min-height:100px;max-height:320px;overflow-y:auto;border:1px solid var(--border2);border-radius:var(--radius);padding:10px;background:var(--bg3);font-size:13px;line-height:1.5;"></div><div class="help-text">Cole texto formatado ou imagens diretamente (Ctrl+V).</div></div></details><div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 10px;border-top:1px solid var(--border);padding-top:16px;flex-wrap:wrap;gap:8px;"><span style="font-family:var(--font-hd);font-size:16px;font-weight:700;">Ações Corretivas</span><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn btn-secondary nc-btn-padrao" onclick="_ncState.editingProblemaId=null; _ncState.editingCorretivaIdx=null; navigate(\'listagem\');">Cancelar</button><button class="btn btn-primary nc-btn-padrao" id="nc-add-corretiva">➕ Adicionar Ação</button><button class="btn btn-primary nc-btn-padrao" onclick="_ncSalvar()">💾 Salvar Ação</button></div></div><div id="nc-corretivas-container"><div style="text-align:center;padding:24px;color:var(--text3);">Nenhuma ação corretiva. Clique em Adicionar Ação para começar.</div></div><div class="modal-footer" id="nc-form-footer" style="padding: 20px 0 0 0; border-top: 1px solid var(--border); margin-top: 20px;justify-content:flex-end;"><button class="btn btn-secondary nc-btn-padrao" onclick="_ncState.editingProblemaId=null; _ncState.editingCorretivaIdx=null; navigate(\'listagem\');">Cancelar</button><button class="btn btn-primary nc-btn-padrao" id="nc-add-corretiva-rodape">➕ Adicionar Ação</button><button class="btn btn-primary nc-btn-padrao" onclick="_ncSalvar()">💾 Salvar Ação</button></div></div></div>`;
+  container.innerHTML = `<div class="panel-body"><div class="form-row" style="grid-template-columns:1fr 1fr auto auto;gap:14px;"><div class="form-group"><label class="form-label">Plano</label><select class="form-control" id="nc-plano">${planosOpts}</select></div><div class="form-group"><label class="form-label">Sub-Tópico</label><select class="form-control" id="nc-subtopico"><option value="">Selecione o plano...</option></select></div><div class="form-group"><label class="form-label">Data de Abertura</label><input class="form-control" type="date" id="nc-data-abertura" value="${today()}"></div><div class="form-group" style="min-width:160px;"><label class="form-label">Responsável</label><select class="form-control" id="nc-responsavel">${respOpts}</select></div></div><div class="form-group" style="margin-top:14px;"><label class="form-label">Problema</label><textarea class="form-control" id="nc-problema" rows="2" placeholder="Descreva o problema detalhadamente..."></textarea></div><div id="nc-op-turno-row" style="display:none;"><div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;margin-bottom:8px;align-items:end;" id="nc-op-row-base"><div class="form-group" style="margin-bottom:0;"><label class="form-label">Operador</label><input class="form-control" id="nc-operador" placeholder="Nº operador"></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Data de Produção</label><input class="form-control" type="date" id="nc-data-producao"></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Turno</label><div style="display:flex;gap:10px;align-items:center;padding-top:6px;"><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t1" style="accent-color:var(--accent);"> T1</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t2" style="accent-color:var(--accent);"> T2</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t3" style="accent-color:var(--accent);"> T3</label></div></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Quantidade</label><input class="form-control" id="nc-quantidade" type="number" min="0" placeholder="Qtd."></div><div style="padding-bottom:2px;"><button type="button" class="btn btn-secondary btn-sm" id="nc-add-reincidencia" title="Adicionar linha de reincidência">➕</button></div></div><div id="nc-reincidencias-container"></div></div><div class="form-row" style="grid-template-columns:1fr auto auto auto;gap:14px;margin-bottom:14px;align-items:start;"><div class="form-group" style="margin-bottom:0;"><label class="form-label">Causa Raiz</label><textarea class="form-control" id="nc-causa" rows="2" placeholder="Causa raiz do problema..."></textarea></div><div class="form-group" style="margin-bottom:0;min-width:150px;"><label class="form-label">Classificação 6M <span style="color:var(--red);">*</span></label><select class="form-control" id="nc-classificacao-6m"><option value="">Selecione...</option><option value="Máquina">Máquina</option><option value="Método">Método</option><option value="Mão de Obra">Mão de Obra</option><option value="Medição">Medição</option><option value="Material">Material</option><option value="Meio Ambiente">Meio Ambiente</option></select></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Evidência do Problema</label><div id="nc-ev-btns"><button class="btn btn-secondary btn-sm" id="nc-ev-upload-btn">📎 Upload</button></div><div class="help-text">Máx. 5 MB</div><input type="file" id="nc-ev-file" accept="image/*,.pdf" style="display:none;"><div id="nc-ev-preview" style="margin-top:6px;"></div></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Reincidência</label><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;margin-top:8px;"><input type="checkbox" id="nc-reincidente" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"><span>Problema Reincidente?</span></label></div></div><details class="form-group" ${_editingProb?.notas ? 'open' : ''}><summary class="form-label nc-notas-summary" style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;"><span class="nc-notas-marcador">▶</span>Notas / Observações</summary><div style="margin-top:8px;"><div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap;"><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="bold" title="Negrito"><b>B</b></button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="italic" title="Itálico"><i>I</i></button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="underline" title="Sublinhado"><u>S</u></button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="insertUnorderedList" title="Lista">• Lista</button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="removeFormat" title="Limpar formatação">Limpar</button></div><div id="nc-notas" contenteditable="true" style="min-height:100px;max-height:320px;overflow-y:auto;border:1px solid var(--border2);border-radius:var(--radius);padding:10px;background:var(--bg3);font-size:13px;line-height:1.5;"></div><div class="help-text">Cole texto formatado ou imagens diretamente (Ctrl+V).</div></div></details><div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 10px;border-top:1px solid var(--border);padding-top:16px;flex-wrap:wrap;gap:8px;"><span style="font-family:var(--font-hd);font-size:16px;font-weight:700;">Ações Corretivas</span><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn btn-secondary nc-btn-padrao" onclick="_ncState.editingProblemaId=null; _ncState.editingCorretivaIdx=null; navigate(\'listagem\');">Cancelar</button><button class="btn btn-primary nc-btn-padrao" id="nc-add-corretiva">➕ Adicionar Ação</button><button class="btn btn-primary nc-btn-padrao" onclick="_ncSalvar(event)">💾 Salvar Ação</button></div></div><div id="nc-corretivas-container"><div style="text-align:center;padding:24px;color:var(--text3);">Nenhuma ação corretiva. Clique em Adicionar Ação para começar.</div></div><div class="modal-footer" id="nc-form-footer" style="padding: 20px 0 0 0; border-top: 1px solid var(--border); margin-top: 20px;justify-content:flex-end;"><button class="btn btn-secondary nc-btn-padrao" onclick="_ncState.editingProblemaId=null; _ncState.editingCorretivaIdx=null; navigate(\'listagem\');">Cancelar</button><button class="btn btn-primary nc-btn-padrao" id="nc-add-corretiva-rodape">➕ Adicionar Ação</button><button class="btn btn-primary nc-btn-padrao" onclick="_ncSalvar(event)">💾 Salvar Ação</button></div></div></div>`;
   document.getElementById('nc-plano').addEventListener('change', _ncOnPlanoChange);
   // nc-cancelar e nc-salvar usam onclick inline no HTML; não existem como ids separados
   document.getElementById('nc-add-corretiva').addEventListener('click', _ncAddCorretiva);
@@ -3607,20 +3607,30 @@ function _ncRenderCorretivas() {
     const alterBadge = (cr.qtd_alteracoes_data||0)>0 ? '<span class="badge badge-yellow">🔄 '+cr.qtd_alteracoes_data+'</span>' : '';
     return '<div class="corretiva-block" id="nc-cr-'+idx+'"><div class="corretiva-header"><span style="font-size:11px;color:var(--text3);font-weight:600;">AÇÃO CORRETIVA '+(idx+1)+'</span>'+(_numAcaoValido(cr.numeroAcao)?'<span style="color:var(--accent);font-size:17px;font-weight:800;font-family:var(--font-hd);margin-left:6px;">#'+cr.numeroAcao+'</span>':'')+''+_ncStatusBadge(status)+'<button class="btn btn-danger btn-xs nc-del-cr" data-idx="'+idx+'">🗑️</button><button class="btn btn-ghost btn-xs nc-add-fu" data-idx="'+idx+'">💬 +Follow-up</button>'+(_ncState.editingProblemaId ? '<button class="btn btn-ghost btn-xs nc-notificar" data-idx="'+idx+'" title="Preparar e-mail avisando o responsável desta ação">✉️ Notificar</button>' : '')+'</div><div class="form-row cols-2"><div class="form-group"><label class="form-label">Ação</label><textarea class="form-control nc-cr-desc" data-idx="'+idx+'" rows="2" placeholder="Descreva a ação corretiva...">'+escHtml(cr.acao_descricao||'')+'</textarea></div><div class="form-group"><label class="form-label">Responsável</label><select class="form-control nc-cr-resp" data-idx="'+idx+'">'+rOpts+'</select></div></div><div class="form-row cols-3"><div class="form-group"><label class="form-label">Data Prevista</label><div style="display:flex;align-items:center;gap:6px;"><input class="form-control nc-cr-prev" type="date" data-idx="'+idx+'" value="'+(cr.data_prevista||'')+'" style="flex:1;">'+alterBadge+'</div></div><div class="form-group"><label class="form-label">Data Efetiva</label><input class="form-control nc-cr-efet" type="date" data-idx="'+idx+'" value="'+(cr.data_efetiva||'')+'"></div><div class="form-group"><label class="form-label">Evidência Fechamento</label><div style="display:flex;gap:4px;flex-wrap:wrap;">'+evBtns+'</div><div class="help-text">Máx. 5 MB</div><input type="file" class="nc-ev-corr-file" data-idx="'+idx+'" accept="image/*" style="display:none;"></div></div><div style="margin-top:10px;"><strong>Follow-ups:</strong> '+(fuHtml||'<span style="color:var(--text3);font-size:12px;">Nenhum follow-up</span>')+'</div></div>';
   }).join('');
-  container.querySelectorAll('.nc-notificar').forEach(btn=>btn.addEventListener('click',()=>{
-    const i = parseInt(btn.dataset.idx);
+  // v19.62: monta os dados do e-mail de notificação de uma ação — reutilizada pelo botão individual e pelo envio em lote
+function _montarEmailAcao(i) {
     const cr = _ncState.acoes_corretivas[i];
-    if (!cr) return;
-    if (!cr.responsavel) { toast('Selecione um responsável para esta ação antes de notificar.', 'warning'); return; }
+    if (!cr) return null;
+    if (!cr.responsavel) { toast('Selecione um responsável para esta ação antes de notificar.', 'warning'); return null; }
     const resp = state.responsaveis.find(r => r.nome === cr.responsavel);
-    if (!resp || !resp.email) { toast('O responsável "' + cr.responsavel + '" não tem e-mail cadastrado.', 'warning'); return; }
+    if (!resp || !resp.email) { toast('O responsável "' + cr.responsavel + '" não tem e-mail cadastrado.', 'warning'); return null; }
     const planoSel = document.getElementById('nc-plano');
     const plano = planoSel ? state.planos.find(p => p.id === planoSel.value) : null;
+    const subtopicoSel = document.getElementById('nc-subtopico');
+    const subtopico = subtopicoSel ? state.subtopicos.find(s => s.id === subtopicoSel.value) : null;
     const problemaTxt = document.getElementById('nc-problema')?.value || '';
+    const numeroAcao = _numAcaoValido(cr.numeroAcao) ? cr.numeroAcao : '—';
     const link = `${location.origin}${location.pathname}#acao=${_ncState.editingProblemaId},${i}`;
     const assunto = `Nova ação em seu nome no Plano de Ação: ${plano ? plano.titulo : ''}`;
-    const corpo = `Olá,\n\nUma ação corretiva foi registrada em seu nome no plano "${plano ? plano.titulo : ''}".\n\nProblema: ${problemaTxt}\nAção: ${cr.acao_descricao || ''}\n\nAcesse os detalhes pelo link abaixo:\n${link}\n\nEste é um aviso automático do ActionPlan.`;
-    window.location.href = `mailto:${encodeURIComponent(resp.email)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
+    const corpo = `Olá,\n\nUma ação corretiva foi registrada em seu nome no plano "${plano ? plano.titulo : ''}".\n\nNº Ação: ${numeroAcao}\nSub-Tópico/Produto: ${subtopico ? subtopico.descricao : '—'}\nProblema: ${problemaTxt}\nAção: ${cr.acao_descricao || ''}\nData da Ação: ${formatDate(cr.data_prevista)}\n\nAcesse os detalhes pelo link abaixo:\n${link}\n\nEste é um aviso automático do ActionPlan.`;
+    return { email: resp.email, assunto, corpo };
+  }
+  container.querySelectorAll('.nc-notificar').forEach(btn=>btn.addEventListener('click',()=>{
+    const i = parseInt(btn.dataset.idx);
+    const dados = _montarEmailAcao(i);
+    if (!dados) return;
+    _ncState.acoes_corretivas[i].notificado = true; // v19.62: marca como notificada
+    window.location.href = `mailto:${encodeURIComponent(dados.email)}?subject=${encodeURIComponent(dados.assunto)}&body=${encodeURIComponent(dados.corpo)}`;
   }));
   container.querySelectorAll('.nc-del-cr').forEach(btn=>btn.addEventListener('click',()=>{ const i=parseInt(btn.dataset.idx); _ncState.acoes_corretivas.splice(i,1); const ne={}; Object.keys(_ncState._evidTmp).forEach(k=>{ const ki=parseInt(k); if(ki<i) ne[ki]=_ncState._evidTmp[k]; else if(ki>i) ne[ki-1]=_ncState._evidTmp[k]; }); _ncState._evidTmp=ne; _ncRenderCorretivas(); }));
   container.querySelectorAll('.nc-cr-desc').forEach(el=>el.addEventListener('input',()=>{ if(_ncState.acoes_corretivas[parseInt(el.dataset.idx)]) _ncState.acoes_corretivas[parseInt(el.dataset.idx)].acao_descricao=el.value; }));
@@ -3645,7 +3655,54 @@ document.addEventListener('click', function(e) {
   _ncState._fuTarget=null; closeModal('followup-modal');
 }, true);
 
-async function _ncSalvar() {
+// v19.62: modal com as ações ainda não notificadas de um problema recém-salvo (Shift+clique em Salvar)
+async function _mostrarModalNotificacaoPendente(problemaId, corretivas) {
+  const pendentes = corretivas.map((cr, idx) => ({ cr, idx })).filter(({cr}) => cr.responsavel && !cr.notificado);
+  if (!pendentes.length) { toast('Todas as ações já foram notificadas.', 'info'); return; }
+
+  let overlay = document.getElementById('notif-pendente-modal');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'notif-pendente-modal';
+    document.body.appendChild(overlay);
+  }
+  const linhas = pendentes.map(({cr, idx}) => {
+    const num = _numAcaoValido(cr.numeroAcao) ? '#' + cr.numeroAcao : '(sem número)';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border2);">
+      <div style="font-size:13px;"><strong>${num}</strong> — ${escHtml(cr.responsavel)}<br><span style="color:var(--text3);font-size:11px;">${escHtml((cr.acao_descricao||'').substring(0,60))}</span></div>
+      <button class="btn btn-primary btn-sm" data-notif-idx="${idx}">📧 Enviar</button>
+    </div>`;
+  }).join('');
+  overlay.innerHTML = `<div class="modal" style="max-width:480px;">
+    <div class="modal-header"><span>📧</span><span class="modal-title">Ações pendentes de notificação</span><button class="modal-close" id="notif-modal-close">✕</button></div>
+    <div class="modal-body" style="max-height:400px;overflow-y:auto;">${linhas}</div>
+    <div class="modal-footer"><button class="btn btn-secondary" id="notif-modal-fechar">Fechar</button></div>
+  </div>`;
+  overlay.classList.add('open');
+  const fechar = () => overlay.classList.remove('open');
+  overlay.querySelector('#notif-modal-close').addEventListener('click', fechar);
+  overlay.querySelector('#notif-modal-fechar').addEventListener('click', fechar);
+  overlay.querySelectorAll('[data-notif-idx]').forEach(btn => btn.addEventListener('click', async () => {
+    const idx = parseInt(btn.dataset.notifIdx);
+    const cr = corretivas[idx];
+    const resp = state.responsaveis.find(r => r.nome === cr.responsavel);
+    if (!resp || !resp.email) { toast('Responsável "' + cr.responsavel + '" sem e-mail cadastrado.', 'warning'); return; }
+    const prob = state.acoes.find(a => a.id === problemaId);
+    const plano = prob ? state.planos.find(p => p.id === prob.plano_id) : null;
+    const subtopico = prob ? state.subtopicos.find(s => s.id === prob.subtopico_id) : null;
+    const numeroAcao = _numAcaoValido(cr.numeroAcao) ? cr.numeroAcao : '—';
+    const link = `${location.origin}${location.pathname}#acao=${problemaId},${idx}`;
+    const assunto = `Nova ação em seu nome no Plano de Ação: ${plano ? plano.titulo : ''}`;
+    const corpo = `Olá,\n\nUma ação corretiva foi registrada em seu nome no plano "${plano ? plano.titulo : ''}".\n\nNº Ação: ${numeroAcao}\nSub-Tópico/Produto: ${subtopico ? subtopico.descricao : '—'}\nProblema: ${prob?.problema || ''}\nAção: ${cr.acao_descricao || ''}\nData da Ação: ${formatDate(cr.data_prevista)}\n\nAcesse os detalhes pelo link abaixo:\n${link}\n\nEste é um aviso automático do ActionPlan.`;
+    window.location.href = `mailto:${encodeURIComponent(resp.email)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
+    cr.notificado = true;
+    if (prob) { try { await saveData('acoes', prob.id); } catch(e) { console.warn('Erro ao marcar notificado:', e); } }
+    btn.textContent = '✅ Enviado';
+    btn.disabled = true;
+  }));
+}
+async function _ncSalvar(event) {
   const planoId=document.getElementById('nc-plano').value; const subtId=document.getElementById('nc-subtopico').value; const dataAbertura=document.getElementById('nc-data-abertura').value; const responsavel=document.getElementById('nc-responsavel').value; const problema=document.getElementById('nc-problema').value.trim(); const causa=document.getElementById('nc-causa').value.trim(); const classificacao6m=document.getElementById('nc-classificacao-6m').value; const reincidente=document.getElementById('nc-reincidente').checked;
   let notas=_sanitizarHtmlNotas(document.getElementById('nc-notas').innerHTML);
   if(!planoId){toast('Selecione um Plano','warning');return;} if(!problema){toast('Descreva o Problema','warning');return;} if(!classificacao6m){toast('Selecione a Classificação 6M','warning');return;}
@@ -3717,6 +3774,7 @@ async function _ncSalvar() {
         await _sincronizarIndiceNumeroAcao(existente.id, existente.acoes_corretivas, _corretivasAntesIdx);
         if (_subtopicoIdAntes !== subtId) await _ressincronizarCursosDoProblema(existente.id, subtId); // v19.22
         toast('Cadastro atualizado!','success');
+        if (event?.shiftKey) await _mostrarModalNotificacaoPendente(existente.id, existente.acoes_corretivas); // v19.62
       }
       _ncFormSujo = false;
       _ncState.editingProblemaId = null; _ncState.editingCorretivaIdx = null;
@@ -3737,7 +3795,9 @@ async function _ncSalvar() {
       await _sincronizarIndiceNumeroAcao(novoProblema.id, novoProblema.acoes_corretivas, null);
       // ── Auto-create Curso de 1 Tema se o plano for GP12 ──
       await _autoCreateCurso1Tema(novoProblema, plano);
-      toast('Problema cadastrado com sucesso!','success'); _ncFormSujo = false; hideLoading(); state.currentPage='listagem'; render();
+      toast('Problema cadastrado com sucesso!','success'); _ncFormSujo = false; hideLoading();
+      if (event?.shiftKey) await _mostrarModalNotificacaoPendente(novoProblema.id, novoProblema.acoes_corretivas); // v19.62
+      state.currentPage='listagem'; render();
     }
   } catch(err){hideLoading();toast('Erro ao salvar: '+err.message,'error');}
 }
@@ -4465,7 +4525,7 @@ function renderFazerBackup(container) {
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
-      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.61', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
+      _meta: { gerado_em: new Date().toISOString(), versao: 'v19.63', total_acoes: state.acoes.length, total_presencas: state.presencas.length, total_cursos1tema: state.cursos1tema.length, com_fotos: !!incluirFotos },
       clientes: state.clientes,
       responsaveis: state.responsaveis,
       planos: state.planos,
