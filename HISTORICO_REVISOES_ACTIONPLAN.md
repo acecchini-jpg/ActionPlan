@@ -181,6 +181,66 @@ Sistema de gestão de planos de ação, ações corretivas e Curso de 1 Tema par
 - Layout do Dashboard reorganizado: Defeitos por Turno + 6M na mesma linha, Defeitos por Operador + Sub-Tópico na linha de baixo (6M ocupa a linha inteira sozinho quando Turno está oculto).
 - Dropdown "Quantidade de Peças/Ocorrências" oculto por padrão (só aparece para Planos que exigem Operador/Quantidade), com "Ocorrências" como novo padrão.
 
+# v19.54 – v19.63 — Consolidação de funcionalidades
+
+- Classificação 6M obrigatória; drill-down por operador no Dashboard (clique na barra filtra o Sub-tópico); botão 🔄 para ressincronizar um Curso 1 Tema individual; campo Descrição em Sub-tópico com tooltip nas listagens (+ scripts de exportação/importação em lote); Shift+clique para excluir Curso 1 Tema; CSS de impressão restrito à Listagem (corrige o Relatório PDF); barra inferior escondida na impressão; respiro no topo dos gráficos (rótulos cortados); e-mail de notificação enriquecido (Nº Ação, Sub-Tópico/Produto, Data da Ação) com envio em lote via Shift+clique em Salvar.
+
+# v19.64 — Refatoração, Etapa 1 (sem mudança de comportamento)
+
+Após revisão criteriosa do código (421 KB, 173 funções, 50 globais, `renderDashboard` com 630 linhas), iniciou-se uma refatoração planejada em 7 etapas, documentada em `DIRETIVA_REFATORACAO_ACTIONPLAN.md`.
+
+- `APP_VERSAO` única — a versão passa a viver num só lugar (logo e backup leem dela); elimina a classe de erro "versão diferente em dois pontos".
+- `_validarProblema()` central e pura (sem DOM), chamada antes de gravar — concentra as regras de integridade e barra na entrada o dado inválido "fechamento antes da ocorrência" (que quebrou a soma da Atividade na Semana na v19.49).
+- CSS reformatado de uma linha de 8.740 caracteres para 100 linhas, com verificação automática de conteúdo idêntico.
+- Constatado que `_sanitizarHtmlNotas` já existia (item da revisão já resolvido).
+
+# v19.65 — Refatoração, Etapa 2 (sem mudança de comportamento)
+
+Reformatação de one-liners de JS em múltiplas linhas legíveis, seguindo `DIRETIVA_REFATORACAO_ACTIONPLAN.md`. Duas funções tratadas com verificação automática byte-a-byte (conteúdo idêntico ignorando só o espaço inserido entre tags):
+
+- `renderNovoCadastro` — 6.927 chars em 1 linha → 136 linhas.
+- `renderListagem` — 3.292 chars em 1 linha → 47 linhas.
+
+Uma terceira candidata (linha de `linhasData.push` em `aplicarFiltrosETabela`) foi **propositalmente pulada**: mistura um objeto JS com HTML e IIFEs aninhadas, reprovando a checagem de segurança de chaves aninhadas dentro de `${...}`. Outras três candidatas (`openPlanoModal`, `renderSubtopicoTable`, `initCube`) são corpos de função inteiros numa linha — padrão diferente do coberto por esta etapa, que exigiria identificar fronteiras de *statements* JS em vez de fronteiras de tag HTML. Ambas ficam registradas na diretiva para uma sessão futura dedicada a esse padrão.
+
+# v19.66 — Refatoração, Etapa 3 (sem mudança de comportamento)
+
+Estado global do Dashboard agrupado num único objeto `dashState = { plano, semana, modo, topN, operador, agruparPor }`, seguindo `DIRETIVA_REFATORACAO_ACTIONPLAN.md`. Migradas as 6 variáveis soltas (`_filtroPlanoDashboard`, `_dashDefeitosSemana`, `_dashModoContagem`, `_dashDefeitosTopN`, `_dashOperadorSelecionado`, `_dashAgruparPor`), uma de cada vez com validação entre cada troca. Nova função `_resetDashState()` substitui as 4 linhas manuais do botão "Limpar Filtros" — comportamento conferido idêntico antes da troca (mesmos 4 campos resetados, mesmos valores-padrão).
+
+# v19.67 — Refatoração, Etapa 4 (sem mudança de comportamento)
+
+`renderDashboard` (628 linhas, a função mais crítica do sistema) dividida em 3, seguindo `DIRETIVA_REFATORACAO_ACTIONPLAN.md`, uma extração por vez com checklist entre cada:
+
+- `_calcularAgregacoesDashboard()` (105 linhas) — toda a matemática, sem DOM e sem Chart.js; devolve um objeto `agg` só com o que o restante consome (17 valores; 12 ficam internos). Pela primeira vez os números do Dashboard são testáveis isoladamente.
+- `_montarHtmlDashboard(container, agg)` (151 linhas) — só a barra de filtro fixa e o `container.innerHTML`.
+- `_montarGraficosDashboard(agg)` (378 linhas) — só as instâncias Chart.js e os listeners.
+- `renderDashboard` ficou com 10 linhas de orquestração.
+
+**Verificação além do checklist:** criado um teste de equivalência (`teste_equivalencia_dashboard.js`, uso só em desenvolvimento) que executa o `renderDashboard` **antigo** e o **novo** em Node com o mesmo mock de DOM/Chart.js e o mesmo estado sintético, em 6 cenários (todos os planos; plano com operador em modo peças; plano sem operador; semana + agrupamento por departamento; drill-down por operador; modo auditoria). Resultado: HTML byte-a-byte idêntico e mesma sequência de gráficos em todos — inclusive nos cenários em que a quantidade de gráficos muda (9/9/4/9/9/8), o que prova que o teste exercita os caminhos de lógica de verdade. Esse teste é o ponto de partida natural da Etapa 7.
+
+# v19.68 — Refatoração, Etapa 5 (mudança de comportamento intencional e restrita)
+
+`db.batch()` no par de gravações citado pela `DIRETIVA_REFATORACAO_ACTIONPLAN.md` como exemplo principal: ao criar um novo problema em Plano GP12 (caminho de criação sem reincidência em `_ncSalvar`), o **problema** e o **Curso de 1 Tema** correspondente agora são gravados **atomicamente** — se um falhar, nenhum dos dois persiste, evitando o banco ficar com o problema sem o curso.
+
+- Nova função utilitária `_salvarComBatch(itens)`, reproduzindo o mesmo `set(..., {merge:true})` que `saveDoc` já usa.
+- `_autoCreateCurso1Tema` teve sua lógica de montagem extraída para `_montarNovoCurso1TemaSeAplicavel` (pura, não grava) — a função original continua idêntica para os outros 3 chamadores (edição, reincidências, criação manual via modal), só o caminho de criação principal passou a usar o batch.
+- **Decisão deliberada:** o índice auxiliar de número de ação (`_sincronizarIndiceNumeroAcao`, que pode gravar N documentos) ficou **fora** do batch — é uma estrutura de busca reconstruível, e incluí-la arriscaria bloquear a gravação do problema (o dado mais crítico) por causa de uma falha num índice secundário. Registrado como decisão consciente, não omissão.
+- **Verificação:** teste de equivalência (`teste_equivalencia_batch_curso1tema.js`, uso só em desenvolvimento) com mock de Firestore que registra cada escrita — confirma resultado final idêntico em sucesso (plano comum e plano GP12) e confirma a atomicidade real em falha simulada (no caminho antigo o problema ficava salvo sozinho mesmo com o curso falhando; no novo, nenhum dos dois persiste se o commit falhar).
+
+# v19.69 — Refatoração, Etapa 6 (UX: abas no Dashboard)
+
+Dashboard reorganizado em 3 abas, seguindo `DIRETIVA_REFATORACAO_ACTIONPLAN.md` — a primeira etapa da refatoração com mudança de UX visível e intencional (as anteriores eram puramente estruturais):
+
+- **Visão Geral**: KPIs, Status Geral (doughnut), Tendência 8 semanas, Status por Plano.
+- **Responsáveis**: Pendências/Fechadas/Vencidas por Responsável-Departamento, Taxa de Presença, Atividade na Semana.
+- **Defeitos**: Turno, 6M, Operador, Sub-Tópico.
+
+`_montarGraficosDashboard` (Etapa 4) foi dividida em `_montarGraficosVisaoGeral`, `_montarGraficosResponsaveis` e `_montarGraficosDefeitos`, mais um orquestrador que monta **só a aba ativa** — os gráficos das outras duas só são criados no primeiro clique naquela aba (lazy loading real, verificado pelo teste). Trocar de aba não recalcula `_calcularAgregacoesDashboard` nem remonta gráficos já criados. Os filtros compartilhados (Plano, Semana, Modo, TopN, Agrupamento, drill-down por operador) continuam funcionando entre abas, e a aba escolhida persiste ao trocar um filtro.
+
+**Verificação:** teste de equivalência (`teste_equivalencia_abas_dashboard.js`, uso só em desenvolvimento) com um mini-DOM que simula clique real nos botões de aba. Confirma, em 4 cenários, que o **conjunto total** de gráficos instanciados ao visitar as 3 abas é idêntico ao do Dashboard antigo (que montava tudo de uma vez), que só 2 gráficos são criados antes do primeiro clique (a aba padrão), e que clicar duas vezes em cada aba não remonta nada.
+
+**Pequena mudança cosmética:** o gráfico de Tendência passou a usar a altura padrão de `.chart-wrap` (240px) em vez do `height:260px` que tinha isoladamente — inofensivo, mas registrado por transparência.
+
 ---
 
 ## Scripts utilitários de manutenção (rodados via Console do navegador)
@@ -190,4 +250,4 @@ ressincronização de Cursos 1 Tema por sub-tópico, atualização retroativa de
 
 ---
 
-*Documento gerado a partir do histórico de conversas do projeto ActionPlan — cobre da fase inicial até a v19.53.*
+*Documento gerado a partir do histórico de conversas do projeto ActionPlan — cobre da fase inicial até a v19.69.*
