@@ -471,7 +471,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.67';
+const APP_VERSAO = 'v19.68';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -860,6 +860,18 @@ const _snapUnsubs = [];
 async function saveDoc(col, item) { if (!db) { toast('Firebase não configurado', 'warning'); return; } const { id, ...data } = item; try { await db.collection(col).doc(id).set(data, { merge: true }); } catch (e) { toast('Erro ao salvar: ' + e.message, 'error'); throw e; } }
 async function deleteFireDoc(col, id) { if (!db) { toast('Firebase não configurado', 'warning'); return; } try { await db.collection(col).doc(id).delete(); } catch (e) { toast('Erro ao excluir: ' + e.message, 'error'); throw e; } }
 async function saveData(col, changedId) { if (!db) { toast('Firebase não configurado', 'warning'); return; } const map = { clientes: state.clientes, responsaveis: state.responsaveis, planos: state.planos, subtopicos: state.subtopicos, acoes: state.acoes, presencas: state.presencas, cursos1tema: state.cursos1tema }; const items = map[col]; if (!items) return; if (changedId) { const item = items.find(i => i.id === changedId); if (item) await saveDoc(col, item); } else { await Promise.all(items.map(item => saveDoc(col, item))); } }
+// v19.68 (Etapa 5): grava vários itens em coleções (possivelmente diferentes) de forma ATÔMICA — tudo ou nada.
+// Reproduz o mesmo set(..., {merge:true}) que saveDoc já usa, pra não mudar a semântica de gravação individual.
+async function _salvarComBatch(itens) {
+  if (!db) { toast('Firebase não configurado', 'warning'); return; }
+  const batch = db.batch();
+  itens.forEach(({ col, item }) => {
+    const { id, ...data } = item;
+    batch.set(db.collection(col).doc(id), data, { merge: true });
+  });
+  try { await batch.commit(); }
+  catch (e) { toast('Erro ao salvar: ' + e.message, 'error'); throw e; }
+}
 let _saveTimer = {}; function scheduleSave(col, delay = 1500) { clearTimeout(_saveTimer[col]); _saveTimer[col] = setTimeout(() => saveData(col), delay); }
 function _migrateAcoes() { state.acoes.forEach(prob => { if (!prob.acoes_corretivas) prob.acoes_corretivas = []; prob.acoes_corretivas.forEach(cr => { if (!cr.followups) cr.followups = []; if (typeof cr.qtd_alteracoes_data !== 'number') cr.qtd_alteracoes_data = 0; }); }); }
 let _listenersLigados = false;
@@ -4105,10 +4117,19 @@ async function _ncSalvar(event) {
         const probReinc = { ...novoProblema, data_abertura: reinc.data_producao || novoProblema.data_abertura, operador: reinc.operador || novoProblema.operador, quantidade: reinc.quantidade || novoProblema.quantidade, turnos: reinc.turnos && reinc.turnos.length ? reinc.turnos : novoProblema.turnos, _reincidencia_id: reinc.id };
         await _autoCreateCurso1Tema(probReinc, plano, reinc.id);
       }
-      state.acoes.push(novoProblema); await saveData('acoes',novoProblema.id); _ncState._novoId = null;
+      // v19.68 (Etapa 5): problema + Curso 1 Tema principal (se GP12) gravados atomicamente — evita banco
+      // inconsistente se um dos dois falhar no meio do caminho. O índice de nº de ação fica DE FORA de
+      // propósito: é auxiliar/reconstruível (busca), travar o problema por causa dele seria pior que
+      // o problema que a Etapa 5 quer resolver. Reincidências continuam pelo caminho de antes (acima).
+      const _cursoPrincipalGP12 = _montarNovoCurso1TemaSeAplicavel(novoProblema, plano);
+      state.acoes.push(novoProblema);
+      if (_cursoPrincipalGP12) state.cursos1tema.push(_cursoPrincipalGP12);
+      await _salvarComBatch([
+        { col: 'acoes', item: novoProblema },
+        ...(_cursoPrincipalGP12 ? [{ col: 'cursos1tema', item: _cursoPrincipalGP12 }] : [])
+      ]);
+      _ncState._novoId = null;
       await _sincronizarIndiceNumeroAcao(novoProblema.id, novoProblema.acoes_corretivas, null);
-      // ── Auto-create Curso de 1 Tema se o plano for GP12 ──
-      await _autoCreateCurso1Tema(novoProblema, plano);
       toast('Problema cadastrado com sucesso!','success'); _ncFormSujo = false; hideLoading();
       if (event?.shiftKey) await _mostrarModalNotificacaoPendente(novoProblema.id, novoProblema.acoes_corretivas); // v19.62
       state.currentPage='listagem'; render();
@@ -4135,23 +4156,26 @@ async function _ressincronizarCursosDoProblema(problemaId, novoSubtopicoId) {
     try { await saveData('cursos1tema', curso.id); } catch(e) { console.warn('Erro ao ressincronizar curso:', curso.id, e); }
   }
 }
-async function _autoCreateCurso1Tema(problema, plano, reincidenciaId) {
-  if (!plano) return;
+// v19.68 (Etapa 5): extrai a MONTAGEM do objeto de Curso 1 Tema (decide se aplica, monta os dados) sem gravar —
+// permite ao caminho de criação em _ncSalvar gravar o curso no MESMO batch do problema, atomicamente.
+// _autoCreateCurso1Tema mantém o comportamento idêntico pros demais chamadores (edição, reincidências, Fast Response).
+function _montarNovoCurso1TemaSeAplicavel(problema, plano, reincidenciaId) {
+  if (!plano) return null;
   const tituloPlano = (plano.titulo || '').toUpperCase();
-  if (!tituloPlano.includes('GP12') && !tituloPlano.includes('GP-12')) return;
+  if (!tituloPlano.includes('GP12') && !tituloPlano.includes('GP-12')) return null;
   // Não duplicar se já existe
   // Deduplicação: por reincidencia_id (reincidências) ou por problema_id (curso principal)
   const jaExiste = reincidenciaId
     ? state.cursos1tema.find(c => c._reincidencia_id === reincidenciaId)
     : state.cursos1tema.find(c => c.problema_id === problema.id && !c._reincidencia_id);
-  if (jaExiste) return;
+  if (jaExiste) return null;
   const subtopico = state.subtopicos.find(s => s.id === problema.subtopico_id);
   const cliente = (() => {
     const sid = subtopico ? (subtopico.cliente_id || plano.cliente_id) : plano.cliente_id;
     const c = state.clientes.find(x => x.id === sid);
     return c ? c.nome : '';
   })();
-  const novoCurso = {
+  return {
     id: uid(),
     problema_id: problema.id,
     plano_id: plano.id,
@@ -4171,6 +4195,10 @@ async function _autoCreateCurso1Tema(problema, plano, reincidenciaId) {
     _reincidencia_id: reincidenciaId || null,
     criado_em: new Date().toISOString()
   };
+}
+async function _autoCreateCurso1Tema(problema, plano, reincidenciaId) {
+  const novoCurso = _montarNovoCurso1TemaSeAplicavel(problema, plano, reincidenciaId);
+  if (!novoCurso) return;
   state.cursos1tema.push(novoCurso);
   await saveData('cursos1tema', novoCurso.id);
 }
