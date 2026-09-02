@@ -471,7 +471,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.65';
+const APP_VERSAO = 'v19.66';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -580,16 +580,14 @@ let _modeloOrigem = null; // v19.1: 'storage' | 'local' | null — usado no badg
 let _pendingDeeplink   = null; // { probId, idx } aguardando dados carregarem // ArrayBuffer do Curso1TemaPadrão.xlsx
 const _MODELO_LS_KEY = "curso1tema_modelo_xlsx_b64"; // localStorage key
 let _filtroPlanoAnalise = '';   // filtro ativo no Resumo para PDM
-let _filtroPlanoDashboard   = '';  // filtro ativo no Dashboard
 let _cursoSortCol           = '';  // coluna sort Curso 1 Tema
 let _subSortCol              = '';  // coluna sort Sub-Tópicos
 let _subSortAsc              = true;
 let _cursoSortAsc           = true;
-let _dashModoContagem       = 'ocorrencias'; // 'pecas' | 'ocorrencias' — compartilhado entre Turno, Operador, Sub-tópico e 6M
-let _dashDefeitosTopN       = 15;  // barras — compartilhado entre Operador e Sub-tópico (Turno não usa)
-let _dashOperadorSelecionado = null; // v19.55: drill-down — { codigo, label } do operador clicado no gráfico, filtra o Sub-tópico
-let _dashDefeitosSemana     = ''; // filtro de semana — compartilhado entre Turno, Operador e Sub-tópico
-let _dashAgruparPor         = 'responsavel';  // 'responsavel' | 'departamento' — agrupamento dos 3 gráficos por responsável
+// v19.66: estado do Dashboard agrupado num objeto único — evita "esquecer" de resetar uma variável solta
+// (já aconteceu: modo Peças ficava "travado" ao trocar de Plano). Substitui as 6 variáveis soltas que existiam antes.
+const dashState = { plano: '', semana: '', modo: 'ocorrencias', topN: 15, operador: null, agruparPor: 'responsavel' };
+function _resetDashState() { dashState.plano = ''; dashState.semana = ''; dashState.modo = 'ocorrencias'; dashState.operador = null; }
 const state = { config: { ...DEFAULT_FIREBASE_CONFIG }, clientes: [], responsaveis: [], planos: [], subtopicos: [], acoes: [], presencas: [], cursos1tema: [], operadores_turno: [], currentPage: 'dashboard', currentEvidenciaTarget: null, evidenciaDataURL: null, modoAuditoria: false, logoEmpresaUrl: null, };
 
 // ==================== FUNÇÕES AUXILIARES (comuns) ====================
@@ -2781,10 +2779,10 @@ function _semanaAtualISO(){
   return `${d.getFullYear()}-W${String(w).padStart(2,'0')}`;
 }
 function _renderAtividadeSemana(){
-  const semStr=_dashDefeitosSemana||_semanaAtualISO();
+  const semStr=dashState.semana||_semanaAtualISO();
   const range=_semanaRange(semStr);
   if(!range) return '<div class="empty-state">Selecione uma semana</div>';
-  const _af=_filtroPlanoDashboard?state.acoes.filter(a=>a.plano_id===_filtroPlanoDashboard):state.acoes;
+  const _af=dashState.plano?state.acoes.filter(a=>a.plano_id===dashState.plano):state.acoes;
   const _resps=[...new Set(_af.flatMap(p=>(p.acoes_corretivas||[]).map(c=>c.responsavel||'').filter(Boolean)))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
   if(!_resps.length) return '<div class="empty-state" style="padding:20px;">Nenhum responsável encontrado.</div>';
   const _atasSemana=state.presencas.filter(a=>_inRange(a.data||'',range));
@@ -2817,7 +2815,7 @@ function _renderAtividadeSemana(){
         if(pendenteNoFim && dataPrev && dataPrev<=range.end) vencFim++;
       });
     });
-    const {taxa:tx}=calcTaxaPresencaResponsavel(resp,_filtroPlanoDashboard||null,_atasSemana);
+    const {taxa:tx}=calcTaxaPresencaResponsavel(resp,dashState.plano||null,_atasSemana);
     const txH=tx!==null?`<span class="taxa-badge ${taxaSemaforoClass(tx)}" style="font-size:11px;">${tx}%</span>`:'<span style="color:var(--text3);">—</span>';
     const hi=(n,c)=>n>0?`<strong style="color:${c||'var(--text1)'}">${n}</strong>`:'<span style="color:var(--text3)">0</span>';
     return `<tr><td>${escHtml(resp)}</td>`
@@ -2846,12 +2844,12 @@ function renderDashboard(container){
   if(typeof Chart==='undefined'){ container.innerHTML=`<div class="panel"><div class="panel-body" style="text-align:center;padding:40px"><div class="spinner"></div><p>Aguardando gráficos...</p></div></div>`; setTimeout(()=>renderDashboard(container),500); return; }
   const _scrollAntesDoRender = container ? container.scrollTop : 0; // v19.10: evita a tela "pular" ao trocar um filtro
   destroyCharts();
-  const _acoesDashBase = _filtroPlanoDashboard ? state.acoes.filter(a=>a.plano_id===_filtroPlanoDashboard) : state.acoes;
+  const _acoesDashBase = dashState.plano ? state.acoes.filter(a=>a.plano_id===dashState.plano) : state.acoes;
   // v19.31: modo auditoria — remove ações vencidas de todo o Dashboard (KPIs, gráficos, Status por Plano)
   const _acoesDash = state.modoAuditoria
     ? _acoesDashBase.map(p => ({ ...p, acoes_corretivas: (p.acoes_corretivas||[]).filter(cr => calcStatusAcao(cr) !== 'VENCIDO') }))
     : _acoesDashBase;
-  const _planosDash = _filtroPlanoDashboard ? state.planos.filter(p=>p.id===_filtroPlanoDashboard)      : state.planos;
+  const _planosDash = dashState.plano ? state.planos.filter(p=>p.id===dashState.plano)      : state.planos;
   let total=0,fechadas=0,emAndamento=0,vencidas=0,semAcoes=0,semPrazo=0;
   const cursosPendentes = state.cursos1tema.filter(c => c.statusCurso !== 'Finalizado').length; // v19.14
   const byResp={}; const byPlano={};
@@ -2911,7 +2909,7 @@ function renderDashboard(container){
   const _respDeptMap = {};
   state.responsaveis.forEach(r => { _respDeptMap[r.nome] = r.departamento || 'Sem Departamento'; });
   function _regroupPorDept(map) {
-    if (_dashAgruparPor !== 'departamento') return map;
+    if (dashState.agruparPor !== 'departamento') return map;
     const out = {};
     Object.entries(map).forEach(([nome, planoMap]) => {
       const dept = _respDeptMap[nome] || 'Sem Departamento';
@@ -2923,7 +2921,7 @@ function renderDashboard(container){
   const pendByGrupo = _regroupPorDept(pendByRespPlano);
   const vencByGrupo = _regroupPorDept(vencByRespPlano);
   const fechByGrupo = _regroupPorDept(fechByRespPlano);
-  const _agrupLabel = _dashAgruparPor === 'departamento' ? 'Departamento' : 'Responsável';
+  const _agrupLabel = dashState.agruparPor === 'departamento' ? 'Departamento' : 'Responsável';
 
   // ── Helper: monta datasets para um Stacked Bar Chart ──
   function buildStackedDatasets(respLabels, respPlanoMap) {
@@ -2968,15 +2966,15 @@ function renderDashboard(container){
     return { ym, label: `${nm.charAt(0).toUpperCase()+nm.slice(1)}/${String(d.getFullYear()).slice(2)}` };
   });
 const presencaRespRows = responsaveisAtivos.map(r=>{
-    const { taxa: tp, reunioes: nr } = calcTaxaPresencaResponsavel(r.nome, _filtroPlanoDashboard || null);
+    const { taxa: tp, reunioes: nr } = calcTaxaPresencaResponsavel(r.nome, dashState.plano || null);
     // Oculta responsáveis sem dados (S/D) quando há filtro de plano ativo
-    if (_filtroPlanoDashboard && tp === null) return '';
+    if (dashState.plano && tp === null) return '';
     const cls = taxaSemaforoClass(tp);
     const taxaHtml = tp !== null
       ? `<span class="taxa-badge ${cls}">${tp}%</span>`
       : `<span class="taxa-badge taxa-sem-dado">S/D</span>`;
     const _mesesCells = _meses3.map(m => {
-      const tm = calcTaxaPresencaMes(r.nome, m.ym, _filtroPlanoDashboard || null);
+      const tm = calcTaxaPresencaMes(r.nome, m.ym, dashState.plano || null);
       if (tm === null) return `<td style="text-align:center;font-size:11px;color:var(--text3);">—</td>`;
       const cm = taxaSemaforoClass(tm);
       return `<td style="text-align:center;"><span class="taxa-badge ${cm}" style="font-size:11px;padding:1px 6px;">${tm}%</span></td>`;
@@ -2991,7 +2989,7 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
   }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:20px;">Nenhum dado de presença registrado.</td></tr>';
 
   const _dashPlanoOpts = `<option value="">Todos os planos</option>`
-    + state.planos.map(p=>`<option value="${escHtml(p.id)}" ${_filtroPlanoDashboard===p.id?'selected':''}>${escHtml(p.titulo)}</option>`).join('');
+    + state.planos.map(p=>`<option value="${escHtml(p.id)}" ${dashState.plano===p.id?'selected':''}>${escHtml(p.titulo)}</option>`).join('');
 
   const _dashFilterFixedEl = document.getElementById('dash-filter-fixed');
   if (_dashFilterFixedEl) {
@@ -3002,24 +3000,24 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
       <select id="dash-filtro-plano" class="form-control" style="width:auto;min-width:200px;">${_dashPlanoOpts}</select>
       <span style="font-size:13px;color:var(--text2);font-weight:600;margin-left:14px;">📊 Exibir por:</span>
       <select id="dash-agrupar-por" class="form-control" style="width:auto;">
-        <option value="responsavel" ${_dashAgruparPor==='responsavel'?'selected':''}>Responsável</option>
-        <option value="departamento" ${_dashAgruparPor==='departamento'?'selected':''}>Departamento</option>
+        <option value="responsavel" ${dashState.agruparPor==='responsavel'?'selected':''}>Responsável</option>
+        <option value="departamento" ${dashState.agruparPor==='departamento'?'selected':''}>Departamento</option>
       </select>
-      ${(() => { const _pSelFiltro = _filtroPlanoDashboard ? state.planos.find(p=>p.id===_filtroPlanoDashboard) : null; return (_pSelFiltro && _pSelFiltro.necessita_op_qtd) ? `
+      ${(() => { const _pSelFiltro = dashState.plano ? state.planos.find(p=>p.id===dashState.plano) : null; return (_pSelFiltro && _pSelFiltro.necessita_op_qtd) ? `
       <span style="font-size:13px;color:var(--text2);font-weight:600;margin-left:14px;">📈 Defeitos:</span>
       <select id="dash-modo-contagem" class="form-control" style="width:auto;">
-        <option value="pecas" ${_dashModoContagem==='pecas'?'selected':''}>Quantidade de Peças</option>
-        <option value="ocorrencias" ${_dashModoContagem==='ocorrencias'?'selected':''}>Quantidade de Ocorrências</option>
+        <option value="pecas" ${dashState.modo==='pecas'?'selected':''}>Quantidade de Peças</option>
+        <option value="ocorrencias" ${dashState.modo==='ocorrencias'?'selected':''}>Quantidade de Ocorrências</option>
       </select>` : ''; })()}
       <label style="font-size:13px;color:var(--text2);font-weight:600;">Top:</label>
       <select id="dash-defeitos-topn" class="form-control" style="width:auto;">
-        ${[5,10,15,20,30,0].map(n=>`<option value="${n}" ${_dashDefeitosTopN===n?'selected':''}>${n===0?'Todos':n}</option>`).join('')}
+        ${[5,10,15,20,30,0].map(n=>`<option value="${n}" ${dashState.topN===n?'selected':''}>${n===0?'Todos':n}</option>`).join('')}
       </select>
       <label style="font-size:13px;color:var(--text2);font-weight:600;">Semana:</label>
-      <input type="week" id="dash-defeitos-semana" class="form-control" style="width:auto;" value="${_dashDefeitosSemana}">
+      <input type="week" id="dash-defeitos-semana" class="form-control" style="width:auto;" value="${dashState.semana}">
       <span style="flex:1;"></span>
-      ${_filtroPlanoDashboard ? `<span class="badge badge-yellow">${escHtml(state.planos.find(p=>p.id===_filtroPlanoDashboard)?.titulo||'')}</span>` : ''}
-      ${(_filtroPlanoDashboard || _dashDefeitosSemana) ? `<button id="dash-limpar-filtro" class="btn btn-ghost btn-sm">✕ Limpar Filtros</button>` : ''}
+      ${dashState.plano ? `<span class="badge badge-yellow">${escHtml(state.planos.find(p=>p.id===dashState.plano)?.titulo||'')}</span>` : ''}
+      ${(dashState.plano || dashState.semana) ? `<button id="dash-limpar-filtro" class="btn btn-ghost btn-sm">✕ Limpar Filtros</button>` : ''}
     </div>`;
   }
 
@@ -3082,7 +3080,7 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
         <span class="panel-title">Atividade na Semana</span>
         <div style="display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap;">
           <span style="font-size:12px;color:var(--text2);">Semana: <strong>${(()=>{
-            const r=_semanaRange(_dashDefeitosSemana||_semanaAtualISO());
+            const r=_semanaRange(dashState.semana||_semanaAtualISO());
             return r?r.start+' → '+r.end:'';
           })()}</strong></span>
         </div>
@@ -3238,14 +3236,14 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
     }
 
     // v19.10: filtro de semana único, compartilhado pelos 3 gráficos
-    const _rangeDefeitos = _dashDefeitosSemana ? _semanaRange(_dashDefeitosSemana) : null;
+    const _rangeDefeitos = dashState.semana ? _semanaRange(dashState.semana) : null;
     const _eventosFiltrados = _rangeDefeitos ? _eventos.filter(ev => _inRange(ev.data, _rangeDefeitos)) : _eventos;
-    const _modoLabel = _dashModoContagem === 'ocorrencias' ? 'Ocorrências' : 'Peças';
+    const _modoLabel = dashState.modo === 'ocorrencias' ? 'Ocorrências' : 'Peças';
 
     // ── Defeitos por Turno — agora respeita o modo Peças/Ocorrências (sem dividir entre turnos simultâneos do mesmo evento) ──
     const _porTurno = { 'T1': 0, 'T2': 0, 'T3': 0, 'Não informado': 0 };
     _eventosFiltrados.forEach(ev => {
-      const _valor = _dashModoContagem === 'ocorrencias' ? 1 : ev.qtd;
+      const _valor = dashState.modo === 'ocorrencias' ? 1 : ev.qtd;
       if (!ev.turnos.length) { _porTurno['Não informado'] += _valor; return; }
       ev.turnos.forEach(t => { if (_porTurno[t] !== undefined) _porTurno[t] += _valor; else _porTurno['Não informado'] += _valor; });
     });
@@ -3257,50 +3255,50 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
       const _tLabel = ev.turnos.length ? `[${ev.turnos.join('/')}]` : '[?]';
       const _ops = _extrairOperadores(ev);
       return (_ops.length ? _ops : ['Não informado']).map(op => `${op} ${_tLabel}`);
-    }, _dashModoContagem);
+    }, dashState.modo);
     let _opEntries = Object.entries(_porOp).sort((a,b) => b[1] - a[1]);
-    if (_dashDefeitosTopN > 0 && _opEntries.length > _dashDefeitosTopN) _opEntries = _opEntries.slice(0, _dashDefeitosTopN);
+    if (dashState.topN > 0 && _opEntries.length > dashState.topN) _opEntries = _opEntries.slice(0, dashState.topN);
     const _opLabels  = _opEntries.map(e => e[0]);
     const _opData    = _opEntries.map(e => e[1]);
 
     // ── Análise por Sub-tópico — mesmos filtros compartilhados + drill-down opcional por operador ──
-    const _eventosParaSub = _dashOperadorSelecionado
-      ? _eventosFiltrados.filter(ev => _extrairOperadores(ev).includes(_dashOperadorSelecionado.codigo))
+    const _eventosParaSub = dashState.operador
+      ? _eventosFiltrados.filter(ev => _extrairOperadores(ev).includes(dashState.operador.codigo))
       : _eventosFiltrados;
     const _porSub = _agregarPorChave(_eventosParaSub, ev => {
       const sub = state.subtopicos.find(s => s.id === ev.subtopico_id);
       return [sub ? sub.descricao : 'Sem Sub-tópico'];
-    }, _dashModoContagem);
+    }, dashState.modo);
     let _subEntries = Object.entries(_porSub).sort((a,b) => b[1] - a[1]);
-    if (_dashDefeitosTopN > 0 && _subEntries.length > _dashDefeitosTopN) _subEntries = _subEntries.slice(0, _dashDefeitosTopN);
+    if (dashState.topN > 0 && _subEntries.length > dashState.topN) _subEntries = _subEntries.slice(0, dashState.topN);
     const _subLabels = _subEntries.map(e => e[0]);
     const _subData   = _subEntries.map(e => e[1]);
 
     // ── Defeitos por Categoria (6M) — conta problemas por padrão; soma Quantidade de Peças quando esse modo
     // estiver ativo (só é possível quando o Plano selecionado exige Operador/Quantidade) ──
     // v19.52/v19.53: disponível pra QUALQUER plano (não depende de necessita_op_qtd, diferente dos outros 3)
-    const _range6m = _dashDefeitosSemana ? _semanaRange(_dashDefeitosSemana) : null;
+    const _range6m = dashState.semana ? _semanaRange(dashState.semana) : null;
     const _por6M = {};
     _acoesDash.forEach(prob => {
       if (_range6m && !_inRange(prob.data_abertura||'', _range6m)) return;
       const chave = prob.classificacao_6m || 'Não Classificado';
-      const _valor6m = _dashModoContagem === 'pecas' ? (parseInt(prob.quantidade, 10) || 0) : 1;
-      if (_dashModoContagem === 'pecas' && _valor6m <= 0) return; // sem quantidade válida, não conta nada nesse modo
+      const _valor6m = dashState.modo === 'pecas' ? (parseInt(prob.quantidade, 10) || 0) : 1;
+      if (dashState.modo === 'pecas' && _valor6m <= 0) return; // sem quantidade válida, não conta nada nesse modo
       _por6M[chave] = (_por6M[chave] || 0) + _valor6m;
     });
     let _entries6M = Object.entries(_por6M).sort((a,b) => b[1] - a[1]);
-    if (_dashDefeitosTopN > 0 && _entries6M.length > _dashDefeitosTopN) _entries6M = _entries6M.slice(0, _dashDefeitosTopN);
+    if (dashState.topN > 0 && _entries6M.length > dashState.topN) _entries6M = _entries6M.slice(0, dashState.topN);
     const _labels6M = _entries6M.map(e => e[0]);
     const _data6M   = _entries6M.map(e => e[1]);
 
     // v19.50: se um Plano específico estiver selecionado e ele não usa Operador/Turno, esconde os 3 gráficos
     // de vez (antes ficavam em branco quando havia filtro de semana ativo, mesmo sem nenhum dado possível)
-    const _planoSelDash = _filtroPlanoDashboard ? state.planos.find(p => p.id === _filtroPlanoDashboard) : null;
+    const _planoSelDash = dashState.plano ? state.planos.find(p => p.id === dashState.plano) : null;
     const _planoNaoUsaOperador = _planoSelDash && !_planoSelDash.necessita_op_qtd;
-    const _hasTurnoData = !_planoNaoUsaOperador && (_turnoData.some(v => v > 0) || _dashDefeitosSemana !== '');
-    const _hasOpData    = !_planoNaoUsaOperador && (_opData.some(v => v > 0) || _dashDefeitosSemana !== '');
-    const _hasSubData   = !_planoNaoUsaOperador && (_subData.some(v => v > 0) || _dashDefeitosSemana !== '');
-    const _has6MData    = _data6M.some(v => v > 0) || _dashDefeitosSemana !== '';
+    const _hasTurnoData = !_planoNaoUsaOperador && (_turnoData.some(v => v > 0) || dashState.semana !== '');
+    const _hasOpData    = !_planoNaoUsaOperador && (_opData.some(v => v > 0) || dashState.semana !== '');
+    const _hasSubData   = !_planoNaoUsaOperador && (_subData.some(v => v > 0) || dashState.semana !== '');
+    const _has6MData    = _data6M.some(v => v > 0) || dashState.semana !== '';
     const _pTurno = document.getElementById('panel-def-turno');
     const _pOp    = document.getElementById('panel-def-operador');
     const _pSub   = document.getElementById('panel-def-subtopico');
@@ -3319,13 +3317,13 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
     if (_tituloTurno) _tituloTurno.textContent = `Defeitos por Turno (${_modoLabel}) — ${_periodoLabel}`;
     if (_tituloOp) _tituloOp.textContent = `Defeitos por Operador (${_modoLabel}) — ${_periodoLabel}`;
     if (_tituloSub) {
-      const _sufOperador = _dashOperadorSelecionado
-        ? ` — Operador ${escHtml(_dashOperadorSelecionado.label)} <button id="btn-limpar-drill-operador" class="btn btn-ghost btn-xs" style="margin-left:4px;font-size:11px;padding:1px 6px;" title="Limpar filtro de operador">✕</button>`
+      const _sufOperador = dashState.operador
+        ? ` — Operador ${escHtml(dashState.operador.label)} <button id="btn-limpar-drill-operador" class="btn btn-ghost btn-xs" style="margin-left:4px;font-size:11px;padding:1px 6px;" title="Limpar filtro de operador">✕</button>`
         : '';
       _tituloSub.innerHTML = `Defeitos por Sub-Tópico (${_modoLabel})${_sufOperador} — ${_periodoLabel}`;
       document.getElementById('btn-limpar-drill-operador')?.addEventListener('click', (e) => {
         e.stopPropagation();
-        _dashOperadorSelecionado = null;
+        dashState.operador = null;
         const _pg = document.getElementById('page'); if (_pg) renderDashboard(_pg);
       });
     }
@@ -3349,7 +3347,7 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
         type: 'bar',
         data: { labels: _opLabels, datasets: [{ label: 'Defeitos',
           data: _opData,
-          backgroundColor: _opLabels.map(l => (_dashOperadorSelecionado && l.split(' ')[0] === _dashOperadorSelecionado.codigo) ? '#fb923c' : '#f97316'),
+          backgroundColor: _opLabels.map(l => (dashState.operador && l.split(' ')[0] === dashState.operador.codigo) ? '#fb923c' : '#f97316'),
           borderRadius: 4 }] },
         options: { responsive: true, maintainAspectRatio: false, ...cd,
           // v19.55: clique numa barra filtra o gráfico de Sub-tópico só daquele operador (clicar de novo desmarca)
@@ -3357,7 +3355,7 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
             if (!elements.length) return;
             const codigo = String(_opLabels[elements[0].index] || '').split(' ')[0];
             const label = _opLabels[elements[0].index];
-            _dashOperadorSelecionado = (_dashOperadorSelecionado && _dashOperadorSelecionado.codigo === codigo) ? null : { codigo, label };
+            dashState.operador = (dashState.operador && dashState.operador.codigo === codigo) ? null : { codigo, label };
             const _pg = document.getElementById('page'); if (_pg) renderDashboard(_pg);
           },
           onHover: (evt, elements) => { if (evt.native?.target) evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
@@ -3387,7 +3385,7 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
     if (_ctxD6M && _has6MData) {
       _charts.def6M = new Chart(_ctxD6M, {
         type: 'bar',
-        data: { labels: _labels6M, datasets: [{ label: _dashModoContagem === 'pecas' ? 'Peças' : 'Problemas', data: _data6M,
+        data: { labels: _labels6M, datasets: [{ label: dashState.modo === 'pecas' ? 'Peças' : 'Problemas', data: _data6M,
           backgroundColor: '#14b8a6', borderRadius: 4 }] },
         options: { responsive: true, maintainAspectRatio: false, ...cd,
           plugins: { ...cd.plugins, legend: { display: false } },
@@ -3400,37 +3398,34 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
   const _dashFiltroEl = document.getElementById('dash-filtro-plano');
   if (_dashFiltroEl) {
     _dashFiltroEl.addEventListener('change', function() {
-      _filtroPlanoDashboard = this.value;
-      const _pSel = _filtroPlanoDashboard ? state.planos.find(p=>p.id===_filtroPlanoDashboard) : null;
-      if (!_pSel || !_pSel.necessita_op_qtd) _dashModoContagem = 'ocorrencias'; // v19.53: evita ficar "travado" em Peças com o dropdown escondido
+      dashState.plano = this.value;
+      const _pSel = dashState.plano ? state.planos.find(p=>p.id===dashState.plano) : null;
+      if (!_pSel || !_pSel.necessita_op_qtd) dashState.modo = 'ocorrencias'; // v19.53: evita ficar "travado" em Peças com o dropdown escondido
       const _pgEl = document.getElementById('page'); if (_pgEl) renderDashboard(_pgEl);
     });
   }
   const _dashLimparBtn = document.getElementById('dash-limpar-filtro');
   if (_dashLimparBtn) {
     _dashLimparBtn.addEventListener('click', function() {
-      _filtroPlanoDashboard = '';
-      _dashDefeitosSemana = '';
-      _dashModoContagem = 'ocorrencias'; // v19.53
-      _dashOperadorSelecionado = null; // v19.55
+      _resetDashState(); // v19.66: substitui as 4 linhas manuais — mesmo efeito, sem risco de esquecer uma
       const _pgEl = document.getElementById('page'); if (_pgEl) renderDashboard(_pgEl);
     });
   }
   document.getElementById('dash-agrupar-por')?.addEventListener('change', function() {
-    _dashAgruparPor = this.value;
+    dashState.agruparPor = this.value;
     const _pgEl = document.getElementById('page'); if (_pgEl) renderDashboard(_pgEl);
   });
   // ── Wire: controles unificados dos 3 gráficos de defeito (Turno/Operador/Sub-tópico) ──
   document.getElementById('dash-modo-contagem')?.addEventListener('change', function() {
-    _dashModoContagem = this.value;
+    dashState.modo = this.value;
     const _pg = document.getElementById('page'); if (_pg) renderDashboard(_pg);
   });
   document.getElementById('dash-defeitos-topn')?.addEventListener('change', function() {
-    _dashDefeitosTopN = parseInt(this.value, 10) || 0;
+    dashState.topN = parseInt(this.value, 10) || 0;
     const _pg = document.getElementById('page'); if (_pg) renderDashboard(_pg);
   });
   document.getElementById('dash-defeitos-semana')?.addEventListener('change', function() {
-    _dashDefeitosSemana = this.value;
+    dashState.semana = this.value;
     const _pg = document.getElementById('page'); if (_pg) renderDashboard(_pg);
   });
   document.querySelectorAll('.kpi-card').forEach(card => {
@@ -3453,7 +3448,7 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
         if (statusSelect) statusSelect.value = '';
         if (exibirFechadosCheck) exibirFechadosCheck.checked = false;
         // leva o mesmo Plano que estava filtrado no Dashboard, se houver
-        if (planoSelect) planoSelect.value = _filtroPlanoDashboard || '';
+        if (planoSelect) planoSelect.value = dashState.plano || '';
         if (window._atualizarSubResponsavelPorPlano) window._atualizarSubResponsavelPorPlano();
         try { localStorage.removeItem(_LS_FILTROS_KEY); } catch(e) {}
         if (filterType === 'total') { if (statusSelect) statusSelect.value = ''; if (exibirFechadosCheck) exibirFechadosCheck.checked = true; }
