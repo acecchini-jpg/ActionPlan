@@ -476,7 +476,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.69';
+const APP_VERSAO = 'v19.70';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -2801,6 +2801,36 @@ function _semanaAtualISO(){
   const w=Math.floor((d-mon)/(7*86400000))+1;
   return `${d.getFullYear()}-W${String(w).padStart(2,'0')}`;
 }
+// v19.70 (Etapa 7): matemática pura da Atividade na Semana para UM responsável — sem DOM, testável isolada.
+// Invariante: pendInicio + addS - fechS === pendFim (a contabilidade da semana precisa fechar exata).
+function _calcularAtividadeSemana(acoes, resp, range) {
+  let pendInicio=0, addS=0, fechS=0, fupS=0, pendFim=0, vencFim=0;
+  (acoes||[]).forEach(prob=>{
+    const dataOcorr=prob.data_abertura||'';
+    (prob.acoes_corretivas||[]).forEach(cr=>{
+      if((cr.responsavel||'')!==resp) return;
+      // v19.49: defesa contra dado inválido (fechamento registrado ANTES da ocorrência — erro de digitação)
+      // nesse caso trata como se ainda estivesse em aberto, pra não quebrar a soma da semana
+      const dataFechBruta=cr.data_efetiva||'';
+      const dataFech=(dataFechBruta && dataOcorr && dataFechBruta<dataOcorr)?'':dataFechBruta;
+      const dataPrev=cr.data_prevista||'';
+      // 1) Pendentes no INÍCIO da semana: já existia antes da semana começar e ainda não tinha sido fechada
+      if(dataOcorr && dataOcorr<range.start && (!dataFech || dataFech>=range.start)) pendInicio++;
+      // 2) Adicionadas NA semana (pela data de Ocorrência do problema — mesmo critério já usado hoje)
+      if(_inRange(dataOcorr,range)) addS++;
+      // 3) Fechadas NA semana (precisa ter Data de Ocorrência válida, senão quebra a soma com Pendentes/Fechamento)
+      if(dataOcorr && dataFech && _inRange(dataFech,range)) fechS++;
+      // 4) Com follow-up NA semana (conta 1 por ação, não por follow-up)
+      if((cr.followups||[]).some(fu=>_inRange(fu.data_followup||fu.data||'',range))) fupS++;
+      // 5) Pendentes no FIM da semana: já existia até o fim da semana e ainda não tinha sido fechada até lá
+      const pendenteNoFim = dataOcorr && dataOcorr<=range.end && (!dataFech || dataFech>range.end);
+      if(pendenteNoFim) pendFim++;
+      // 6) Vencidas no FIM da semana: das pendentes no fim, aquelas cujo prazo já tinha passado até lá
+      if(pendenteNoFim && dataPrev && dataPrev<=range.end) vencFim++;
+    });
+  });
+  return { pendInicio, addS, fechS, fupS, pendFim, vencFim };
+}
 function _renderAtividadeSemana(){
   const semStr=dashState.semana||_semanaAtualISO();
   const range=_semanaRange(semStr);
@@ -2813,31 +2843,7 @@ function _renderAtividadeSemana(){
   // antes "Fechamento Sem. Anterior" era derivado do estado ATUAL (quebrava em semanas passadas);
   // agora Pendentes/Vencidas também refletem "como estava no fim daquela semana", não o estado de hoje.
   const rows=_resps.map(resp=>{
-    let pendInicio=0,addS=0,fechS=0,fupS=0,pendFim=0,vencFim=0;
-    _af.forEach(prob=>{
-      const dataOcorr=prob.data_abertura||'';
-      (prob.acoes_corretivas||[]).forEach(cr=>{
-        if((cr.responsavel||'')!==resp) return;
-        // v19.49: defesa contra dado inválido (fechamento registrado ANTES da ocorrência — erro de digitação)
-        // nesse caso trata como se ainda estivesse em aberto, pra não quebrar a soma da semana
-        const dataFechBruta=cr.data_efetiva||'';
-        const dataFech=(dataFechBruta && dataOcorr && dataFechBruta<dataOcorr)?'':dataFechBruta;
-        const dataPrev=cr.data_prevista||'';
-        // 1) Pendentes no INÍCIO da semana: já existia antes da semana começar e ainda não tinha sido fechada
-        if(dataOcorr && dataOcorr<range.start && (!dataFech || dataFech>=range.start)) pendInicio++;
-        // 2) Adicionadas NA semana (pela data de Ocorrência do problema — mesmo critério já usado hoje)
-        if(_inRange(dataOcorr,range)) addS++;
-        // 3) Fechadas NA semana (precisa ter Data de Ocorrência válida, senão quebra a soma com Pendentes/Fechamento)
-        if(dataOcorr && dataFech && _inRange(dataFech,range)) fechS++;
-        // 4) Com follow-up NA semana (conta 1 por ação, não por follow-up)
-        if((cr.followups||[]).some(fu=>_inRange(fu.data_followup||fu.data||'',range))) fupS++;
-        // 5) Pendentes no FIM da semana: já existia até o fim da semana e ainda não tinha sido fechada até lá
-        const pendenteNoFim = dataOcorr && dataOcorr<=range.end && (!dataFech || dataFech>range.end);
-        if(pendenteNoFim) pendFim++;
-        // 6) Vencidas no FIM da semana: das pendentes no fim, aquelas cujo prazo já tinha passado até lá
-        if(pendenteNoFim && dataPrev && dataPrev<=range.end) vencFim++;
-      });
-    });
+    const {pendInicio,addS,fechS,fupS,pendFim,vencFim} = _calcularAtividadeSemana(_af, resp, range);
     const {taxa:tx}=calcTaxaPresencaResponsavel(resp,dashState.plano||null,_atasSemana);
     const txH=tx!==null?`<span class="taxa-badge ${taxaSemaforoClass(tx)}" style="font-size:11px;">${tx}%</span>`:'<span style="color:var(--text3);">—</span>';
     const hi=(n,c)=>n>0?`<strong style="color:${c||'var(--text1)'}">${n}</strong>`:'<span style="color:var(--text3)">0</span>';
