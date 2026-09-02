@@ -471,7 +471,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.66';
+const APP_VERSAO = 'v19.67';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -2840,10 +2840,9 @@ function _renderAtividadeSemana(){
     +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 
-function renderDashboard(container){
-  if(typeof Chart==='undefined'){ container.innerHTML=`<div class="panel"><div class="panel-body" style="text-align:center;padding:40px"><div class="spinner"></div><p>Aguardando gráficos...</p></div></div>`; setTimeout(()=>renderDashboard(container),500); return; }
-  const _scrollAntesDoRender = container ? container.scrollTop : 0; // v19.10: evita a tela "pular" ao trocar um filtro
-  destroyCharts();
+// v19.67 (Etapa 4.1): TODA a matemática do Dashboard, sem DOM e sem Chart.js — testável isolada.
+// Devolve só o que renderDashboard consome; o resto fica interno.
+function _calcularAgregacoesDashboard(){
   const _acoesDashBase = dashState.plano ? state.acoes.filter(a=>a.plano_id===dashState.plano) : state.acoes;
   // v19.31: modo auditoria — remove ações vencidas de todo o Dashboard (KPIs, gráficos, Status por Plano)
   const _acoesDash = state.modoAuditoria
@@ -2944,7 +2943,13 @@ function renderDashboard(container){
   const pendRespLabels = Object.keys(pendByGrupo).filter(k=>_sumMap(pendByGrupo,k)>0).sort((a,b)=>_sumMap(pendByGrupo,b)-_sumMap(pendByGrupo,a));
   const vencRespLabels = Object.keys(vencByGrupo).filter(k=>_sumMap(vencByGrupo,k)>0).sort((a,b)=>_sumMap(vencByGrupo,b)-_sumMap(vencByGrupo,a));
   const fechRespLabels = Object.keys(fechByGrupo).filter(k=>_sumMap(fechByGrupo,k)>0).sort((a,b)=>_sumMap(fechByGrupo,b)-_sumMap(fechByGrupo,a));
-
+  return { _acoesDash, total, fechadas, emAndamento, vencidas, semPrazo, cursosPendentes, byPlano, taxa,
+           pendByGrupo, vencByGrupo, fechByGrupo, _agrupLabel, buildStackedDatasets,
+           pendRespLabels, vencRespLabels, fechRespLabels };
+}
+// v19.67 (Etapa 4.2): só a montagem do HTML do Dashboard (barra de filtro fixa + conteúdo). Sem Chart.js, sem eventos.
+function _montarHtmlDashboard(container, agg){
+  const { total, fechadas, emAndamento, vencidas, semPrazo, cursosPendentes, byPlano, taxa, _agrupLabel } = agg;
   // ── Tabela Status por Plano com coluna % Presença ──
   const linhasPlanos = Object.entries(byPlano).map(([pid, p])=>{
     const tot = p.pendentes+p.fechadas+p.vencidas;
@@ -3093,6 +3098,12 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
       <div class="panel-body"><div class="chart-wrap" style="height:260px;"><canvas id="chart-tendencia"></canvas></div></div>
     </div>`;
 
+}
+// v19.67 (Etapa 4.3): só Chart.js + listeners de eventos do Dashboard. Recebe os números prontos em agg.
+function _montarGraficosDashboard(agg){
+  const { _acoesDash, total, fechadas, emAndamento, vencidas, semPrazo, taxa,
+          pendByGrupo, vencByGrupo, fechByGrupo, buildStackedDatasets,
+          pendRespLabels, vencRespLabels, fechRespLabels } = agg;
   const cd={color:'#94a3b8',layout:{padding:{top:22}},plugins:{legend:{labels:{color:'#94a3b8',font:{family:"'Barlow', sans-serif"}}}},scales:{x:{ticks:{color:'#64748b'},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#64748b'},grid:{color:'rgba(255,255,255,.05)'}}}};
   const ctxStatus=document.getElementById('chart-status')?.getContext('2d');   if(ctxStatus) _charts.status=new Chart(ctxStatus,{type:'doughnut',data:{labels:['Em Andamento','Fechadas','Vencidas','Sem Prazo'],datasets:[{data:[Math.max(0,emAndamento-semPrazo),fechadas,vencidas,semPrazo],backgroundColor:['#3b82f6','#22c55e','#ef4444','#64748b'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{
       ...cd.plugins,
@@ -3466,6 +3477,15 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
     card.addEventListener('click', handler);
     card._dashboardHandler = handler;
   });
+}
+function renderDashboard(container){
+  if(typeof Chart==='undefined'){ container.innerHTML=`<div class="panel"><div class="panel-body" style="text-align:center;padding:40px"><div class="spinner"></div><p>Aguardando gráficos...</p></div></div>`; setTimeout(()=>renderDashboard(container),500); return; }
+  const _scrollAntesDoRender = container ? container.scrollTop : 0; // v19.10: evita a tela "pular" ao trocar um filtro
+  destroyCharts();
+  // v19.67 (Etapa 4): orquestração em 3 passos — números → HTML → gráficos/eventos
+  const agg = _calcularAgregacoesDashboard();
+  _montarHtmlDashboard(container, agg);
+  _montarGraficosDashboard(agg);
   if (container) container.scrollTop = _scrollAntesDoRender; // v19.10: restaura a posição, evita "pulo" de tela
 }
 
