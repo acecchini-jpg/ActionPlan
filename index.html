@@ -314,6 +314,11 @@ button.evidencia-thumb { border:none!important; background:transparent!important
 .nc-notas-summary::-webkit-details-marker { display:none; }
 .nc-notas-marcador { display:inline-block; transition:transform .15s; font-size:11px; color:var(--accent); }
 details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); }
+/* ── v19.69 (Etapa 6): Abas do Dashboard ── */
+.dash-tabs { display:flex; gap:2px; border-bottom:1px solid var(--border); margin-bottom:20px; }
+.dash-tab-btn { background:none; border:none; border-bottom:2px solid transparent; padding:10px 18px; font-family:var(--font-hd); font-size:14px; font-weight:600; color:var(--text2); cursor:pointer; transition:color .15s,border-color .15s; }
+.dash-tab-btn:hover { color:var(--text); }
+.dash-tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
 </style>
 </head>
 <body>
@@ -471,7 +476,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.68';
+const APP_VERSAO = 'v19.69';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -587,6 +592,12 @@ let _cursoSortAsc           = true;
 // v19.66: estado do Dashboard agrupado num objeto único — evita "esquecer" de resetar uma variável solta
 // (já aconteceu: modo Peças ficava "travado" ao trocar de Plano). Substitui as 6 variáveis soltas que existiam antes.
 const dashState = { plano: '', semana: '', modo: 'ocorrencias', topN: 15, operador: null, agruparPor: 'responsavel' };
+// v19.69 (Etapa 6): estado das abas do Dashboard. _dashAbaAtiva persiste entre renders (troca de
+// filtro não reseta a aba escolhida). _dashUltimoAgg/_dashUltimoCd guardam o cálculo já feito pra
+// montar outra aba sem recalcular nada. _dashAbasMontadas evita remontar gráficos já existentes.
+let _dashAbaAtiva = 'visao-geral';
+let _dashUltimoAgg = null, _dashUltimoCd = null;
+const _dashAbasMontadas = new Set();
 function _resetDashState() { dashState.plano = ''; dashState.semana = ''; dashState.modo = 'ocorrencias'; dashState.operador = null; }
 const state = { config: { ...DEFAULT_FIREBASE_CONFIG }, clientes: [], responsaveis: [], planos: [], subtopicos: [], acoes: [], presencas: [], cursos1tema: [], operadores_turno: [], currentPage: 'dashboard', currentEvidenciaTarget: null, evidenciaDataURL: null, modoAuditoria: false, logoEmpresaUrl: null, };
 
@@ -3049,80 +3060,165 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
       <div class="kpi-card" data-filter="sem_prazo"><div class="kpi-value" style="color:var(--text2)">${semPrazo}</div><div class="kpi-label">Sem Prazo Def.</div></div>
       <div class="kpi-card" data-filter="cursos_pendentes"><div class="kpi-value" style="color:var(--yellow)">${cursosPendentes}</div><div class="kpi-label">Curso 1 Tema Pend.</div></div>
     </div>
-    <div class="charts-grid">
-      <div class="chart-panel"><div class="chart-title">Status Geral</div><div class="chart-wrap"><canvas id="chart-status"></canvas></div></div>
-      <div class="chart-panel"><div class="chart-title" id="chart-title-pend">Pendências por ${_agrupLabel} (por Plano)</div><div class="chart-wrap"><canvas id="chart-pend-resp"></canvas></div></div>
+    <div class="dash-tabs">
+      <button class="dash-tab-btn" data-aba="visao-geral">🎯 Visão Geral</button>
+      <button class="dash-tab-btn" data-aba="responsaveis">🧑‍ Responsáveis</button>
+      <button class="dash-tab-btn" data-aba="defeitos">🛠️ Defeitos</button>
     </div>
-    <div class="charts-grid">
-      <div class="chart-panel"><div class="chart-title" id="chart-title-fech">Fechadas por ${_agrupLabel} (por Plano)</div><div class="chart-wrap"><canvas id="chart-resp"></canvas></div></div>
-      <div class="chart-panel"><div class="chart-title" id="chart-title-venc">Vencidas por ${_agrupLabel} (por Plano)</div><div class="chart-wrap"><canvas id="chart-venc"></canvas></div></div>
-    </div>
-    <div class="charts-grid">
-      <div class="chart-panel" id="panel-def-turno" style="display:none;"><div class="chart-title" id="chart-title-def-turno">Defeitos por Turno</div><div class="chart-wrap"><canvas id="chart-def-turno"></canvas></div></div>
-      <div class="chart-panel" id="panel-def-6m" style="display:none;"><div class="chart-title" id="chart-title-def-6m">Defeitos por Categoria (6M)</div><div class="chart-wrap"><canvas id="chart-def-6m"></canvas></div></div>
-    </div>
-    <div class="charts-grid">
-      <div class="chart-panel" id="panel-def-operador" style="display:none;"><div class="chart-title" id="chart-title-def-operador">Defeitos por Operador</div><div class="chart-wrap"><canvas id="chart-def-operador"></canvas></div></div>
-      <div class="chart-panel" id="panel-def-subtopico" style="display:none;"><div class="chart-title" id="chart-title-def-subtopico">Defeitos por Sub-Tópico</div><div class="chart-wrap"><canvas id="chart-def-subtopico"></canvas></div></div>
-    </div>
-    <div class="panel">
-      <div class="panel-header"><span>📋</span><span class="panel-title">Status por Plano</span></div>
-      <div class="panel-body">
-        <div class="table-wrap">
-          <table><thead><tr><th>Plano</th><th>Em Aberto</th><th>Pendentes</th><th>Fechadas</th><th>Vencidas</th><th>Total</th><th>% Fechamento</th><th>% Presença</th></tr></thead>
-          <tbody>${linhasPlanos}</tbody></table>
-        </div>
+
+    <div class="dash-tab-panel" data-aba="visao-geral">
+      <div class="charts-grid">
+        <div class="chart-panel"><div class="chart-title">Status Geral</div><div class="chart-wrap"><canvas id="chart-status"></canvas></div></div>
+        <div class="chart-panel"><div class="chart-title">Tendência — Últimas 8 Semanas</div><div class="chart-wrap"><canvas id="chart-tendencia"></canvas></div></div>
       </div>
-    </div>
-    <div class="panel">
-      <div class="panel-header"><span>🗓️</span><span class="panel-title">Taxa de Presença por Responsável</span><span style="margin-left:8px;font-size:11px;color:var(--text3);">(Presenças necessárias vs. realizadas)</span></div>
-      <div class="panel-body">
-        <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
-          <span style="font-size:12px;color:var(--text2);">Semáforo:</span>
-          <span class="taxa-badge taxa-verde">≥90% ✓</span>
-          <span class="taxa-badge taxa-amarelo">75–89% !</span>
-          <span class="taxa-badge taxa-vermelho">&lt;75% ✗</span>
-          <span class="taxa-badge taxa-sem-dado">S/D (sem dados)</span>
-        </div>
-        <div class="table-wrap">
-          <table><thead><tr><th>Responsável</th><th>Departamento</th>${_meses3.map(m=>`<th style="text-align:center;font-size:11px;color:var(--text3);">${m.label}</th>`).join('')}<th style="text-align:center;">Taxa Total</th><th style="text-align:center;">Reuniões</th></tr></thead>
-          <tbody>${presencaRespRows}</tbody></table>
+      <div class="panel">
+        <div class="panel-header"><span>📋</span><span class="panel-title">Status por Plano</span></div>
+        <div class="panel-body">
+          <div class="table-wrap">
+            <table><thead><tr><th>Plano</th><th>Em Aberto</th><th>Pendentes</th><th>Fechadas</th><th>Vencidas</th><th>Total</th><th>% Fechamento</th><th>% Presença</th></tr></thead>
+            <tbody>${linhasPlanos}</tbody></table>
+          </div>
         </div>
       </div>
     </div>
 
-    ${state.modoAuditoria ? '' : `<div class="panel" style="margin-top:20px;">
-      <div class="panel-header" style="flex-wrap:wrap;gap:10px;">
-        <span>📅</span>
-        <span class="panel-title">Atividade na Semana</span>
-        <div style="display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap;">
-          <span style="font-size:12px;color:var(--text2);">Semana: <strong>${(()=>{
-            const r=_semanaRange(dashState.semana||_semanaAtualISO());
-            return r?r.start+' → '+r.end:'';
-          })()}</strong></span>
+    <div class="dash-tab-panel" data-aba="responsaveis" style="display:none;">
+      <div class="charts-grid">
+        <div class="chart-panel"><div class="chart-title" id="chart-title-pend">Pendências por ${_agrupLabel} (por Plano)</div><div class="chart-wrap"><canvas id="chart-pend-resp"></canvas></div></div>
+        <div class="chart-panel"><div class="chart-title" id="chart-title-fech">Fechadas por ${_agrupLabel} (por Plano)</div><div class="chart-wrap"><canvas id="chart-resp"></canvas></div></div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-panel"><div class="chart-title" id="chart-title-venc">Vencidas por ${_agrupLabel} (por Plano)</div><div class="chart-wrap"><canvas id="chart-venc"></canvas></div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><span>🗓️</span><span class="panel-title">Taxa de Presença por Responsável</span><span style="margin-left:8px;font-size:11px;color:var(--text3);">(Presenças necessárias vs. realizadas)</span></div>
+        <div class="panel-body">
+          <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+            <span style="font-size:12px;color:var(--text2);">Semáforo:</span>
+            <span class="taxa-badge taxa-verde">≥90% ✓</span>
+            <span class="taxa-badge taxa-amarelo">75–89% !</span>
+            <span class="taxa-badge taxa-vermelho">&lt;75% ✗</span>
+            <span class="taxa-badge taxa-sem-dado">S/D (sem dados)</span>
+          </div>
+          <div class="table-wrap">
+            <table><thead><tr><th>Responsável</th><th>Departamento</th>${_meses3.map(m=>`<th style="text-align:center;font-size:11px;color:var(--text3);">${m.label}</th>`).join('')}<th style="text-align:center;">Taxa Total</th><th style="text-align:center;">Reuniões</th></tr></thead>
+            <tbody>${presencaRespRows}</tbody></table>
+          </div>
         </div>
       </div>
-      <div class="panel-body" style="padding:0;">${_renderAtividadeSemana()}</div>
-    </div>`}
+      ${state.modoAuditoria ? '' : `<div class="panel" style="margin-top:20px;">
+        <div class="panel-header" style="flex-wrap:wrap;gap:10px;">
+          <span>📅</span>
+          <span class="panel-title">Atividade na Semana</span>
+          <div style="display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap;">
+            <span style="font-size:12px;color:var(--text2);">Semana: <strong>${(()=>{
+              const r=_semanaRange(dashState.semana||_semanaAtualISO());
+              return r?r.start+' → '+r.end:'';
+            })()}</strong></span>
+          </div>
+        </div>
+        <div class="panel-body" style="padding:0;">${_renderAtividadeSemana()}</div>
+      </div>`}
+    </div>
 
-    <div class="panel" style="margin-top:20px;">
-      <div class="panel-header"><span>📉</span><span class="panel-title">Tendência — Últimas 8 Semanas</span></div>
-      <div class="panel-body"><div class="chart-wrap" style="height:260px;"><canvas id="chart-tendencia"></canvas></div></div>
+    <div class="dash-tab-panel" data-aba="defeitos" style="display:none;">
+      <div class="charts-grid">
+        <div class="chart-panel" id="panel-def-turno" style="display:none;"><div class="chart-title" id="chart-title-def-turno">Defeitos por Turno</div><div class="chart-wrap"><canvas id="chart-def-turno"></canvas></div></div>
+        <div class="chart-panel" id="panel-def-6m" style="display:none;"><div class="chart-title" id="chart-title-def-6m">Defeitos por Categoria (6M)</div><div class="chart-wrap"><canvas id="chart-def-6m"></canvas></div></div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-panel" id="panel-def-operador" style="display:none;"><div class="chart-title" id="chart-title-def-operador">Defeitos por Operador</div><div class="chart-wrap"><canvas id="chart-def-operador"></canvas></div></div>
+        <div class="chart-panel" id="panel-def-subtopico" style="display:none;"><div class="chart-title" id="chart-title-def-subtopico">Defeitos por Sub-Tópico</div><div class="chart-wrap"><canvas id="chart-def-subtopico"></canvas></div></div>
+      </div>
     </div>`;
 
 }
 // v19.67 (Etapa 4.3): só Chart.js + listeners de eventos do Dashboard. Recebe os números prontos em agg.
-function _montarGraficosDashboard(agg){
+// v19.69 (Etapa 6): mostra/esconde os painéis de aba e monta os gráficos da aba clicada (lazy).
+function _wireDashTabs() {
+  document.querySelectorAll('.dash-tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.aba === _dashAbaAtiva);
+    btn.addEventListener('click', () => {
+      if (btn.dataset.aba === _dashAbaAtiva) return;
+      _dashAbaAtiva = btn.dataset.aba;
+      document.querySelectorAll('.dash-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.aba === _dashAbaAtiva));
+      document.querySelectorAll('.dash-tab-panel').forEach(p => { p.style.display = p.dataset.aba === _dashAbaAtiva ? '' : 'none'; });
+      _montarGraficosDaAba(_dashAbaAtiva);
+    });
+  });
+  document.querySelectorAll('.dash-tab-panel').forEach(p => { p.style.display = p.dataset.aba === _dashAbaAtiva ? '' : 'none'; });
+}
+// v19.69 (Etapa 6): monta os gráficos de uma aba específica, só se ainda não montados nesta
+// renderização. O painel precisa já estar VISÍVEL antes de instanciar — Chart.js calcula mal
+// as dimensões de um canvas escondido (display:none).
+function _montarGraficosDaAba(aba) {
+  if (_dashAbasMontadas.has(aba) || !_dashUltimoAgg) return;
+  _dashAbasMontadas.add(aba);
+  if (aba === 'visao-geral') _montarGraficosVisaoGeral(_dashUltimoAgg, _dashUltimoCd);
+  else if (aba === 'responsaveis') _montarGraficosResponsaveis(_dashUltimoAgg, _dashUltimoCd);
+  else if (aba === 'defeitos') _montarGraficosDefeitos(_dashUltimoAgg, _dashUltimoCd);
+}
+// v19.69 (Etapa 6): Status Geral (doughnut) + Tendência — só a aba "Visão Geral"
+function _montarGraficosVisaoGeral(agg, cd){
   const { _acoesDash, total, fechadas, emAndamento, vencidas, semPrazo, taxa,
           pendByGrupo, vencByGrupo, fechByGrupo, buildStackedDatasets,
           pendRespLabels, vencRespLabels, fechRespLabels } = agg;
-  const cd={color:'#94a3b8',layout:{padding:{top:22}},plugins:{legend:{labels:{color:'#94a3b8',font:{family:"'Barlow', sans-serif"}}}},scales:{x:{ticks:{color:'#64748b'},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#64748b'},grid:{color:'rgba(255,255,255,.05)'}}}};
   const ctxStatus=document.getElementById('chart-status')?.getContext('2d');   if(ctxStatus) _charts.status=new Chart(ctxStatus,{type:'doughnut',data:{labels:['Em Andamento','Fechadas','Vencidas','Sem Prazo'],datasets:[{data:[Math.max(0,emAndamento-semPrazo),fechadas,vencidas,semPrazo],backgroundColor:['#3b82f6','#22c55e','#ef4444','#64748b'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{
       ...cd.plugins,
       _datalabels:{ display: ctx=>ctx.dataset.data[ctx.dataIndex]>0,
         formatter:(v,ctx)=>{ const tot=ctx.dataset.data.reduce((a,b)=>a+b,0); return tot?Math.round(v/tot*100)+'%':''; },
         color:'#fff', font:{weight:'bold',size:11} }
     }}});
+  // ── F4: Gráfico de tendência — últimas 8 semanas ──
+  const ctxTend = document.getElementById('chart-tendencia')?.getContext('2d');
+  if (ctxTend) {
+    const _semAtual = _semanaAtualISO();
+    const [_ty, _tw] = _semAtual.split('-W').map(Number);
+    const _semanas = [];
+    for (let off = 7; off >= 0; off--) {
+      // Retrocede semanas via Date (lida com virada de ano)
+      const jan4 = new Date(_ty, 0, 4); const dow = jan4.getDay() || 7;
+      const monBase = new Date(jan4); monBase.setDate(jan4.getDate() - (dow - 1) + (_tw - 1) * 7);
+      const mon = new Date(monBase); mon.setDate(monBase.getDate() - off * 7);
+      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+      const fmt = d => d.toISOString().slice(0, 10);
+      _semanas.push({ start: fmt(mon), end: fmt(sun), label: `${String(mon.getDate()).padStart(2,'0')}/${String(mon.getMonth()+1).padStart(2,'0')}` });
+    }
+    const _fechPorSem = _semanas.map(r => {
+      let n = 0;
+      _acoesDash.forEach(p => (p.acoes_corretivas||[]).forEach(cr => { if (cr.data_efetiva && cr.data_efetiva >= r.start && cr.data_efetiva <= r.end) n++; }));
+      return n;
+    });
+    const _abertasAcum = _semanas.map(r => {
+      let n = 0;
+      _acoesDash.forEach(p => (p.acoes_corretivas||[]).forEach(cr => {
+        const aberta = (p.data_abertura || '') <= r.end;
+        const fechadaAntes = cr.data_efetiva && cr.data_efetiva <= r.end;
+        if (aberta && !fechadaAntes) n++;
+      }));
+      return n;
+    });
+    _charts.tendencia = new Chart(ctxTend, {
+      type: 'line',
+      data: {
+        labels: _semanas.map(s => s.label),
+        datasets: [
+          { label: 'Abertas (acumulado)', data: _abertasAcum, borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,.12)', fill: true, tension: .3, pointRadius: 4 },
+          { label: 'Fechadas na semana', data: _fechPorSem, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.12)', fill: true, tension: .3, pointRadius: 4 }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, ...cd,
+        plugins: { ...cd.plugins, legend: { ...cd.plugins.legend, display: true, position: 'bottom' } },
+        scales: { x: { ...cd.scales.x }, y: { ...cd.scales.y, beginAtZero: true, ticks: { ...cd.scales.y.ticks, precision: 0 } } } }
+    });
+  }
+
+}
+// v19.69 (Etapa 6): Pendências/Fechadas/Vencidas por Responsável/Departamento — só a aba "Responsáveis"
+function _montarGraficosResponsaveis(agg, cd){
+  const { _acoesDash, total, fechadas, emAndamento, vencidas, semPrazo, taxa,
+          pendByGrupo, vencByGrupo, fechByGrupo, buildStackedDatasets,
+          pendRespLabels, vencRespLabels, fechRespLabels } = agg;
   // ── Opções base para Stacked Bar Charts ──
   const stackedOpts = (extraY) => ({
     responsive: true,
@@ -3173,50 +3269,12 @@ function _montarGraficosDashboard(agg){
     });
   }
 
-  // ── F4: Gráfico de tendência — últimas 8 semanas ──
-  const ctxTend = document.getElementById('chart-tendencia')?.getContext('2d');
-  if (ctxTend) {
-    const _semAtual = _semanaAtualISO();
-    const [_ty, _tw] = _semAtual.split('-W').map(Number);
-    const _semanas = [];
-    for (let off = 7; off >= 0; off--) {
-      // Retrocede semanas via Date (lida com virada de ano)
-      const jan4 = new Date(_ty, 0, 4); const dow = jan4.getDay() || 7;
-      const monBase = new Date(jan4); monBase.setDate(jan4.getDate() - (dow - 1) + (_tw - 1) * 7);
-      const mon = new Date(monBase); mon.setDate(monBase.getDate() - off * 7);
-      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-      const fmt = d => d.toISOString().slice(0, 10);
-      _semanas.push({ start: fmt(mon), end: fmt(sun), label: `${String(mon.getDate()).padStart(2,'0')}/${String(mon.getMonth()+1).padStart(2,'0')}` });
-    }
-    const _fechPorSem = _semanas.map(r => {
-      let n = 0;
-      _acoesDash.forEach(p => (p.acoes_corretivas||[]).forEach(cr => { if (cr.data_efetiva && cr.data_efetiva >= r.start && cr.data_efetiva <= r.end) n++; }));
-      return n;
-    });
-    const _abertasAcum = _semanas.map(r => {
-      let n = 0;
-      _acoesDash.forEach(p => (p.acoes_corretivas||[]).forEach(cr => {
-        const aberta = (p.data_abertura || '') <= r.end;
-        const fechadaAntes = cr.data_efetiva && cr.data_efetiva <= r.end;
-        if (aberta && !fechadaAntes) n++;
-      }));
-      return n;
-    });
-    _charts.tendencia = new Chart(ctxTend, {
-      type: 'line',
-      data: {
-        labels: _semanas.map(s => s.label),
-        datasets: [
-          { label: 'Abertas (acumulado)', data: _abertasAcum, borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,.12)', fill: true, tension: .3, pointRadius: 4 },
-          { label: 'Fechadas na semana', data: _fechPorSem, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.12)', fill: true, tension: .3, pointRadius: 4 }
-        ]
-      },
-      options: { responsive: true, maintainAspectRatio: false, ...cd,
-        plugins: { ...cd.plugins, legend: { ...cd.plugins.legend, display: true, position: 'bottom' } },
-        scales: { x: { ...cd.scales.x }, y: { ...cd.scales.y, beginAtZero: true, ticks: { ...cd.scales.y.ticks, precision: 0 } } } }
-    });
-  }
-
+}
+// v19.69 (Etapa 6): Turno/Operador/Sub-tópico/6M — só a aba "Defeitos"
+function _montarGraficosDefeitos(agg, cd){
+  const { _acoesDash, total, fechadas, emAndamento, vencidas, semPrazo, taxa,
+          pendByGrupo, vencByGrupo, fechByGrupo, buildStackedDatasets,
+          pendRespLabels, vencRespLabels, fechRespLabels } = agg;
   // ── v18.1/v19.10: Defeitos por Turno, Operador e Sub-tópico — filtros unificados ──
   {
     // Coleta eventos: registro principal + reincidências de cada problema
@@ -3418,6 +3476,12 @@ function _montarGraficosDashboard(agg){
     }
   }
 
+}
+// v19.69 (Etapa 6): orquestrador — monta cd (compartilhado), guarda agg/cd pra troca de
+// aba sem recalcular nada, religa os eventos globais, e monta só a aba ativa (lazy).
+function _montarGraficosDashboard(agg){
+  const cd={color:'#94a3b8',layout:{padding:{top:22}},plugins:{legend:{labels:{color:'#94a3b8',font:{family:"'Barlow', sans-serif"}}}},scales:{x:{ticks:{color:'#64748b'},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#64748b'},grid:{color:'rgba(255,255,255,.05)'}}}};
+  _dashUltimoAgg = agg; _dashUltimoCd = cd; _dashAbasMontadas.clear();
   const _dashFiltroEl = document.getElementById('dash-filtro-plano');
   if (_dashFiltroEl) {
     _dashFiltroEl.addEventListener('change', function() {
@@ -3489,6 +3553,8 @@ function _montarGraficosDashboard(agg){
     card.addEventListener('click', handler);
     card._dashboardHandler = handler;
   });
+  _wireDashTabs();
+  _montarGraficosDaAba(_dashAbaAtiva);
 }
 function renderDashboard(container){
   if(typeof Chart==='undefined'){ container.innerHTML=`<div class="panel"><div class="panel-body" style="text-align:center;padding:40px"><div class="spinner"></div><p>Aguardando gráficos...</p></div></div>`; setTimeout(()=>renderDashboard(container),500); return; }
