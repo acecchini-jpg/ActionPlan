@@ -471,7 +471,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.64';
+const APP_VERSAO = 'v19.65';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -2038,7 +2038,52 @@ function renderListagem(container) {
   const responsavelOpts = `<option value="">Todos os responsáveis</option>` + Array.from(responsaveisSet).sort((a,b)=>a.localeCompare(b,'pt-BR')).map(r=>`<option value="${escHtml(r)}">${escHtml(r)}</option>`).join('');
   const statusOpts = `<option value="">Todos os status</option><option value="EM ANDAMENTO">Em Andamento</option><option value="VENCIDO">Vencido</option><option value="FECHADO">Fechado</option><option value="SEM_PRAZO">Sem Prazo</option>`;
   // ── CORREÇÃO 2: O id do container da tabela é "listagem-tbody" — confirmado e correto ──
-  container.innerHTML = `<div class="panel"><div class="panel-body"><div class="filters-bar" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;"><select id="filtro-plano" class="form-control" style="width:auto;">${planosOpts}</select><select id="filtro-subtopico" class="form-control" style="width:auto;">${subtopicosOpts}</select><select id="filtro-responsavel" class="form-control" style="width:auto;">${responsavelOpts}</select><select id="filtro-status" class="form-control" style="width:auto;">${statusOpts}</select><input type="search" id="filtro-busca" class="form-control" placeholder="🔍 Buscar... (#327 = só pelo nº)" title="Digite #327 para buscar exatamente pelo número da ação, ou só texto para buscar no conteúdo" style="min-width:180px;flex:1;max-width:360px;"><button id="limpar-filtros" class="btn btn-ghost btn-sm">✕ Limpar</button><span id="listagem-contador" style="font-size:12px;color:var(--text2);white-space:nowrap;align-self:center;"></span><span style="flex:1;"></span><button id="btn-importar-followups-lote" class="btn btn-ghost btn-sm" title="Importar Follow-ups em Lote (Excel: Número da Ação, Data, Responsável, Comentário)" style="font-size:15px;padding:4px 8px;">➕📥</button><button id="btn-excel-listagem" class="btn btn-ghost btn-sm" title="Exportar para Excel" style="font-size:15px;padding:4px 8px;">📥</button><button id="expandir-tudo-followups" class="btn btn-ghost btn-sm" title="Expandir todos os follow-ups" style="font-size:15px;padding:4px 8px;">⬇️</button><button id="colapsar-tudo-followups" class="btn btn-ghost btn-sm" title="Recolher todos os follow-ups" style="font-size:15px;padding:4px 8px;">⬆️</button><button id="btn-relatorio-pdf" class="btn btn-ghost btn-sm" title="Gerar Relatório PDF do Plano" style="font-size:15px;padding:4px 8px;">🖨️</button><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;white-space:nowrap;"><input type="checkbox" id="filtro-exibir-fechados" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"> Exibir Fechados</label></div><div class="table-wrap"><table id="tabela-acoes"><thead><tr><th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-plano">Plano</th><th style="min-width:58px;text-align:center;cursor:pointer;user-select:none;" id="lh-num">Nº Ação</th><th style="min-width:140px;cursor:pointer;user-select:none;" id="lh-subtopico">Sub-Tópico</th><th style="min-width:180px;cursor:pointer;user-select:none;" id="lh-problema">Problema</th><th style="min-width:60px;">Evidência</th><th style="min-width:200px;cursor:pointer;user-select:none;" id="lh-acao">Ação Corretiva</th><th style="min-width:130px;cursor:pointer;user-select:none;" id="lh-responsavel">Responsável</th><th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-abertura">Ocorrência</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-prazo">Prazo</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-fup">Último FUP</th><th style="min-width:60px;cursor:pointer;user-select:none;" id="lh-idade">Idade</th><th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-status">Status</th><th style="min-width:160px;">Ações</th></tr></thead><tbody id="listagem-tbody"></tbody></table></div></div></div>`;
+  container.innerHTML = `<div class="panel">
+    <div class="panel-body">
+      <div class="filters-bar" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
+        <select id="filtro-plano" class="form-control" style="width:auto;">${planosOpts}</select>
+          <select id="filtro-subtopico" class="form-control" style="width:auto;">${subtopicosOpts}</select>
+            <select id="filtro-responsavel" class="form-control" style="width:auto;">${responsavelOpts}</select>
+              <select id="filtro-status" class="form-control" style="width:auto;">${statusOpts}</select>
+                <input type="search" id="filtro-busca" class="form-control" placeholder="🔍 Buscar... (#327 = só pelo nº)" title="Digite #327 para buscar exatamente pelo número da ação, ou só texto para buscar no conteúdo" style="min-width:180px;flex:1;max-width:360px;">
+                <button id="limpar-filtros" class="btn btn-ghost btn-sm">✕ Limpar</button>
+                <span id="listagem-contador" style="font-size:12px;color:var(--text2);white-space:nowrap;align-self:center;">
+              </span>
+              <span style="flex:1;">
+            </span>
+            <button id="btn-importar-followups-lote" class="btn btn-ghost btn-sm" title="Importar Follow-ups em Lote (Excel: Número da Ação, Data, Responsável, Comentário)" style="font-size:15px;padding:4px 8px;">➕📥</button>
+            <button id="btn-excel-listagem" class="btn btn-ghost btn-sm" title="Exportar para Excel" style="font-size:15px;padding:4px 8px;">📥</button>
+            <button id="expandir-tudo-followups" class="btn btn-ghost btn-sm" title="Expandir todos os follow-ups" style="font-size:15px;padding:4px 8px;">⬇️</button>
+            <button id="colapsar-tudo-followups" class="btn btn-ghost btn-sm" title="Recolher todos os follow-ups" style="font-size:15px;padding:4px 8px;">⬆️</button>
+            <button id="btn-relatorio-pdf" class="btn btn-ghost btn-sm" title="Gerar Relatório PDF do Plano" style="font-size:15px;padding:4px 8px;">🖨️</button>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;white-space:nowrap;">
+            <input type="checkbox" id="filtro-exibir-fechados" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"> Exibir Fechados</label>
+          </div>
+          <div class="table-wrap">
+            <table id="tabela-acoes">
+            <thead>
+            <tr>
+            <th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-plano">Plano</th>
+            <th style="min-width:58px;text-align:center;cursor:pointer;user-select:none;" id="lh-num">Nº Ação</th>
+            <th style="min-width:140px;cursor:pointer;user-select:none;" id="lh-subtopico">Sub-Tópico</th>
+            <th style="min-width:180px;cursor:pointer;user-select:none;" id="lh-problema">Problema</th>
+            <th style="min-width:60px;">Evidência</th>
+            <th style="min-width:200px;cursor:pointer;user-select:none;" id="lh-acao">Ação Corretiva</th>
+            <th style="min-width:130px;cursor:pointer;user-select:none;" id="lh-responsavel">Responsável</th>
+            <th style="min-width:90px;cursor:pointer;user-select:none;" id="lh-abertura">Ocorrência</th>
+            <th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-prazo">Prazo</th>
+            <th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-fup">Último FUP</th>
+            <th style="min-width:60px;cursor:pointer;user-select:none;" id="lh-idade">Idade</th>
+            <th style="min-width:100px;cursor:pointer;user-select:none;" id="lh-status">Status</th>
+            <th style="min-width:160px;">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="listagem-tbody">
+      </tbody>
+    </table>
+    </div>
+    </div>
+  </div>`;
   // ── PERSISTÊNCIA DOS FILTROS DA LISTAGEM (localStorage) ──
   const _LS_FILTROS_KEY = 'listagem_filtros_v1';
   function _salvarFiltrosListagem() {
@@ -3451,7 +3496,141 @@ function renderNovoCadastro(container) {
   }
   const planosOpts = '<option value="">Selecione...</option>' + [...state.planos].sort((a,b)=>(a.titulo||'').localeCompare(b.titulo||'','pt-BR')).map(p=>'<option value="'+p.id+'">'+escHtml(p.titulo)+'</option>').join('');
   const respOpts = '<option value="">Selecione...</option>' + getResponsaveisAtivos().map(r=>'<option value="'+escHtml(r.nome)+'">'+escHtml(r.nome)+'</option>').join('');
-  container.innerHTML = `<div class="panel-body"><div class="form-row" style="grid-template-columns:1fr 1fr auto auto;gap:14px;"><div class="form-group"><label class="form-label">Plano</label><select class="form-control" id="nc-plano">${planosOpts}</select></div><div class="form-group"><label class="form-label">Sub-Tópico</label><select class="form-control" id="nc-subtopico"><option value="">Selecione o plano...</option></select></div><div class="form-group"><label class="form-label">Data de Abertura</label><input class="form-control" type="date" id="nc-data-abertura" value="${today()}"></div><div class="form-group" style="min-width:160px;"><label class="form-label">Responsável</label><select class="form-control" id="nc-responsavel">${respOpts}</select></div></div><div class="form-group" style="margin-top:14px;"><label class="form-label">Problema</label><textarea class="form-control" id="nc-problema" rows="2" placeholder="Descreva o problema detalhadamente..."></textarea></div><div id="nc-op-turno-row" style="display:none;"><div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;margin-bottom:8px;align-items:end;" id="nc-op-row-base"><div class="form-group" style="margin-bottom:0;"><label class="form-label">Operador</label><input class="form-control" id="nc-operador" placeholder="Nº operador"></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Data de Produção</label><input class="form-control" type="date" id="nc-data-producao"></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Turno</label><div style="display:flex;gap:10px;align-items:center;padding-top:6px;"><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t1" style="accent-color:var(--accent);"> T1</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t2" style="accent-color:var(--accent);"> T2</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="nc-turno-t3" style="accent-color:var(--accent);"> T3</label></div></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Quantidade</label><input class="form-control" id="nc-quantidade" type="number" min="0" placeholder="Qtd."></div><div style="padding-bottom:2px;"><button type="button" class="btn btn-secondary btn-sm" id="nc-add-reincidencia" title="Adicionar linha de reincidência">➕</button></div></div><div id="nc-reincidencias-container"></div></div><div class="form-row" style="grid-template-columns:1fr auto auto auto;gap:14px;margin-bottom:14px;align-items:start;"><div class="form-group" style="margin-bottom:0;"><label class="form-label">Causa Raiz</label><textarea class="form-control" id="nc-causa" rows="2" placeholder="Causa raiz do problema..."></textarea></div><div class="form-group" style="margin-bottom:0;min-width:150px;"><label class="form-label">Classificação 6M <span style="color:var(--red);">*</span></label><select class="form-control" id="nc-classificacao-6m"><option value="">Selecione...</option><option value="Máquina">Máquina</option><option value="Método">Método</option><option value="Mão de Obra">Mão de Obra</option><option value="Medição">Medição</option><option value="Material">Material</option><option value="Meio Ambiente">Meio Ambiente</option></select></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Evidência do Problema</label><div id="nc-ev-btns"><button class="btn btn-secondary btn-sm" id="nc-ev-upload-btn">📎 Upload</button></div><div class="help-text">Máx. 5 MB</div><input type="file" id="nc-ev-file" accept="image/*,.pdf" style="display:none;"><div id="nc-ev-preview" style="margin-top:6px;"></div></div><div class="form-group" style="margin-bottom:0;"><label class="form-label">Reincidência</label><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;margin-top:8px;"><input type="checkbox" id="nc-reincidente" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"><span>Problema Reincidente?</span></label></div></div><details class="form-group" ${_editingProb?.notas ? 'open' : ''}><summary class="form-label nc-notas-summary" style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;"><span class="nc-notas-marcador">▶</span>Notas / Observações</summary><div style="margin-top:8px;"><div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap;"><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="bold" title="Negrito"><b>B</b></button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="italic" title="Itálico"><i>I</i></button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="underline" title="Sublinhado"><u>S</u></button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="insertUnorderedList" title="Lista">• Lista</button><button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="removeFormat" title="Limpar formatação">Limpar</button></div><div id="nc-notas" contenteditable="true" style="min-height:100px;max-height:320px;overflow-y:auto;border:1px solid var(--border2);border-radius:var(--radius);padding:10px;background:var(--bg3);font-size:13px;line-height:1.5;"></div><div class="help-text">Cole texto formatado ou imagens diretamente (Ctrl+V).</div></div></details><div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 10px;border-top:1px solid var(--border);padding-top:16px;flex-wrap:wrap;gap:8px;"><span style="font-family:var(--font-hd);font-size:16px;font-weight:700;">Ações Corretivas</span><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn btn-secondary nc-btn-padrao" onclick="_ncState.editingProblemaId=null; _ncState.editingCorretivaIdx=null; navigate(\'listagem\');">Cancelar</button><button class="btn btn-primary nc-btn-padrao" id="nc-add-corretiva">➕ Adicionar Ação</button><button class="btn btn-primary nc-btn-padrao" onclick="_ncSalvar(event)">💾 Salvar Ação</button></div></div><div id="nc-corretivas-container"><div style="text-align:center;padding:24px;color:var(--text3);">Nenhuma ação corretiva. Clique em Adicionar Ação para começar.</div></div><div class="modal-footer" id="nc-form-footer" style="padding: 20px 0 0 0; border-top: 1px solid var(--border); margin-top: 20px;justify-content:flex-end;"><button class="btn btn-secondary nc-btn-padrao" onclick="_ncState.editingProblemaId=null; _ncState.editingCorretivaIdx=null; navigate(\'listagem\');">Cancelar</button><button class="btn btn-primary nc-btn-padrao" id="nc-add-corretiva-rodape">➕ Adicionar Ação</button><button class="btn btn-primary nc-btn-padrao" onclick="_ncSalvar(event)">💾 Salvar Ação</button></div></div></div>`;
+  container.innerHTML = `<div class="panel-body">
+    <div class="form-row" style="grid-template-columns:1fr 1fr auto auto;gap:14px;">
+      <div class="form-group">
+        <label class="form-label">Plano</label>
+        <select class="form-control" id="nc-plano">${planosOpts}</select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sub-Tópico</label>
+          <select class="form-control" id="nc-subtopico">
+            <option value="">Selecione o plano...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Data de Abertura</label>
+          <input class="form-control" type="date" id="nc-data-abertura" value="${today()}">
+        </div>
+        <div class="form-group" style="min-width:160px;">
+          <label class="form-label">Responsável</label>
+          <select class="form-control" id="nc-responsavel">${respOpts}</select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:14px;">
+          <label class="form-label">Problema</label>
+          <textarea class="form-control" id="nc-problema" rows="2" placeholder="Descreva o problema detalhadamente...">
+        </textarea>
+      </div>
+      <div id="nc-op-turno-row" style="display:none;">
+        <div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;margin-bottom:8px;align-items:end;" id="nc-op-row-base">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Operador</label>
+            <input class="form-control" id="nc-operador" placeholder="Nº operador">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Data de Produção</label>
+            <input class="form-control" type="date" id="nc-data-producao">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Turno</label>
+            <div style="display:flex;gap:10px;align-items:center;padding-top:6px;">
+              <label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;">
+              <input type="checkbox" id="nc-turno-t1" style="accent-color:var(--accent);"> T1</label>
+              <label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;">
+              <input type="checkbox" id="nc-turno-t2" style="accent-color:var(--accent);"> T2</label>
+              <label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;">
+              <input type="checkbox" id="nc-turno-t3" style="accent-color:var(--accent);"> T3</label>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Quantidade</label>
+            <input class="form-control" id="nc-quantidade" type="number" min="0" placeholder="Qtd.">
+          </div>
+          <div style="padding-bottom:2px;">
+            <button type="button" class="btn btn-secondary btn-sm" id="nc-add-reincidencia" title="Adicionar linha de reincidência">➕</button>
+          </div>
+        </div>
+        <div id="nc-reincidencias-container">
+        </div>
+      </div>
+      <div class="form-row" style="grid-template-columns:1fr auto auto auto;gap:14px;margin-bottom:14px;align-items:start;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Causa Raiz</label>
+          <textarea class="form-control" id="nc-causa" rows="2" placeholder="Causa raiz do problema...">
+        </textarea>
+      </div>
+      <div class="form-group" style="margin-bottom:0;min-width:150px;">
+        <label class="form-label">Classificação 6M <span style="color:var(--red);">*</span>
+      </label>
+      <select class="form-control" id="nc-classificacao-6m">
+        <option value="">Selecione...</option>
+        <option value="Máquina">Máquina</option>
+        <option value="Método">Método</option>
+        <option value="Mão de Obra">Mão de Obra</option>
+        <option value="Medição">Medição</option>
+        <option value="Material">Material</option>
+        <option value="Meio Ambiente">Meio Ambiente</option>
+      </select>
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label">Evidência do Problema</label>
+      <div id="nc-ev-btns">
+        <button class="btn btn-secondary btn-sm" id="nc-ev-upload-btn">📎 Upload</button>
+      </div>
+      <div class="help-text">Máx. 5 MB</div>
+        <input type="file" id="nc-ev-file" accept="image/*,.pdf" style="display:none;">
+        <div id="nc-ev-preview" style="margin-top:6px;">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Reincidência</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;margin-top:8px;">
+        <input type="checkbox" id="nc-reincidente" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);">
+        <span>Problema Reincidente?</span>
+      </label>
+    </div>
+    </div>
+    <details class="form-group" ${_editingProb?.notas ? 'open' : ''}>
+      <summary class="form-label nc-notas-summary" style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;">
+      <span class="nc-notas-marcador">▶</span>Notas / Observações</summary>
+      <div style="margin-top:8px;">
+        <div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap;">
+          <button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="bold" title="Negrito">
+          <b>B</b>
+        </button>
+        <button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="italic" title="Itálico">
+        <i>I</i>
+      </button>
+      <button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="underline" title="Sublinhado">
+      <u>S</u>
+    </button>
+    <button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="insertUnorderedList" title="Lista">• Lista</button>
+    <button type="button" class="btn btn-ghost btn-xs nc-notas-cmd" data-cmd="removeFormat" title="Limpar formatação">Limpar</button>
+    </div>
+    <div id="nc-notas" contenteditable="true" style="min-height:100px;max-height:320px;overflow-y:auto;border:1px solid var(--border2);border-radius:var(--radius);padding:10px;background:var(--bg3);font-size:13px;line-height:1.5;">
+    </div>
+    <div class="help-text">Cole texto formatado ou imagens diretamente (Ctrl+V).</div>
+    </div>
+    </details>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 10px;border-top:1px solid var(--border);padding-top:16px;flex-wrap:wrap;gap:8px;">
+      <span style="font-family:var(--font-hd);font-size:16px;font-weight:700;">Ações Corretivas</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+        <button class="btn btn-secondary nc-btn-padrao" onclick="_ncState.editingProblemaId=null; _ncState.editingCorretivaIdx=null; navigate(\'listagem\');">Cancelar</button>
+        <button class="btn btn-primary nc-btn-padrao" id="nc-add-corretiva">➕ Adicionar Ação</button>
+        <button class="btn btn-primary nc-btn-padrao" onclick="_ncSalvar(event)">💾 Salvar Ação</button>
+      </div>
+    </div>
+    <div id="nc-corretivas-container">
+      <div style="text-align:center;padding:24px;color:var(--text3);">Nenhuma ação corretiva. Clique em Adicionar Ação para começar.</div>
+      </div>
+      <div class="modal-footer" id="nc-form-footer" style="padding: 20px 0 0 0; border-top: 1px solid var(--border); margin-top: 20px;justify-content:flex-end;">
+        <button class="btn btn-secondary nc-btn-padrao" onclick="_ncState.editingProblemaId=null; _ncState.editingCorretivaIdx=null; navigate(\'listagem\');">Cancelar</button>
+        <button class="btn btn-primary nc-btn-padrao" id="nc-add-corretiva-rodape">➕ Adicionar Ação</button>
+        <button class="btn btn-primary nc-btn-padrao" onclick="_ncSalvar(event)">💾 Salvar Ação</button>
+      </div>
+    </div>
+  </div>`;
   document.getElementById('nc-plano').addEventListener('change', _ncOnPlanoChange);
   // nc-cancelar e nc-salvar usam onclick inline no HTML; não existem como ids separados
   document.getElementById('nc-add-corretiva').addEventListener('click', _ncAddCorretiva);
