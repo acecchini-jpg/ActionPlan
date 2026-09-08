@@ -440,6 +440,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
       <div class="nav-item" data-page="listagem"><span class="nav-icon">📊</span><span>Listagem Geral</span><span id="badge-vencidas" style="display:none;margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:10px;min-width:18px;text-align:center;"></span></div>
       <div class="nav-item" data-page="analise"><span class="nav-icon">📈</span><span>Resumo para PDM</span></div>
       <div class="nav-item" data-page="curso1tema"><span class="nav-icon">📚</span><span>Curso de 1 Tema</span></div>
+      <div class="nav-item" data-page="ata-reuniao"><span class="nav-icon">📝</span><span>Ata de Reunião</span></div>
       <div class="nav-item" data-page="presenca"><span class="nav-icon">🗓️</span><span>Controle de Presença</span></div>
       <div class="nav-section" id="nav-section-cadastros">Cadastros</div>
       <div class="nav-item" data-page="clientes"><span class="nav-icon">👥</span><span>Clientes</span></div>
@@ -476,7 +477,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.70';
+const APP_VERSAO = 'v19.73';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -1382,7 +1383,7 @@ function initTheme() { const savedTheme = localStorage.getItem('theme'); if(save
 }
 
 // ==================== NAVEGAÇÃO ====================
-const _pageTitlesBase = { clientes:'Clientes', responsaveis:'Responsáveis', planos:'Planos de Ação', subtopicos:'Sub-Tópicos', listagem:'Listagem Geral', dashboard:'Dashboard', analise:'Análise — Resumo PDM', 'novo-cadastro':'Cadastro de Problemas', 'fazer-backup':'Fazer Backup', 'recuperar-backup':'Recuperar Backup', presenca:'Controle de Presença', 'curso1tema':'Curso de 1 Tema', 'configuracoes':'Configurações' };
+const _pageTitlesBase = { clientes:'Clientes', responsaveis:'Responsáveis', planos:'Planos de Ação', subtopicos:'Sub-Tópicos', listagem:'Listagem Geral', dashboard:'Dashboard', analise:'Análise — Resumo PDM', 'novo-cadastro':'Cadastro de Problemas', 'fazer-backup':'Fazer Backup', 'recuperar-backup':'Recuperar Backup', presenca:'Controle de Presença', 'curso1tema':'Curso de 1 Tema', 'ata-reuniao':'Ata de Reunião', 'configuracoes':'Configurações' };
 const pageTitles = new Proxy(_pageTitlesBase, { get(t,k) { if(k==='novo-cadastro') return _ncState.editingProblemaId ? 'Editar Problema' : 'Cadastro de Problemas'; return t[k]; } });
 // ── v19.0: Matriz de permissões por página (substitui a senha 'rochling') ──
 const _PAGE_PERMISSOES = {
@@ -1408,7 +1409,7 @@ async function navigate(page) {
   }
   if(page !== 'novo-cadastro') { _ncState.editingProblemaId = null; _ncState.editingCorretivaIdx = null; _ncState._novoId = null; } state.currentPage = page; document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page===page)); document.getElementById('page-title').textContent = pageTitles[page]||page; render();
 }
-function render() { if (typeof _updateVencidasBadge === 'function') setTimeout(_updateVencidasBadge, 0); if (typeof aplicarPermissoesUI === 'function') setTimeout(aplicarPermissoesUI, 0); if (window._updateBottomNav) window._updateBottomNav(state.currentPage); const _dashFilterEl = document.getElementById('dash-filter-fixed'); if (_dashFilterEl && state.currentPage !== 'dashboard') _dashFilterEl.style.display = 'none'; const _auditBadge = document.getElementById('modo-auditoria-badge'); if (_auditBadge) _auditBadge.style.display = state.modoAuditoria ? 'inline-block' : 'none'; document.body.classList.toggle('printing-relatorio', state.currentPage === 'relatorio-pdf'); const el = document.getElementById('page'); const renders = { dashboard:renderDashboard, analise:renderAnalise, clientes:renderClientes, responsaveis:renderResponsaveis, planos:renderPlanos, subtopicos:renderSubtopicos, listagem:renderListagem, 'novo-cadastro':renderNovoCadastro, 'fazer-backup':renderFazerBackup, 'recuperar-backup':renderRecuperarBackup, presenca:renderPresenca, curso1tema:renderCurso1Tema, configuracoes:renderConfiguracoes, 'relatorio-pdf':renderRelatorioPDF }; el.innerHTML = ''; (renders[state.currentPage]||renderDashboard)(el); }
+function render() { if (typeof _updateVencidasBadge === 'function') setTimeout(_updateVencidasBadge, 0); if (typeof aplicarPermissoesUI === 'function') setTimeout(aplicarPermissoesUI, 0); if (window._updateBottomNav) window._updateBottomNav(state.currentPage); const _dashFilterEl = document.getElementById('dash-filter-fixed'); if (_dashFilterEl && state.currentPage !== 'dashboard') _dashFilterEl.style.display = 'none'; const _auditBadge = document.getElementById('modo-auditoria-badge'); if (_auditBadge) _auditBadge.style.display = state.modoAuditoria ? 'inline-block' : 'none'; document.body.classList.toggle('printing-relatorio', state.currentPage === 'relatorio-pdf'); const el = document.getElementById('page'); const renders = { dashboard:renderDashboard, analise:renderAnalise, clientes:renderClientes, responsaveis:renderResponsaveis, planos:renderPlanos, subtopicos:renderSubtopicos, listagem:renderListagem, 'novo-cadastro':renderNovoCadastro, 'fazer-backup':renderFazerBackup, 'recuperar-backup':renderRecuperarBackup, presenca:renderPresenca, curso1tema:renderCurso1Tema, 'ata-reuniao':renderAtaReuniao, configuracoes:renderConfiguracoes, 'relatorio-pdf':renderRelatorioPDF }; el.innerHTML = ''; (renders[state.currentPage]||renderDashboard)(el); }
 
 // ==================== PÁGINAS BÁSICAS (Clientes, Planos, Subtópicos) ====================
 // (código mantido idêntico ao original, apenas para não quebrar o funcionamento)
@@ -2072,11 +2073,16 @@ function renderListagem(container) {
               </span>
               <span style="flex:1;">
             </span>
-            <button id="btn-importar-followups-lote" class="btn btn-ghost btn-sm" title="Importar Follow-ups em Lote (Excel: Número da Ação, Data, Responsável, Comentário)" style="font-size:15px;padding:4px 8px;">➕📥</button>
-            <button id="btn-excel-listagem" class="btn btn-ghost btn-sm" title="Exportar para Excel" style="font-size:15px;padding:4px 8px;">📥</button>
-            <button id="expandir-tudo-followups" class="btn btn-ghost btn-sm" title="Expandir todos os follow-ups" style="font-size:15px;padding:4px 8px;">⬇️</button>
-            <button id="colapsar-tudo-followups" class="btn btn-ghost btn-sm" title="Recolher todos os follow-ups" style="font-size:15px;padding:4px 8px;">⬆️</button>
-            <button id="btn-relatorio-pdf" class="btn btn-ghost btn-sm" title="Gerar Relatório PDF do Plano" style="font-size:15px;padding:4px 8px;">🖨️</button>
+            <div style="position:relative;display:inline-block;">
+              <button id="btn-listagem-mais" class="btn btn-ghost btn-sm" title="Mais opções">⋯ Mais</button>
+              <div id="listagem-mais-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:100;min-width:230px;overflow:hidden;">
+                <button id="btn-importar-followups-lote" class="btn btn-ghost" style="width:100%;justify-content:flex-start;border-radius:0;padding:9px 14px;font-size:13px;">➕📥 Importar Follow-ups em Lote</button>
+                <button id="btn-excel-listagem" class="btn btn-ghost" style="width:100%;justify-content:flex-start;border-radius:0;padding:9px 14px;font-size:13px;">📥 Exportar para Excel</button>
+                <button id="expandir-tudo-followups" class="btn btn-ghost" style="width:100%;justify-content:flex-start;border-radius:0;padding:9px 14px;font-size:13px;">⬇️ Expandir todos os follow-ups</button>
+                <button id="colapsar-tudo-followups" class="btn btn-ghost" style="width:100%;justify-content:flex-start;border-radius:0;padding:9px 14px;font-size:13px;">⬆️ Recolher todos os follow-ups</button>
+                <button id="btn-relatorio-pdf" class="btn btn-ghost" style="width:100%;justify-content:flex-start;border-radius:0;padding:9px 14px;font-size:13px;">🖨️ Gerar Relatório PDF do Plano</button>
+              </div>
+            </div>
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;white-space:nowrap;">
             <input type="checkbox" id="filtro-exibir-fechados" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"> Exibir Fechados</label>
           </div>
@@ -2233,6 +2239,14 @@ function renderListagem(container) {
     finally { hideLoading(); _forcarTabelaCompleta = false; aplicarFiltrosETabela(); }
   });
   document.getElementById('btn-relatorio-pdf')?.addEventListener('click', () => _abrirModalRelatorioPDF());
+  // v19.71: menu "⋯ Mais" consolidando os botões secundários da barra de ações da Listagem
+  const _maisBtn = document.getElementById('btn-listagem-mais');
+  const _maisMenu = document.getElementById('listagem-mais-menu');
+  if (_maisBtn && _maisMenu) {
+    _maisBtn.addEventListener('click', (e) => { e.stopPropagation(); _maisMenu.style.display = _maisMenu.style.display === 'none' ? 'block' : 'none'; });
+    _maisMenu.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { _maisMenu.style.display = 'none'; }));
+    document.addEventListener('click', (e) => { if (!_maisMenu.contains(e.target) && e.target !== _maisBtn) _maisMenu.style.display = 'none'; });
+  }
   document.getElementById('btn-importar-followups-lote')?.addEventListener('click', () => {
     if (!podeVer('config')) { toast('Acesso não permitido para o seu nível de usuário.', 'error'); return; }
     const input = document.createElement('input');
@@ -2683,6 +2697,102 @@ function calcTaxaPresencaResponsavel(respNome, planoIdFiltro, atasCustom) {
   // Resultado é um inteiro limpo entre 0 e 100; sem NaN possível
   const taxa = Math.round((Number(totalPresente) / Number(totalObrigatorio)) * 100);
   return { taxa, reunioes: totalObrigatorio };
+}
+
+// ==================== v19.73: ATA DE REUNIÃO ====================
+// Função PURA de agregação — sem DOM. Recebe o período (datas ISO 'YYYY-MM-DD') e um plano_id
+// opcional ('' = todos os planos), devolve tudo que a tela e o texto/e-mail precisam.
+function _gerarDadosAta(dataDe, dataAte, planoId) {
+  const _inPeriodo = d => !!(d && d >= dataDe && d <= dataAte);
+  const plano = planoId ? state.planos.find(p => p.id === planoId) : null;
+
+  // ── Participantes: união de quem foi marcado Necessário em qualquer ata do período/plano ──
+  const atasPeriodo = state.presencas.filter(a => _inPeriodo(a.data || '') && (!planoId || a.plano_id === planoId));
+  const nomesNecessarios = new Set();
+  atasPeriodo.forEach(ata => (ata.participantes || []).forEach(p => {
+    if (p.necessario === true || p.necessario === 'true') nomesNecessarios.add(String(p.nome).trim());
+  }));
+  const participantes = [...nomesNecessarios].sort((a, b) => a.localeCompare(b, 'pt-BR')).map(nome => {
+    const { taxa, reunioes } = calcTaxaPresencaResponsavel(nome, planoId || null, atasPeriodo);
+    const resp = state.responsaveis.find(r => r.nome === nome);
+    let label;
+    if (reunioes <= 1) label = taxa === 100 ? 'Presente' : (taxa === 0 ? 'Ausente' : `${taxa}%`);
+    else label = `${taxa}%`;
+    return { nome, departamento: resp ? (resp.departamento || '—') : '—', email: resp ? (resp.email || '') : '', taxa, reunioes, label };
+  });
+
+  // ── Atividades: por Departamento > por Ação, eventos como sub-itens ──
+  const _respDeptMap = {};
+  state.responsaveis.forEach(r => { _respDeptMap[r.nome] = r.departamento || 'Sem Departamento'; });
+  const acoesPorDepto = {}; // departamento -> [{ numeroAcao, subtopico, problemaTexto, eventos:[{tipo,texto,data}] }]
+  const emailsEnvolvidos = new Set();
+
+  state.acoes.forEach(prob => {
+    if (planoId && prob.plano_id !== planoId) return;
+    const subtopico = state.subtopicos.find(s => s.id === prob.subtopico_id);
+    (prob.acoes_corretivas || []).forEach(cr => {
+      const eventos = [];
+      const tagAcao = ` (ação #${_numAcaoValido(cr.numeroAcao) ? cr.numeroAcao : ''})`;
+
+      // 1) Ação Adicionada — follow-up automático (v19.72)
+      (cr.followups || []).filter(f => f.automatico && f.comentario === 'Nova ação adicionada.' && _inPeriodo((f.data_followup || '').slice(0, 10)))
+        .forEach(f => eventos.push({ data: f.data_followup, texto: `Ação Adicionada por ${f.responsavel || 'Sistema'}` }));
+
+      // 2) Follow-ups manuais (exclui os automáticos e o de "Data alterada para X", que já vira o evento de Prazo abaixo)
+      (cr.followups || []).filter(f => !f.automatico && !/^Data alterada para /.test(f.comentario || '') && _inPeriodo((f.data_followup || '').slice(0, 10)))
+        .forEach(f => eventos.push({ data: f.data_followup, texto: `Follow-up por ${f.responsavel || '—'}: "${f.comentario || ''}"` }));
+
+      // 3) Responsável / Prazo alterados — vem do histórico do PROBLEMA, filtrado pelo campo desta ação
+      (prob.historico || []).forEach(h => {
+        const dataH = (h.data || '').slice(0, 10);
+        if (!_inPeriodo(dataH)) return;
+        if (h.campo === 'responsavel_acao' + tagAcao) eventos.push({ data: dataH, texto: `Responsável Alterado de "${h.valor_anterior || '—'}" para "${h.valor_novo || '—'}"` });
+        else if (h.campo === 'data_prevista' + tagAcao) eventos.push({ data: dataH, texto: `Prazo Alterado de ${formatDate(h.valor_anterior)} para ${formatDate(h.valor_novo)}` });
+      });
+
+      // 4) Ação Encerrada — data efetiva dentro do período
+      if (_inPeriodo(cr.data_efetiva || '')) eventos.push({ data: cr.data_efetiva, texto: `Ação Encerrada por ${cr.responsavel || '—'}` });
+
+      if (!eventos.length) return;
+      eventos.sort((a, b) => (a.data || '').localeCompare(b.data || ''));
+
+      const depto = _respDeptMap[cr.responsavel] || 'Sem Departamento';
+      if (!acoesPorDepto[depto]) acoesPorDepto[depto] = [];
+      acoesPorDepto[depto].push({
+        numeroAcao: _numAcaoValido(cr.numeroAcao) ? cr.numeroAcao : '—',
+        subtopico: subtopico ? subtopico.descricao : '—',
+        problemaTexto: prob.problema || '—',
+        eventos
+      });
+
+      const _rEmail = state.responsaveis.find(r => r.nome === cr.responsavel);
+      if (_rEmail && _rEmail.email) emailsEnvolvidos.add(_rEmail.email);
+    });
+  });
+  const atividadesPorDepartamento = Object.keys(acoesPorDepto).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+    .map(depto => ({ departamento: depto, acoes: acoesPorDepto[depto] }));
+
+  // ── Cursos de 1 Tema Aplicados: finalizado_em dentro do período (v19.72) ──
+  const cursosAplicados = state.cursos1tema
+    .filter(c => c.finalizado_em && _inPeriodo((c.finalizado_em || '').slice(0, 10)) && (!planoId || c.plano_id === planoId))
+    .map(c => ({ subtopico: c.subtopico_descricao || '—', problemaTexto: c.problema_descricao || '—', dataFinalizacao: (c.finalizado_em || '').slice(0, 10) }))
+    .sort((a, b) => a.dataFinalizacao.localeCompare(b.dataFinalizacao));
+
+  // ── Destinatários: participantes com e-mail + responsáveis das ações envolvidas + dono do Plano ──
+  participantes.forEach(p => { if (p.email) emailsEnvolvidos.add(p.email); });
+  if (plano && plano.responsavel) {
+    const _rPlano = state.responsaveis.find(r => r.nome === plano.responsavel);
+    if (_rPlano && _rPlano.email) emailsEnvolvidos.add(_rPlano.email);
+  }
+
+  return {
+    planoTitulo: plano ? plano.titulo : 'Todos os Planos',
+    dataDe, dataAte,
+    participantes,
+    atividadesPorDepartamento,
+    cursosAplicados,
+    emails: [...emailsEnvolvidos].sort()
+  };
 }
 
 // ==================== DASHBOARD COM INDICADORES ATUALIZADOS ====================
@@ -4100,6 +4210,14 @@ function _validarProblema({ planoId, problema, classificacao6m, dataAbertura, co
   }
   return { ok: true };
 }
+// v19.72: follow-up automático ao criar uma ação corretiva nova — registra Data, "dono do Plano"
+// (plano.responsavel) e "Nova ação adicionada.", reaproveitando a MESMA estrutura de follow-up
+// manual (já aparece no histórico da ação, na Listagem, em tudo). Resolve "quando uma ação foi
+// adicionada" sem precisar de um campo novo — útil pra telas como a Ata de Reunião.
+function _adicionarFollowupAutomaticoNovaAcao(cr, plano) {
+  if (!cr.followups) cr.followups = [];
+  cr.followups.push({ id: uid(), data_followup: today(), responsavel: (plano && plano.responsavel) || 'Sistema', comentario: 'Nova ação adicionada.', automatico: true });
+}
 async function _ncSalvar(event) {
   const planoId=document.getElementById('nc-plano').value; const subtId=document.getElementById('nc-subtopico').value; const dataAbertura=document.getElementById('nc-data-abertura').value; const responsavel=document.getElementById('nc-responsavel').value; const problema=document.getElementById('nc-problema').value.trim(); const causa=document.getElementById('nc-causa').value.trim(); const classificacao6m=document.getElementById('nc-classificacao-6m').value; const reincidente=document.getElementById('nc-reincidente').checked;
   let notas=_sanitizarHtmlNotas(document.getElementById('nc-notas').innerHTML);
@@ -4154,6 +4272,24 @@ async function _ncSalvar(event) {
         if (existente.historico.length > 200) existente.historico = existente.historico.slice(-200);
         const _corretivasAntesIdx = JSON.parse(JSON.stringify(existente.acoes_corretivas || [])); // v19.5: p/ sincronizar índice de nº de ação
         const _subtopicoIdAntes = existente.subtopico_id; // v19.22: p/ detectar troca de sub-tópico e ressincronizar cursos vinculados
+        // v19.72: ações corretivas cujo id não existia antes desta edição são NOVAS — ganham o follow-up automático
+        const _idsCorretivasAntes = new Set((existente.acoes_corretivas || []).map(c => c.id).filter(Boolean));
+        _corretivasOut.forEach(cr => { if (cr.id && !_idsCorretivasAntes.has(cr.id)) _adicionarFollowupAutomaticoNovaAcao(cr, plano); });
+        // v19.72: estende a auditoria pro nível de CADA ação corretiva também no caminho do Novo
+        // Cadastro — antes só a edição pela Listagem registrava troca de Responsável/Prazo no histórico.
+        const _corretivasAntesPorId = {};
+        (existente.acoes_corretivas || []).forEach(c => { if (c.id) _corretivasAntesPorId[c.id] = c; });
+        _corretivasOut.forEach((cr, idx) => {
+          const antiga = cr.id ? _corretivasAntesPorId[cr.id] : null;
+          if (!antiga) return; // corretiva nova, sem "antes" pra comparar — já tratada acima
+          const _tagCr = ` (ação #${_numAcaoValido(cr.numeroAcao) ? cr.numeroAcao : idx + 1})`;
+          [['acao_descricao','acao_descricao'],['responsavel','responsavel_acao'],['data_prevista','data_prevista'],['data_efetiva','data_efetiva']].forEach(([campoObj, nomeHist]) => {
+            const antigo = antiga[campoObj], novoVal = cr[campoObj];
+            if (String(antigo ?? '') !== String(novoVal ?? '')) {
+              existente.historico.push({ data: new Date().toISOString(), usuario: _usr, campo: nomeHist + _tagCr, valor_anterior: antigo ?? null, valor_novo: novoVal ?? null });
+            }
+          });
+        });
         Object.assign(existente, { plano_id: planoId, subtopico_id: subtId, data_abertura: dataAbertura, responsavel, problema, causa, classificacao_6m: classificacao6m, notas, reincidente, evidencia_problema: _ncState._evidenciaAlterada ? _ncState.evidencia_problema : existente.evidencia_problema, acoes_corretivas: _corretivasOut, updated_at: new Date().toISOString(), updated_by: _userProfile?.email || 'sistema' });
         if (nOpQtd) {
           existente.operador = operador; existente.quantidade = quantidade;
@@ -4179,6 +4315,7 @@ async function _ncSalvar(event) {
       hideLoading(); state.currentPage='listagem'; render();
     } else {
       const novoProblema={id:_ncState._novoId||uid(),id_global:nextAcaoId(),plano_id:planoId,subtopico_id:subtId,data_abertura:dataAbertura,responsavel,problema,causa,classificacao_6m:classificacao6m,notas,reincidente,recorrencia_count:0,evidencia_problema:_ncState.evidencia_problema||null,acoes_corretivas:_corretivasOut};
+      _corretivasOut.forEach(cr => _adicionarFollowupAutomaticoNovaAcao(cr, plano)); // v19.72: todas as corretivas de um problema novo são "novas"
       if(nOpQtd){
         novoProblema.operador=operador; novoProblema.quantidade=quantidade;
         novoProblema.data_producao=data_producao; novoProblema.turnos=turnos;
@@ -4455,8 +4592,10 @@ function renderCurso1Tema(container) {
     curso[campo] = chk.checked;
     if (curso.t1 === true && curso.t2 === true && curso.t3 === true) {
       curso.statusCurso = 'Finalizado';
+      if (!curso.finalizado_em) curso.finalizado_em = new Date().toISOString(); // v19.72: data real de conclusão, distinta de criado_em
     } else {
       curso.statusCurso = 'Pendente';
+      curso.finalizado_em = null; // voltou a pendente — não está mais concluído
     }
     await saveData('cursos1tema', cursoId);
     const row = tbody.querySelector('tr[data-curso-id="' + cursoId + '"]');
@@ -4610,6 +4749,7 @@ function _rebindCursoUpload(cursoId) {
         // Auto-marca T1, T2 e T3 ao enviar evidência
         curso.t1 = true; curso.t2 = true; curso.t3 = true;
         curso.statusCurso = 'Finalizado';
+        if (!curso.finalizado_em) curso.finalizado_em = new Date().toISOString(); // v19.72: data real de conclusão
         await saveData('cursos1tema', cursoId);
         if (isStorageUrl(_urlAntigaCurso)) deleteFromStorage(_urlAntigaCurso);
         // re-render row
@@ -5836,6 +5976,88 @@ async function _renderUsuariosPainel() {
 // ==================== FIM v19.0: PÁGINA CONFIGURAÇÕES ====================
 
 // ==================== CONTROLE DE PRESENÇA ====================
+// v19.73: monta o texto simples da Ata — usado tanto na tela (dentro de .pdm-box) quanto em Copiar/E-mail
+function _montarTextoAta(dados) {
+  const linhas = [];
+  linhas.push(`Ata de Reunião — ${dados.planoTitulo} — de ${formatDate(dados.dataDe)} até ${formatDate(dados.dataAte)}`);
+  linhas.push('');
+  linhas.push('PARTICIPANTES:');
+  if (!dados.participantes.length) linhas.push('  Nenhum participante necessário registrado no período.');
+  dados.participantes.forEach(p => linhas.push(`  ${p.nome} (${p.departamento}) — ${p.label}`));
+  linhas.push('');
+  linhas.push('ATIVIDADES:');
+  if (!dados.atividadesPorDepartamento.length) linhas.push('  Nenhuma atividade registrada no período.');
+  dados.atividadesPorDepartamento.forEach(dep => {
+    linhas.push('');
+    linhas.push(dep.departamento.toUpperCase());
+    dep.acoes.forEach(ac => {
+      linhas.push(`Ação #${ac.numeroAcao} - ${ac.subtopico} - ${ac.problemaTexto}`);
+      ac.eventos.forEach(ev => linhas.push(`  ${ev.texto} em ${formatDate(ev.data)}`));
+    });
+  });
+  linhas.push('');
+  linhas.push('CURSOS DE 1 TEMA APLICADOS:');
+  if (!dados.cursosAplicados.length) linhas.push('  Nenhum curso finalizado no período.');
+  dados.cursosAplicados.forEach(c => linhas.push(`  ${c.subtopico} - ${c.problemaTexto} em ${formatDate(c.dataFinalizacao)}`));
+  return linhas.join('\n');
+}
+function renderAtaReuniao(container) {
+  const planosOpts = `<option value="">Todos os Planos</option>` + [...state.planos].sort((a,b)=>(a.titulo||'').localeCompare(b.titulo||'','pt-BR')).map(p=>`<option value="${p.id}">${escHtml(p.titulo)}</option>`).join('');
+  container.innerHTML = `<div class="panel">
+    <div class="panel-header"><span>📝</span><span class="panel-title">Ata de Reunião</span></div>
+    <div class="panel-body">
+      <div class="form-row" style="grid-template-columns:auto auto auto 1fr auto;gap:10px;align-items:end;">
+        <div class="form-group" style="margin-bottom:0;"><label class="form-label">De</label><input type="date" class="form-control" id="ata-de" value="${today()}"></div>
+        <div style="padding-bottom:8px;"><button class="btn btn-ghost btn-sm" id="ata-copiar-data" title="Copiar a data 'De' para 'Até'">→</button></div>
+        <div class="form-group" style="margin-bottom:0;"><label class="form-label">Até</label><input type="date" class="form-control" id="ata-ate" value="${today()}"></div>
+        <div class="form-group" style="margin-bottom:0;"><label class="form-label">Plano</label><select class="form-control" id="ata-plano">${planosOpts}</select></div>
+        <div><button class="btn btn-primary" id="ata-gerar">📝 Gerar Ata</button></div>
+      </div>
+      <div id="ata-resultado" style="margin-top:18px;"></div>
+    </div>
+  </div>`;
+  document.getElementById('ata-copiar-data')?.addEventListener('click', () => {
+    document.getElementById('ata-ate').value = document.getElementById('ata-de').value;
+  });
+  document.getElementById('ata-gerar')?.addEventListener('click', () => {
+    const de = document.getElementById('ata-de').value;
+    const ate = document.getElementById('ata-ate').value;
+    if (!de || !ate) { toast('Selecione o período (De e Até).', 'warning'); return; }
+    if (de > ate) { toast('A data "De" não pode ser depois da data "Até".', 'warning'); return; }
+    const planoId = document.getElementById('ata-plano').value;
+    const dados = _gerarDadosAta(de, ate, planoId);
+    _renderResultadoAta(dados);
+  });
+}
+function _renderResultadoAta(dados) {
+  const resEl = document.getElementById('ata-resultado');
+  if (!resEl) return;
+  const texto = _montarTextoAta(dados);
+  const totalAcoes = dados.atividadesPorDepartamento.reduce((s,d)=>s+d.acoes.length,0);
+  const totalEventos = dados.atividadesPorDepartamento.reduce((s,d)=>s+d.acoes.reduce((s2,a)=>s2+a.eventos.length,0),0);
+  resEl.innerHTML = `
+    <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+      <span style="font-size:12px;color:var(--text2);">${dados.participantes.length} participante(s) · ${totalEventos} evento(s) em ${totalAcoes} ação(ões) · ${dados.cursosAplicados.length} curso(s) finalizado(s)</span>
+      <span style="flex:1;"></span>
+      <button class="btn btn-secondary btn-sm" id="ata-copiar-texto">📋 Copiar Texto</button>
+      <button class="btn btn-primary btn-sm" id="ata-abrir-email">✉️ Abrir E-mail</button>
+    </div>
+    <div class="pdm-box" id="ata-texto-box" style="max-height:60vh;">${escHtml(texto)}</div>
+  `;
+  document.getElementById('ata-copiar-texto')?.addEventListener('click', () => copyToClipboard(texto, 'Ata copiada! Cole no seu e-mail.'));
+  document.getElementById('ata-abrir-email')?.addEventListener('click', () => {
+    const assunto = `Ata de Reunião — ${dados.planoTitulo} — ${formatDate(dados.dataDe)} a ${formatDate(dados.dataAte)}`;
+    const destinatarios = dados.emails.join(',');
+    const mailto = `mailto:${encodeURIComponent(destinatarios)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(texto)}`;
+    // v19.73: mailto: tem limite prático de tamanho (varia por cliente, ~2000 chars é um teto seguro) —
+    // Atas longas estourariam e o e-mail abriria cortado sem avisar; por isso barramos antes com uma margem.
+    if (mailto.length > 1800) {
+      toast('A Ata é grande demais para abrir direto no e-mail (limite do link mailto:). Use "📋 Copiar Texto" e cole no seu e-mail.', 'warning');
+      return;
+    }
+    window.location.href = mailto;
+  });
+}
 function renderPresenca(container) {
   const planosOpts = `<option value="">— Selecione o Plano —</option>` + state.planos.map(p=>`<option value="${p.id}">${escHtml(p.titulo)}</option>`).join('');
   const responsaveisOrdenados = [...state.responsaveis].filter(r=>r.ativo!==false).sort((a,b)=>(a.nome||'').localeCompare(b.nome||'','pt-BR',{sensitivity:'base'}));
