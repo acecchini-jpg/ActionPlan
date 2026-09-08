@@ -477,7 +477,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.73';
+const APP_VERSAO = 'v19.74';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -2721,16 +2721,25 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
     return { nome, departamento: resp ? (resp.departamento || '—') : '—', email: resp ? (resp.email || '') : '', taxa, reunioes, label };
   });
 
-  // ── Atividades: por Departamento > por Ação, eventos como sub-itens ──
+  // ── Atividades: por Departamento > por Responsável (todos, com totais gerais) > eventos do período ──
   const _respDeptMap = {};
   state.responsaveis.forEach(r => { _respDeptMap[r.nome] = r.departamento || 'Sem Departamento'; });
-  const acoesPorDepto = {}; // departamento -> [{ numeroAcao, subtopico, problemaTexto, eventos:[{tipo,texto,data}] }]
+  const statsPorResp = {}; // nome -> { total, vencidas, emAndamento, acoes:[{numeroAcao,subtopico,problemaTexto,eventos}] }
   const emailsEnvolvidos = new Set();
 
   state.acoes.forEach(prob => {
     if (planoId && prob.plano_id !== planoId) return;
     const subtopico = state.subtopicos.find(s => s.id === prob.subtopico_id);
     (prob.acoes_corretivas || []).forEach(cr => {
+      const nome = cr.responsavel || 'N/D';
+      if (!statsPorResp[nome]) statsPorResp[nome] = { total: 0, vencidas: 0, emAndamento: 0, acoes: [] };
+      // v19.74: contadores são do ESCOPO TODO (Plano filtrado, sem filtro de data) — retrato geral
+      // da carga da pessoa, não só do que mexeu no período. "No prazo" = em andamento (não vencido).
+      statsPorResp[nome].total++;
+      const _status = calcStatusAcao(cr);
+      if (_status === 'VENCIDO') statsPorResp[nome].vencidas++;
+      else if (_status === 'EM ANDAMENTO') statsPorResp[nome].emAndamento++;
+
       const eventos = [];
       const tagAcao = ` (ação #${_numAcaoValido(cr.numeroAcao) ? cr.numeroAcao : ''})`;
 
@@ -2753,24 +2762,28 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
       // 4) Ação Encerrada — data efetiva dentro do período
       if (_inPeriodo(cr.data_efetiva || '')) eventos.push({ data: cr.data_efetiva, texto: `Ação Encerrada por ${cr.responsavel || '—'}` });
 
-      if (!eventos.length) return;
-      eventos.sort((a, b) => (a.data || '').localeCompare(b.data || ''));
-
-      const depto = _respDeptMap[cr.responsavel] || 'Sem Departamento';
-      if (!acoesPorDepto[depto]) acoesPorDepto[depto] = [];
-      acoesPorDepto[depto].push({
-        numeroAcao: _numAcaoValido(cr.numeroAcao) ? cr.numeroAcao : '—',
-        subtopico: subtopico ? subtopico.descricao : '—',
-        problemaTexto: prob.problema || '—',
-        eventos
-      });
-
-      const _rEmail = state.responsaveis.find(r => r.nome === cr.responsavel);
-      if (_rEmail && _rEmail.email) emailsEnvolvidos.add(_rEmail.email);
+      if (eventos.length) {
+        eventos.sort((a, b) => (a.data || '').localeCompare(b.data || ''));
+        statsPorResp[nome].acoes.push({
+          numeroAcao: _numAcaoValido(cr.numeroAcao) ? cr.numeroAcao : '—',
+          subtopico: subtopico ? subtopico.descricao : '—',
+          problemaTexto: prob.problema || '—',
+          eventos
+        });
+        const _rEmail = state.responsaveis.find(r => r.nome === cr.responsavel);
+        if (_rEmail && _rEmail.email) emailsEnvolvidos.add(_rEmail.email);
+      }
     });
   });
-  const atividadesPorDepartamento = Object.keys(acoesPorDepto).sort((a, b) => a.localeCompare(b, 'pt-BR'))
-    .map(depto => ({ departamento: depto, acoes: acoesPorDepto[depto] }));
+  const porDepto = {};
+  Object.keys(statsPorResp).forEach(nome => {
+    const depto = _respDeptMap[nome] || 'Sem Departamento';
+    if (!porDepto[depto]) porDepto[depto] = [];
+    porDepto[depto].push({ nome, ...statsPorResp[nome] });
+  });
+  Object.values(porDepto).forEach(lista => lista.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
+  const atividadesPorDepartamento = Object.keys(porDepto).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+    .map(depto => ({ departamento: depto, responsaveis: porDepto[depto] }));
 
   // ── Cursos de 1 Tema Aplicados: finalizado_em dentro do período (v19.72) ──
   const cursosAplicados = state.cursos1tema
@@ -5989,10 +6002,19 @@ function _montarTextoAta(dados) {
   if (!dados.atividadesPorDepartamento.length) linhas.push('  Nenhuma atividade registrada no período.');
   dados.atividadesPorDepartamento.forEach(dep => {
     linhas.push('');
-    linhas.push(dep.departamento.toUpperCase());
-    dep.acoes.forEach(ac => {
-      linhas.push(`Ação #${ac.numeroAcao} - ${ac.subtopico} - ${ac.problemaTexto}`);
-      ac.eventos.forEach(ev => linhas.push(`  ${ev.texto} em ${formatDate(ev.data)}`));
+    linhas.push(dep.departamento.toUpperCase() + ':');
+    dep.responsaveis.forEach(r => {
+      linhas.push('');
+      linhas.push(r.nome);
+      linhas.push(`Total Ações: ${r.total} | No prazo: ${r.emAndamento} | Vencidas: ${r.vencidas}`);
+      if (!r.acoes.length) {
+        linhas.push('Sem evolução nas ações.');
+      } else {
+        r.acoes.forEach(ac => {
+          linhas.push(`Ação #${ac.numeroAcao} - ${ac.subtopico} - ${ac.problemaTexto}`);
+          ac.eventos.forEach(ev => linhas.push(`  ${ev.texto} em ${formatDate(ev.data)}`));
+        });
+      }
     });
   });
   linhas.push('');
@@ -6033,11 +6055,12 @@ function _renderResultadoAta(dados) {
   const resEl = document.getElementById('ata-resultado');
   if (!resEl) return;
   const texto = _montarTextoAta(dados);
-  const totalAcoes = dados.atividadesPorDepartamento.reduce((s,d)=>s+d.acoes.length,0);
-  const totalEventos = dados.atividadesPorDepartamento.reduce((s,d)=>s+d.acoes.reduce((s2,a)=>s2+a.eventos.length,0),0);
+  const totalResponsaveis = dados.atividadesPorDepartamento.reduce((s,d)=>s+d.responsaveis.length,0);
+  const totalAcoes = dados.atividadesPorDepartamento.reduce((s,d)=>s+d.responsaveis.reduce((s2,r)=>s2+r.acoes.length,0),0);
+  const totalEventos = dados.atividadesPorDepartamento.reduce((s,d)=>s+d.responsaveis.reduce((s2,r)=>s2+r.acoes.reduce((s3,a)=>s3+a.eventos.length,0),0),0);
   resEl.innerHTML = `
     <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
-      <span style="font-size:12px;color:var(--text2);">${dados.participantes.length} participante(s) · ${totalEventos} evento(s) em ${totalAcoes} ação(ões) · ${dados.cursosAplicados.length} curso(s) finalizado(s)</span>
+      <span style="font-size:12px;color:var(--text2);">${dados.participantes.length} participante(s) · ${totalResponsaveis} responsável(is) · ${totalEventos} evento(s) em ${totalAcoes} ação(ões) · ${dados.cursosAplicados.length} curso(s) finalizado(s)</span>
       <span style="flex:1;"></span>
       <button class="btn btn-secondary btn-sm" id="ata-copiar-texto">📋 Copiar Texto</button>
       <button class="btn btn-primary btn-sm" id="ata-abrir-email">✉️ Abrir E-mail</button>
@@ -6047,7 +6070,7 @@ function _renderResultadoAta(dados) {
   document.getElementById('ata-copiar-texto')?.addEventListener('click', () => copyToClipboard(texto, 'Ata copiada! Cole no seu e-mail.'));
   document.getElementById('ata-abrir-email')?.addEventListener('click', () => {
     const assunto = `Ata de Reunião — ${dados.planoTitulo} — ${formatDate(dados.dataDe)} a ${formatDate(dados.dataAte)}`;
-    const destinatarios = dados.emails.join(',');
+    const destinatarios = dados.emails.join(';'); // v19.74: ";" em vez de "," — vírgula dava problema em alguns clientes de e-mail
     const mailto = `mailto:${encodeURIComponent(destinatarios)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(texto)}`;
     // v19.73: mailto: tem limite prático de tamanho (varia por cliente, ~2000 chars é um teto seguro) —
     // Atas longas estourariam e o e-mail abriria cortado sem avisar; por isso barramos antes com uma margem.
