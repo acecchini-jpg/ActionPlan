@@ -477,7 +477,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.76';
+const APP_VERSAO = 'v19.77';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -5992,38 +5992,52 @@ async function _renderUsuariosPainel() {
 
 // ==================== CONTROLE DE PRESENÇA ====================
 // v19.73: monta o texto simples da Ata — usado tanto na tela (dentro de .pdm-box) quanto em Copiar/E-mail
-function _montarTextoAta(dados) {
+// v19.77: monta a Ata como uma lista de linhas estruturadas ({texto, indent, bold}) — uma única
+// fonte de verdade usada tanto pro texto puro (Copiar/E-mail) quanto pra exibição em tela (negrito).
+function _montarLinhasAta(dados) {
   const linhas = [];
-  linhas.push(`Ata de Reunião — ${dados.planoTitulo} — de ${formatDate(dados.dataDe)} até ${formatDate(dados.dataAte)}`);
-  linhas.push('');
-  linhas.push('PARTICIPANTES:');
-  if (!dados.participantes.length) linhas.push('  Nenhum participante necessário registrado no período.');
-  dados.participantes.forEach(p => linhas.push(`  ${p.nome} (${p.departamento}) — ${p.label}`));
-  linhas.push('');
-  linhas.push('ATIVIDADES:');
-  if (!dados.atividadesPorDepartamento.length) linhas.push('  Nenhuma atividade registrada no período.');
+  const add = (texto, opts) => linhas.push({ texto, indent: (opts && opts.indent) || 0, bold: !!(opts && opts.bold) });
+  add(`Ata de Reunião — ${dados.planoTitulo} — de ${formatDate(dados.dataDe)} até ${formatDate(dados.dataAte)}`, { bold: true });
+  add('');
+  add('PARTICIPANTES:');
+  if (!dados.participantes.length) add('Nenhum participante necessário registrado no período.', { indent: 1 });
+  dados.participantes.forEach(p => add(`${p.nome} (${p.departamento}) — ${p.label}`, { indent: 1 }));
+  add('');
+  add('ATIVIDADES:');
+  if (!dados.atividadesPorDepartamento.length) add('Nenhuma atividade registrada no período.', { indent: 1 });
   dados.atividadesPorDepartamento.forEach(dep => {
-    linhas.push('');
-    linhas.push(dep.departamento.toUpperCase() + ':');
-    dep.responsaveis.forEach(r => {
-      linhas.push('');
-      linhas.push(r.nome);
-      linhas.push(`Ações Pendentes: ${r.pendentes} | No prazo: ${r.emAndamento} | Vencidas: ${r.vencidas}`);
+    add('');
+    add(dep.departamento.toUpperCase() + ':', { bold: true }); // v19.77: negrito, sem linha em branco logo depois
+    dep.responsaveis.forEach((r, idx) => {
+      if (idx > 0) add(''); // v19.77: só separa com linha em branco ENTRE pessoas, não logo após o departamento
+      add(r.nome, { indent: 1 }); // v19.77: nomes indentados dentro da área do departamento
+      add(`Ações Pendentes: ${r.pendentes} | No prazo: ${r.emAndamento} | Vencidas: ${r.vencidas}`, { indent: 1 });
       if (!r.acoes.length) {
-        linhas.push('Sem evolução nas ações.');
+        add('Sem evolução nas ações.', { indent: 1 });
       } else {
         r.acoes.forEach(ac => {
-          linhas.push(`Ação #${ac.numeroAcao} - ${ac.subtopico} - ${ac.problemaTexto}`);
-          ac.eventos.forEach(ev => linhas.push(`  ${ev.texto} em ${formatDate(ev.data)}`));
+          add(`Ação #${ac.numeroAcao} - ${ac.subtopico} - ${ac.problemaTexto}`, { indent: 1 });
+          ac.eventos.forEach(ev => add(`${ev.texto} em ${formatDate(ev.data)}`, { indent: 2 }));
         });
       }
     });
   });
-  linhas.push('');
-  linhas.push('CURSOS DE 1 TEMA APLICADOS:');
-  if (!dados.cursosAplicados.length) linhas.push('  Nenhum curso finalizado no período.');
-  dados.cursosAplicados.forEach(c => linhas.push(`  ${c.subtopico} - ${c.problemaTexto} em ${formatDate(c.dataFinalizacao)}`));
-  return linhas.join('\n');
+  add('');
+  add('CURSOS DE 1 TEMA APLICADOS:');
+  if (!dados.cursosAplicados.length) add('Nenhum curso finalizado no período.', { indent: 1 });
+  dados.cursosAplicados.forEach(c => add(`${c.subtopico} - ${c.problemaTexto} em ${formatDate(c.dataFinalizacao)}`, { indent: 1 }));
+  return linhas;
+}
+// Texto puro — usado em Copiar Texto e no corpo do e-mail (não existe "negrito" em texto puro)
+function _montarTextoAta(dados) {
+  return _montarLinhasAta(dados).map(l => '  '.repeat(l.indent) + l.texto).join('\n');
+}
+// HTML — usado só na exibição em tela; departamento em negrito
+function _montarHtmlAta(dados) {
+  return _montarLinhasAta(dados).map(l => {
+    const txt = escHtml('  '.repeat(l.indent) + l.texto);
+    return l.bold ? `<strong>${txt}</strong>` : txt;
+  }).join('\n');
 }
 function renderAtaReuniao(container) {
   const planosOpts = `<option value="">Todos os Planos</option>` + [...state.planos].sort((a,b)=>(a.titulo||'').localeCompare(b.titulo||'','pt-BR')).map(p=>`<option value="${p.id}">${escHtml(p.titulo)}</option>`).join('');
@@ -6067,7 +6081,7 @@ function _renderResultadoAta(dados) {
       <button class="btn btn-secondary btn-sm" id="ata-copiar-texto">📋 Copiar Texto</button>
       <button class="btn btn-primary btn-sm" id="ata-abrir-email">✉️ Abrir E-mail</button>
     </div>
-    <div class="pdm-box" id="ata-texto-box" style="max-height:60vh;">${escHtml(texto)}</div>
+    <div class="pdm-box" id="ata-texto-box" style="max-height:60vh;">${_montarHtmlAta(dados)}</div>
   `;
   document.getElementById('ata-copiar-texto')?.addEventListener('click', () => copyToClipboard(texto, 'Ata copiada! Cole no seu e-mail.'));
   document.getElementById('ata-abrir-email')?.addEventListener('click', () => {
