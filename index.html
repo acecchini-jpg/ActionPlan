@@ -477,7 +477,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.75';
+const APP_VERSAO = 'v19.76';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -2074,17 +2074,18 @@ function renderListagem(container) {
               <span style="flex:1;">
             </span>
             <div style="position:relative;display:inline-block;">
-              <button id="btn-listagem-mais" class="btn btn-ghost btn-sm" title="Mais opções">⋯ Mais</button>
-              <div id="listagem-mais-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:100;min-width:230px;overflow:hidden;">
-                <button id="btn-importar-followups-lote" class="btn btn-ghost" style="width:100%;justify-content:flex-start;border-radius:0;padding:9px 14px;font-size:13px;">➕📥 Importar Follow-ups em Lote</button>
-                <button id="btn-excel-listagem" class="btn btn-ghost" style="width:100%;justify-content:flex-start;border-radius:0;padding:9px 14px;font-size:13px;">📥 Exportar para Excel</button>
-                <button id="expandir-tudo-followups" class="btn btn-ghost" style="width:100%;justify-content:flex-start;border-radius:0;padding:9px 14px;font-size:13px;">⬇️ Expandir todos os follow-ups</button>
-                <button id="colapsar-tudo-followups" class="btn btn-ghost" style="width:100%;justify-content:flex-start;border-radius:0;padding:9px 14px;font-size:13px;">⬆️ Recolher todos os follow-ups</button>
-                <button id="btn-relatorio-pdf" class="btn btn-ghost" style="width:100%;justify-content:flex-start;border-radius:0;padding:9px 14px;font-size:13px;">🖨️ Gerar Relatório PDF do Plano</button>
+              <button id="btn-listagem-mais" class="btn btn-ghost btn-sm" title="Mais opções">☰</button>
+              <div id="listagem-mais-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:100;min-width:250px;overflow:hidden;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:9px 14px;border-bottom:1px solid var(--border);" title="Mostrar também as ações já fechadas na tabela">
+                  <input type="checkbox" id="filtro-exibir-fechados" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"> Exibir Fechados
+                </label>
+                <button id="btn-importar-followups-lote" class="btn btn-ghost" title="Colunas do Excel, nesta ordem: Número da Ação, Data, Responsável, Comentário" style="width:100%;justify-content:flex-start;border-radius:0;padding:9px 14px;font-size:13px;">➕📥 Importar Follow-ups em Lote</button>
+                <button id="btn-excel-listagem" class="btn btn-ghost" title="Exportar para Excel" style="width:100%;justify-content:flex-start;border-radius:0;padding:9px 14px;font-size:13px;">📥 Exportar para Excel</button>
+                <button id="expandir-tudo-followups" class="btn btn-ghost" title="Expandir todos os follow-ups" style="width:100%;justify-content:flex-start;border-radius:0;padding:9px 14px;font-size:13px;">⬇️ Expandir todos os follow-ups</button>
+                <button id="colapsar-tudo-followups" class="btn btn-ghost" title="Recolher todos os follow-ups" style="width:100%;justify-content:flex-start;border-radius:0;padding:9px 14px;font-size:13px;">⬆️ Recolher todos os follow-ups</button>
+                <button id="btn-relatorio-pdf" class="btn btn-ghost" title="Gerar Relatório PDF do Plano" style="width:100%;justify-content:flex-start;border-radius:0;padding:9px 14px;font-size:13px;">🖨️ Gerar Relatório PDF do Plano</button>
               </div>
             </div>
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;white-space:nowrap;">
-            <input type="checkbox" id="filtro-exibir-fechados" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"> Exibir Fechados</label>
           </div>
           <div class="table-wrap">
             <table id="tabela-acoes">
