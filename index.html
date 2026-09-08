@@ -477,7 +477,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.74';
+const APP_VERSAO = 'v19.75';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -2732,13 +2732,12 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
     const subtopico = state.subtopicos.find(s => s.id === prob.subtopico_id);
     (prob.acoes_corretivas || []).forEach(cr => {
       const nome = cr.responsavel || 'N/D';
-      if (!statsPorResp[nome]) statsPorResp[nome] = { total: 0, vencidas: 0, emAndamento: 0, acoes: [] };
-      // v19.74: contadores são do ESCOPO TODO (Plano filtrado, sem filtro de data) — retrato geral
-      // da carga da pessoa, não só do que mexeu no período. "No prazo" = em andamento (não vencido).
-      statsPorResp[nome].total++;
+      if (!statsPorResp[nome]) statsPorResp[nome] = { pendentes: 0, vencidas: 0, emAndamento: 0, acoes: [] };
+      // v19.75: "Ações Pendentes" = Vencidas + Em Andamento, do ESCOPO TODO (Plano filtrado, sem
+      // filtro de data). Fechadas NÃO entram mais nessa conta (antes entravam como "Total Ações").
       const _status = calcStatusAcao(cr);
-      if (_status === 'VENCIDO') statsPorResp[nome].vencidas++;
-      else if (_status === 'EM ANDAMENTO') statsPorResp[nome].emAndamento++;
+      if (_status === 'VENCIDO') { statsPorResp[nome].vencidas++; statsPorResp[nome].pendentes++; }
+      else if (_status === 'EM ANDAMENTO') { statsPorResp[nome].emAndamento++; statsPorResp[nome].pendentes++; }
 
       const eventos = [];
       const tagAcao = ` (ação #${_numAcaoValido(cr.numeroAcao) ? cr.numeroAcao : ''})`;
@@ -2777,9 +2776,11 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
   });
   const porDepto = {};
   Object.keys(statsPorResp).forEach(nome => {
+    const s = statsPorResp[nome];
+    if (s.pendentes === 0 && s.acoes.length === 0) return; // v19.75: só fechadas e nada no período — nada pra reportar
     const depto = _respDeptMap[nome] || 'Sem Departamento';
     if (!porDepto[depto]) porDepto[depto] = [];
-    porDepto[depto].push({ nome, ...statsPorResp[nome] });
+    porDepto[depto].push({ nome, ...s });
   });
   Object.values(porDepto).forEach(lista => lista.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
   const atividadesPorDepartamento = Object.keys(porDepto).sort((a, b) => a.localeCompare(b, 'pt-BR'))
@@ -6006,7 +6007,7 @@ function _montarTextoAta(dados) {
     dep.responsaveis.forEach(r => {
       linhas.push('');
       linhas.push(r.nome);
-      linhas.push(`Total Ações: ${r.total} | No prazo: ${r.emAndamento} | Vencidas: ${r.vencidas}`);
+      linhas.push(`Ações Pendentes: ${r.pendentes} | No prazo: ${r.emAndamento} | Vencidas: ${r.vencidas}`);
       if (!r.acoes.length) {
         linhas.push('Sem evolução nas ações.');
       } else {
