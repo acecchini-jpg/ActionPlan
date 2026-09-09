@@ -477,7 +477,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.77';
+const APP_VERSAO = 'v19.78';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -4216,14 +4216,17 @@ function _validarProblema({ planoId, problema, classificacao6m, dataAbertura, co
   if (!state.planos.some(p => p.id === planoId)) return { ok: false, erro: 'O Plano selecionado não existe mais — recarregue a página' };
   if (!problema) return { ok: false, erro: 'Descreva o Problema' };
   if (!classificacao6m) return { ok: false, erro: 'Selecione a Classificação 6M' };
-  // Fechamento antes da Ocorrência é dado impossível — já quebrou a soma da Atividade na Semana uma vez (v19.49)
+  // v19.78: Fechamento antes da Ocorrência não é mais bloqueio duro — pode ser uma ação migrada de
+  // outro Plano (data efetiva real é anterior à nova Data de Ocorrência). Vira confirmação, mantendo
+  // a rede de segurança contra erro de digitação (motivo original do bloqueio, v19.49).
+  const avisos = [];
   for (let i = 0; i < (corretivas || []).length; i++) {
     const cr = corretivas[i];
     if (cr.data_efetiva && dataAbertura && cr.data_efetiva < dataAbertura) {
-      return { ok: false, erro: `Ação ${i + 1}: Data Efetiva (${formatDate(cr.data_efetiva)}) é anterior à Data de Ocorrência (${formatDate(dataAbertura)}). Corrija uma das duas.` };
+      avisos.push(`Ação ${i + 1}: Data Efetiva (${formatDate(cr.data_efetiva)}) é anterior à Data de Ocorrência (${formatDate(dataAbertura)}). Confirma que está correto (ex: ação migrada de outro Plano)?`);
     }
   }
-  return { ok: true };
+  return { ok: true, avisos };
 }
 // v19.72: follow-up automático ao criar uma ação corretiva nova — registra Data, "dono do Plano"
 // (plano.responsavel) e "Nova ação adicionada.", reaproveitando a MESMA estrutura de follow-up
@@ -4236,7 +4239,7 @@ function _adicionarFollowupAutomaticoNovaAcao(cr, plano) {
 async function _ncSalvar(event) {
   const planoId=document.getElementById('nc-plano').value; const subtId=document.getElementById('nc-subtopico').value; const dataAbertura=document.getElementById('nc-data-abertura').value; const responsavel=document.getElementById('nc-responsavel').value; const problema=document.getElementById('nc-problema').value.trim(); const causa=document.getElementById('nc-causa').value.trim(); const classificacao6m=document.getElementById('nc-classificacao-6m').value; const reincidente=document.getElementById('nc-reincidente').checked;
   let notas=_sanitizarHtmlNotas(document.getElementById('nc-notas').innerHTML);
-  { const _v = _validarProblema({ planoId, problema, classificacao6m, dataAbertura, corretivas: _ncState.acoes_corretivas }); if (!_v.ok) { toast(_v.erro, 'warning'); return; } }
+  { const _v = _validarProblema({ planoId, problema, classificacao6m, dataAbertura, corretivas: _ncState.acoes_corretivas }); if (!_v.ok) { toast(_v.erro, 'warning'); return; } if (_v.avisos && _v.avisos.length) { const _msgAviso = _v.avisos.length === 1 ? _v.avisos[0] : _v.avisos.join('\n\n'); if (!(await showConfirm(_msgAviso))) return; } }
   if(!_ncState.editingProblemaId && !_ncState.evidencia_problema){ if(!(await showConfirm('Nenhuma evidência (foto) foi anexada a este problema. Deseja salvar mesmo assim?'))) return; } // v19.37: alerta de esquecimento, não bloqueia mais
   const plano=state.planos.find(p=>p.id===planoId); const nOpQtd=plano?.necessita_op_qtd||false; let operador='',quantidade='',data_producao='',turnos=[],recorrencias=[]; if(nOpQtd){operador=(document.getElementById('nc-operador')?.value||'').trim();quantidade=(document.getElementById('nc-quantidade')?.value||'').trim();data_producao=(document.getElementById('nc-data-producao')?.value||'').trim();if(document.getElementById('nc-turno-t1')?.checked) turnos.push('T1');if(document.getElementById('nc-turno-t2')?.checked) turnos.push('T2');if(document.getElementById('nc-turno-t3')?.checked) turnos.push('T3');recorrencias=[..._ncState.recorrencias];}
   if (operador && turnos.length) _aprenderTurnoOperador(operador, turnos); // v19.16: fire-and-forget, não bloqueia o salvamento
