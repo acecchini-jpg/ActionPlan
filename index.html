@@ -478,7 +478,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.82';
+const APP_VERSAO = 'v19.83';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -5012,10 +5012,13 @@ async function _downloadCursoExcel(curso) {
             });
             // Posiciona cobrindo exatamente C31:L53
             // ExcelJS índice 0-based: C=col 2, L=col 12 | Linha 31=row 30, Linha 53=row 52
+            // v19.83: editAs só aceita 'twoCell'|'oneCell'|'absolute' no schema oficial — a string
+            // 'undefined' (valor anterior, um engano) violava o schema e ERA a causa real do aviso
+            // de reparo do Excel, confirmado validando contra o XSD oficial ISO/IEC 29500.
             ws.addImage(imageId, {
               tl: { col: 2,  row: 30 },
               br: { col: 12, row: 52 },
-              editAs: 'undefined'
+              editAs: 'oneCell'
             });
           }
         }
