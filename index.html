@@ -11,6 +11,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style id="theme-styles">
 :root { --bg: #f5f7fa; --bg2: #ffffff; --bg3: #f0f2f5; --border: #d1d5db; --border2: #cbd5e1; --accent: #f97316; --accent2: #fb923c; --accent-dim: #fed7aa; --text: #1e293b; --text2: #475569; --text3: #64748b; --green: #10b981; --red: #ef4444; --yellow: #f59e0b; --blue: #3b82f6; --radius: 6px; --sidebar: 240px; --font-hd: 'Barlow Condensed', sans-serif; --font-body: 'Barlow', sans-serif; --font-mono: 'JetBrains Mono', monospace; }
 body.dark-theme { --bg: #0d0f14; --bg2: #131720; --bg3: #1a2030; --border: #252d3d; --border2: #2e3a50; --text: #e2e8f0; --text2: #94a3b8; --text3: #64748b; --accent-dim: #7c3a12; }
@@ -477,7 +478,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.80';
+const APP_VERSAO = 'v19.82';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -4858,6 +4859,32 @@ function _rebindCursoUpload(cursoId) {
 }
 
 // ── Geração do Excel via ExcelJS (clone perfeito do modelo padrão) ──
+// v19.82: bug conhecido da ExcelJS (github.com/exceljs/exceljs/issues/1880, sem correção oficial) —
+// toda imagem inserida via workbook.addImage()/ws.addImage() sai com <a:xfrm><a:ext cx="0" cy="0"/></a:xfrm>
+// no XML de desenho, valor que o Excel considera malformado e dispara "found a problem with some content"
+// ao abrir. Esse xfrm é redundante em twoCellAnchor (a posição real vem do from/to) — removê-lo resolve
+// sem precisar recalcular dimensão nenhuma. Roda em cima do buffer FINAL, depois do writeBuffer().
+async function _corrigirXfrmImagensExcelJS(buffer) {
+  if (typeof JSZip === 'undefined') { console.warn('[v19.82] JSZip não carregado — pulando correção do XML de desenho.'); return buffer; }
+  try {
+    const zip = await JSZip.loadAsync(buffer);
+    const REGEX_XFRM_ZERADO = /<a:xfrm><a:off x="0" y="0"\/><a:ext cx="0" cy="0"\/><\/a:xfrm>/g;
+    let corrigiuAlgo = false;
+    const arquivosDrawing = Object.keys(zip.files).filter(nome => /^xl\/drawings\/drawing\d+\.xml$/.test(nome));
+    for (const nome of arquivosDrawing) {
+      const xmlOriginal = await zip.file(nome).async('string');
+      if (!REGEX_XFRM_ZERADO.test(xmlOriginal)) continue;
+      const xmlCorrigido = xmlOriginal.replace(REGEX_XFRM_ZERADO, '');
+      zip.file(nome, xmlCorrigido);
+      corrigiuAlgo = true;
+    }
+    if (!corrigiuAlgo) return buffer; // nada pra corrigir — devolve o original sem reempacotar à toa
+    return await zip.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+  } catch (e) {
+    console.warn('[v19.82] Falha ao corrigir XML de desenho — entregando arquivo original.', e);
+    return buffer; // nunca bloqueia o download por causa dessa correção
+  }
+}
 async function _downloadCursoExcel(curso) {
   // ── 1. Validação: modelo precisa estar carregado ──
   if (!_modeloArrayBuffer) {
@@ -4874,6 +4901,24 @@ async function _downloadCursoExcel(curso) {
 
   try {
     showLoading('Gerando Excel…');
+
+    // v19.81: confere se os bytes decodificados realmente começam com a assinatura do tipo de
+    // imagem declarado (PNG/JPEG/GIF/BMP/TIFF) — evita embutir dado corrompido/truncado que o
+    // Excel aceita "escrever" sem reclamar, mas recusa "abrir" depois (aviso de reparo).
+    function _bytesBatemComExtensao(base64, extensao) {
+      try {
+        const amostra = atob(base64.substring(0, 16)); // 16 chars base64 = 12 bytes reais, sobra pra qualquer assinatura
+        const b = i => amostra.charCodeAt(i);
+        switch (extensao) {
+          case 'png':  return b(0)===0x89 && b(1)===0x50 && b(2)===0x4E && b(3)===0x47;
+          case 'jpeg': return b(0)===0xFF && b(1)===0xD8 && b(2)===0xFF;
+          case 'gif':  return b(0)===0x47 && b(1)===0x49 && b(2)===0x46;
+          case 'bmp':  return b(0)===0x42 && b(1)===0x4D;
+          case 'tiff': return (b(0)===0x49 && b(1)===0x49) || (b(0)===0x4D && b(1)===0x4D);
+          default: return true; // extensão não coberta pela checagem — não bloqueia
+        }
+      } catch(e) { return false; } // nem decodifica como base64 — certamente inválido
+    }
 
     // ── 3. Clona o ArrayBuffer (load() consome o buffer) ──
     const bufClone = _modeloArrayBuffer.slice(0);
@@ -4955,18 +5000,24 @@ async function _downloadCursoExcel(curso) {
         }
 
         if (base64Puro) {
-          // Adiciona ao workbook com base64 limpo (sem prefixo "data:...")
-          const imageId = workbook.addImage({
-            base64:    base64Puro,
-            extension: extensaoImg,
-          });
-          // Posiciona cobrindo exatamente C31:L53
-          // ExcelJS índice 0-based: C=col 2, L=col 12 | Linha 31=row 30, Linha 53=row 52
-          ws.addImage(imageId, {
-            tl: { col: 2,  row: 30 },
-            br: { col: 12, row: 52 },
-            editAs: 'undefined'
-          });
+          // v19.81: bytes precisam realmente começar com a assinatura do formato declarado
+          if (!_bytesBatemComExtensao(base64Puro, extensaoImg)) {
+            console.warn('[v19.81] Imagem descartada — bytes não batem com a assinatura de .' + extensaoImg + ' (dado corrompido/truncado).');
+            toast('Evidência não inserida: o arquivo de imagem parece corrompido. Curso gerado sem foto.', 'warning');
+          } else {
+            // Adiciona ao workbook com base64 limpo (sem prefixo "data:...")
+            const imageId = workbook.addImage({
+              base64:    base64Puro,
+              extension: extensaoImg,
+            });
+            // Posiciona cobrindo exatamente C31:L53
+            // ExcelJS índice 0-based: C=col 2, L=col 12 | Linha 31=row 30, Linha 53=row 52
+            ws.addImage(imageId, {
+              tl: { col: 2,  row: 30 },
+              br: { col: 12, row: 52 },
+              editAs: 'undefined'
+            });
+          }
         }
       } catch (imgErr) {
         console.error('[v17.3] Erro inesperado ao processar imagem:', imgErr);
@@ -4991,7 +5042,8 @@ async function _downloadCursoExcel(curso) {
     const sufixoReinc = curso._reincidencia_id ? ' (Reincidente)' : '';
     const filename = `${dateStr} - ${subDesc}${sufixoReinc}.xlsx`;
 
-    const buffer      = await workbook.xlsx.writeBuffer();
+    const bufferBruto = await workbook.xlsx.writeBuffer();
+    const buffer      = await _corrigirXfrmImagensExcelJS(bufferBruto); // v19.82
     const dlBlob      = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const dlUrl       = window.URL.createObjectURL(dlBlob);
     const dlA         = document.createElement('a');
