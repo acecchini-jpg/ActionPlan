@@ -477,7 +477,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.79';
+const APP_VERSAO = 'v19.80';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -671,8 +671,8 @@ function daysDiff(from, to) { const dtFrom = normalizeDate(parseDateSafe(from));
 function formatDate(d) { if (!d) return '—'; if (typeof d === 'string') { if (/^\d{4}-\d{2}-\d{2}/.test(d)) { const [y,m,dd]=d.slice(0,10).split('-'); return dd+'/'+m+'/'+y; } if (/^\d{2}\/\d{2}\/\d{4}$/.test(d)) return d; } const dt = parseDateSafe(d); if (!dt) return '—'; return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`; }
 function parseDateSafe(value) { if (value == null || value === '') return null; if (typeof value === 'object') { if (typeof value.toDate === 'function') { const dt = value.toDate(); return isNaN(dt) ? null : dt; } if (typeof value.seconds === 'number') return new Date(value.seconds * 1000); if (value instanceof Date) return isNaN(value) ? null : value; return null; } if (typeof value !== 'string') return null; const s = value.trim(); if (!s) return null; if (/^\d{4}-\d{2}-\d{2}/.test(s)) { const [y, m, d] = s.slice(0,10).split('-').map(Number); if (!y || m < 1 || m > 12 || d < 1 || d > 31) return null; const dt = new Date(y, m-1, d); return isNaN(dt) ? null : dt; } if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) { const [d, m, y] = s.split('/').map(Number); if (!y || m < 1 || m > 12 || d < 1 || d > 31) return null; const dt = new Date(y, m-1, d); return isNaN(dt) ? null : dt; } const dt = new Date(s); return isNaN(dt) ? null : dt; }
 function normalizeDate(dt) { if (!(dt instanceof Date) || isNaN(dt)) return null; return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
-function calcStatusAcao(cr) { const hoje = normalizeDate(new Date()); const prevista = normalizeDate(parseDateSafe(cr.data_prevista)); const efetiva = normalizeDate(parseDateSafe(cr.data_efetiva)); if (efetiva) return 'FECHADO'; if (!prevista) return 'EM ANDAMENTO'; if (prevista >= hoje) return 'EM ANDAMENTO'; return 'VENCIDO'; }
-function statusBadge(s) { const map={'FECHADO':'badge-green','EM ANDAMENTO':'badge-blue','VENCIDO':'badge-red'}; return `<span class="badge ${map[s]||'badge-gray'}">${s}</span>`; }
+function calcStatusAcao(cr) { if (cr.cancelado) return 'CANCELADO'; const hoje = normalizeDate(new Date()); const prevista = normalizeDate(parseDateSafe(cr.data_prevista)); const efetiva = normalizeDate(parseDateSafe(cr.data_efetiva)); if (efetiva) return 'FECHADO'; if (!prevista) return 'EM ANDAMENTO'; if (prevista >= hoje) return 'EM ANDAMENTO'; return 'VENCIDO'; }
+function statusBadge(s) { const map={'FECHADO':'badge-green','EM ANDAMENTO':'badge-blue','VENCIDO':'badge-red','CANCELADO':'badge-gray'}; return `<span class="badge ${map[s]||'badge-gray'}">${s}</span>`; }
 function nextAcaoId() { let max=0; state.acoes.forEach(a=>{ if(a.id_global>max) max=a.id_global; }); return max+1; }
 // ── numeroAcao: sequencial persistido por ação corretiva ──
 function nextNumeroAcao() {
@@ -787,6 +787,39 @@ function showAlert(message, opts) {
     overlay.querySelector('#app-alert-ok').addEventListener('click', done);
     overlay.addEventListener('click', e => { if (e.target === overlay) done(); });
     document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape' || e.key === 'Enter') { document.removeEventListener('keydown', esc); done(); } });
+  });
+}
+
+// v19.80: modal que pede a justificativa ao cancelar uma ação corretiva — devolve o texto (ou null se cancelou o diálogo)
+function _pedirJustificativaCancelamento() {
+  return new Promise(resolve => {
+    let overlay = document.getElementById('cancelar-acao-modal');
+    if (overlay) overlay.remove();
+    overlay = document.createElement('div');
+    overlay.id = 'cancelar-acao-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML = `
+      <div class="panel" style="width:min(460px,95vw);margin:0;box-shadow:0 8px 32px rgba(0,0,0,.4);">
+        <div class="panel-header"><span>🚫</span><span class="panel-title">Cancelar Ação Corretiva</span></div>
+        <div class="panel-body">
+          <div class="form-group"><label class="form-label">Justificativa <span style="color:var(--red);">*</span></label><textarea class="form-control" id="canc-modal-texto" rows="3" placeholder="Explique o motivo do cancelamento..."></textarea></div>
+          <div id="canc-modal-erro" style="color:var(--red);font-size:12px;display:none;margin-bottom:8px;">Descreva o motivo do cancelamento.</div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button class="btn btn-ghost" id="canc-modal-voltar">Voltar</button>
+            <button class="btn btn-danger" id="canc-modal-confirmar">🚫 Confirmar Cancelamento</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const done = val => { overlay.remove(); resolve(val); };
+    overlay.querySelector('#canc-modal-voltar').addEventListener('click', () => done(null));
+    overlay.addEventListener('click', e => { if (e.target === overlay) done(null); });
+    overlay.querySelector('#canc-modal-confirmar').addEventListener('click', () => {
+      const texto = overlay.querySelector('#canc-modal-texto').value.trim();
+      const errEl = overlay.querySelector('#canc-modal-erro');
+      if (!texto) { errEl.style.display = 'block'; return; }
+      done(texto);
+    });
   });
 }
 
@@ -1201,7 +1234,7 @@ function aplicarPermissoesUI() {
   ['saveClienteBtn','saveResponsavelBtn','savePlanoBtn','saveSubtopicoBtn','btn-salvar-presencas'].forEach(id => { const b = document.getElementById(id); if (b) b.style.display = podeVer('cadastrarTudo') ? '' : 'none'; });
 
   // Todos os 🗑️ (listagem, modal, curso, cadastros)
-  document.querySelectorAll('.del-cliente,.del-responsavel,.del-plano,.del-sub,.del-problema,.del-acao-list,.nc-del-cr,.nc-del-reinc,.nc-del-fu,[data-curso-action="excluir"],#modal-del-acao-btn').forEach(el => el.style.display = podeVer('excluir') ? '' : 'none');
+  document.querySelectorAll('.del-cliente,.del-responsavel,.del-plano,.del-sub,.del-problema,.del-acao-list,.nc-del-cr,.nc-cancelar-cr,.nc-del-reinc,.nc-del-fu,[data-curso-action="excluir"],#modal-del-acao-btn').forEach(el => el.style.display = podeVer('excluir') ? '' : 'none');
 
   // ➕ add-followup-list e edição de follow-up
   document.querySelectorAll('.add-followup-list,.edit-followup-list,.remove-followup-list').forEach(el => el.style.display = podeVer('followup') ? '' : 'none');
@@ -2058,7 +2091,7 @@ function renderListagem(container) {
   subtopicosOpts = `<option value="">Todos os sub-tópicos</option>` + _subNomesUnicos.map(s=>`<option value="${escHtml(s.descricao)}">${escHtml(s.descricao)}${s.ativo===false?' (inativo)':''}</option>`).join('');
   const responsaveisSet = new Set(); state.acoes.forEach(prob => { (prob.acoes_corretivas || []).forEach(cr => { if(cr.responsavel) responsaveisSet.add(cr.responsavel); }); });
   const responsavelOpts = `<option value="">Todos os responsáveis</option>` + Array.from(responsaveisSet).sort((a,b)=>a.localeCompare(b,'pt-BR')).map(r=>`<option value="${escHtml(r)}">${escHtml(r)}</option>`).join('');
-  const statusOpts = `<option value="">Todos os status</option><option value="EM ANDAMENTO">Em Andamento</option><option value="VENCIDO">Vencido</option><option value="FECHADO">Fechado</option><option value="SEM_PRAZO">Sem Prazo</option>`;
+  const statusOpts = `<option value="">Todos os status</option><option value="EM ANDAMENTO">Em Andamento</option><option value="VENCIDO">Vencido</option><option value="FECHADO">Fechado</option><option value="CANCELADO">Cancelado</option><option value="SEM_PRAZO">Sem Prazo</option>`;
   // ── CORREÇÃO 2: O id do container da tabela é "listagem-tbody" — confirmado e correto ──
   container.innerHTML = `<div class="panel">
     <div class="panel-body">
@@ -2260,8 +2293,8 @@ function renderListagem(container) {
   document.getElementById('filtro-subtopico')?.addEventListener('change', _onFiltroChange);
   document.getElementById('filtro-responsavel')?.addEventListener('change', _onFiltroChange);
   document.getElementById('filtro-status')?.addEventListener('change', function() {
-    // Auto-marca 'Exibir Fechados' ao selecionar status FECHADO
-    if (this.value === 'FECHADO') {
+    // Auto-marca 'Exibir Fechados' ao selecionar status FECHADO ou CANCELADO (mesma caixa esconde os dois)
+    if (this.value === 'FECHADO' || this.value === 'CANCELADO') {
       const cbF = document.getElementById('filtro-exibir-fechados');
       if (cbF) cbF.checked = true;
     }
@@ -2344,7 +2377,7 @@ function aplicarFiltrosETabela() {
       if (state.modoAuditoria && status === 'VENCIDO') continue; // v19.31: modo auditoria — nunca mostra vencidas
       if (filtroStatus === 'SEM_PRAZO') { if (cr.data_prevista) continue; status = 'EM ANDAMENTO'; }
       else if (filtroStatus && status !== filtroStatus) continue;
-      if(!filtroExibirFechados && status === 'FECHADO') continue;
+      if(!filtroExibirFechados && (status === 'FECHADO' || status === 'CANCELADO')) continue;
       if (filtroBusca) {
         if (filtroBusca.startsWith('#')) {
           // v19.50: "#327" busca exclusivamente pelo número da ação (exato), não pelo conteúdo
@@ -2760,7 +2793,7 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
       });
 
       // 4) Ação Encerrada — data efetiva dentro do período
-      if (_inPeriodo(cr.data_efetiva || '')) eventos.push({ data: cr.data_efetiva, texto: `Ação Encerrada por ${cr.responsavel || '—'}` });
+      if (_inPeriodo(cr.data_efetiva || '')) eventos.push({ data: cr.data_efetiva, texto: cr.cancelado ? `Ação Cancelada por ${cr.responsavel || '—'}` : `Ação Encerrada por ${cr.responsavel || '—'}` });
 
       if (eventos.length) {
         eventos.sort((a, b) => (a.data || '').localeCompare(b.data || ''));
@@ -3004,11 +3037,11 @@ function _calcularAgregacoesDashboard(){
     ? _acoesDashBase.map(p => ({ ...p, acoes_corretivas: (p.acoes_corretivas||[]).filter(cr => calcStatusAcao(cr) !== 'VENCIDO') }))
     : _acoesDashBase;
   const _planosDash = dashState.plano ? state.planos.filter(p=>p.id===dashState.plano)      : state.planos;
-  let total=0,fechadas=0,emAndamento=0,vencidas=0,semAcoes=0,semPrazo=0;
+  let total=0,fechadas=0,emAndamento=0,vencidas=0,canceladas=0,semAcoes=0,semPrazo=0;
   const cursosPendentes = state.cursos1tema.filter(c => c.statusCurso !== 'Finalizado').length; // v19.14
   const byResp={}; const byPlano={};
   // Inicializa byPlano com planos filtrados
-  _planosDash.forEach(p=>{ byPlano[p.id]={titulo:p.titulo,pendentes:0,fechadas:0,vencidas:0,emAberto:0}; });
+  _planosDash.forEach(p=>{ byPlano[p.id]={titulo:p.titulo,pendentes:0,fechadas:0,vencidas:0,canceladas:0,emAberto:0}; });
 
   // ── Paleta de cores para os Planos ──
   const PALETA_PLANOS = [
@@ -3026,6 +3059,7 @@ function _calcularAgregacoesDashboard(){
   const pendByRespPlano = {}; // pendências (em andamento + vencidas)
   const vencByRespPlano = {}; // apenas vencidas
   const fechByRespPlano = {}; // apenas fechadas
+  const cancByRespPlano = {}; // v19.80: apenas canceladas
 
   _acoesDash.forEach(ac=>{
     const corretivas=ac.acoes_corretivas||[];
@@ -3036,11 +3070,12 @@ function _calcularAgregacoesDashboard(){
       if (!cr.data_prevista) semPrazo++; // v19.1.5: mesmo critério do filtro SEM_PRAZO da Listagem
       const s=calcStatusAcao(cr);
       const r=cr.responsavel||'N/D';
-      if(!byResp[r]) byResp[r]={total:0,fechadas:0,vencidas:0};
+      if(!byResp[r]) byResp[r]={total:0,fechadas:0,vencidas:0,canceladas:0};
       byResp[r].total++;
       if(!pendByRespPlano[r]) pendByRespPlano[r]={};
       if(!vencByRespPlano[r]) vencByRespPlano[r]={};
       if(!fechByRespPlano[r]) fechByRespPlano[r]={};
+      if(!cancByRespPlano[r]) cancByRespPlano[r]={};
       if(s==='FECHADO'){
         fechadas++; byResp[r].fechadas++;
         if(byPlano[ac.plano_id]) byPlano[ac.plano_id].fechadas++;
@@ -3050,6 +3085,11 @@ function _calcularAgregacoesDashboard(){
         if(byPlano[ac.plano_id]){ byPlano[ac.plano_id].vencidas++; byPlano[ac.plano_id].emAberto++; }
         vencByRespPlano[r][planoId]=(vencByRespPlano[r][planoId]||0)+1;
         pendByRespPlano[r][planoId]=(pendByRespPlano[r][planoId]||0)+1;
+      } else if(s==='CANCELADO'){
+        // v19.80: cancelada não conta como pendente/em aberto nem entra nos gráficos de Pendências/Vencidas/Fechadas
+        canceladas++; byResp[r].canceladas++;
+        if(byPlano[ac.plano_id]) byPlano[ac.plano_id].canceladas++;
+        cancByRespPlano[r][planoId]=(cancByRespPlano[r][planoId]||0)+1;
       } else {
         emAndamento++;
         if(byPlano[ac.plano_id]){ byPlano[ac.plano_id].pendentes++; byPlano[ac.plano_id].emAberto++; }
@@ -3075,6 +3115,7 @@ function _calcularAgregacoesDashboard(){
   const pendByGrupo = _regroupPorDept(pendByRespPlano);
   const vencByGrupo = _regroupPorDept(vencByRespPlano);
   const fechByGrupo = _regroupPorDept(fechByRespPlano);
+  const cancByGrupo = _regroupPorDept(cancByRespPlano);
   const _agrupLabel = dashState.agruparPor === 'departamento' ? 'Departamento' : 'Responsável';
 
   // ── Helper: monta datasets para um Stacked Bar Chart ──
@@ -3098,16 +3139,17 @@ function _calcularAgregacoesDashboard(){
   const pendRespLabels = Object.keys(pendByGrupo).filter(k=>_sumMap(pendByGrupo,k)>0).sort((a,b)=>_sumMap(pendByGrupo,b)-_sumMap(pendByGrupo,a));
   const vencRespLabels = Object.keys(vencByGrupo).filter(k=>_sumMap(vencByGrupo,k)>0).sort((a,b)=>_sumMap(vencByGrupo,b)-_sumMap(vencByGrupo,a));
   const fechRespLabels = Object.keys(fechByGrupo).filter(k=>_sumMap(fechByGrupo,k)>0).sort((a,b)=>_sumMap(fechByGrupo,b)-_sumMap(fechByGrupo,a));
-  return { _acoesDash, total, fechadas, emAndamento, vencidas, semPrazo, cursosPendentes, byPlano, taxa,
-           pendByGrupo, vencByGrupo, fechByGrupo, _agrupLabel, buildStackedDatasets,
-           pendRespLabels, vencRespLabels, fechRespLabels };
+  const cancRespLabels = Object.keys(cancByGrupo).filter(k=>_sumMap(cancByGrupo,k)>0).sort((a,b)=>_sumMap(cancByGrupo,b)-_sumMap(cancByGrupo,a));
+  return { _acoesDash, total, fechadas, emAndamento, vencidas, canceladas, semPrazo, cursosPendentes, byPlano, taxa,
+           pendByGrupo, vencByGrupo, fechByGrupo, cancByGrupo, _agrupLabel, buildStackedDatasets,
+           pendRespLabels, vencRespLabels, fechRespLabels, cancRespLabels };
 }
 // v19.67 (Etapa 4.2): só a montagem do HTML do Dashboard (barra de filtro fixa + conteúdo). Sem Chart.js, sem eventos.
 function _montarHtmlDashboard(container, agg){
-  const { total, fechadas, emAndamento, vencidas, semPrazo, cursosPendentes, byPlano, taxa, _agrupLabel } = agg;
+  const { total, fechadas, emAndamento, vencidas, canceladas, semPrazo, cursosPendentes, byPlano, taxa, _agrupLabel } = agg;
   // ── Tabela Status por Plano com coluna % Presença ──
   const linhasPlanos = Object.entries(byPlano).map(([pid, p])=>{
-    const tot = p.pendentes+p.fechadas+p.vencidas;
+    const tot = p.pendentes+p.fechadas+p.vencidas+(p.canceladas||0); // v19.80: inclui Canceladas no Total, mesma base da Taxa de Fechamento
     const pct = tot ? Math.round((p.fechadas/tot)*100) : 0;
     const { taxa: tPresenca, reunioes: nReunioes } = calcTaxaPresencaPlano(pid);
     const taxaHtml = tPresenca !== null
@@ -3184,12 +3226,13 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
   container.innerHTML=`
     <div class="kpi-grid">
       <div class="kpi-card" data-filter="total"><div class="kpi-value">${total}</div><div class="kpi-label">Total A.Corretivas</div></div>
-      <div class="kpi-card" data-filter="em_aberto"><div class="kpi-value" style="color:var(--yellow)">${total-fechadas}</div><div class="kpi-label">Ações em Aberto</div></div>
-      <div class="kpi-card" data-filter="em_andamento"><div class="kpi-value" style="color:var(--blue)">${emAndamento}</div><div class="kpi-label">Em Andamento</div></div>
       <div class="kpi-card" data-filter="fechadas"><div class="kpi-value" style="color:var(--green)">${fechadas}</div><div class="kpi-label">Fechadas</div></div>
-      <div class="kpi-card" data-filter="vencidas"><div class="kpi-value" style="color:var(--red)">${vencidas}</div><div class="kpi-label">Vencidas</div></div>
       <div class="kpi-card" data-filter="taxa"><div class="kpi-value" style="color:var(--yellow)">${taxa}%</div><div class="kpi-label">Taxa Fechamento</div></div>
+      <div class="kpi-card" data-filter="em_aberto"><div class="kpi-value" style="color:var(--yellow)">${total-fechadas-canceladas}</div><div class="kpi-label">Ações em Aberto</div></div>
+      <div class="kpi-card" data-filter="vencidas"><div class="kpi-value" style="color:var(--red)">${vencidas}</div><div class="kpi-label">Vencidas</div></div>
+      <div class="kpi-card" data-filter="em_andamento"><div class="kpi-value" style="color:var(--blue)">${emAndamento}</div><div class="kpi-label">Em Andamento</div></div>
       <div class="kpi-card" data-filter="sem_prazo"><div class="kpi-value" style="color:var(--text2)">${semPrazo}</div><div class="kpi-label">Sem Prazo Def.</div></div>
+      <div class="kpi-card" data-filter="canceladas"><div class="kpi-value" style="color:var(--text3)">${canceladas}</div><div class="kpi-label">Canceladas</div></div>
       <div class="kpi-card" data-filter="cursos_pendentes"><div class="kpi-value" style="color:var(--yellow)">${cursosPendentes}</div><div class="kpi-label">Curso 1 Tema Pend.</div></div>
     </div>
     <div class="dash-tabs">
@@ -3221,6 +3264,7 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
       </div>
       <div class="charts-grid">
         <div class="chart-panel"><div class="chart-title" id="chart-title-venc">Vencidas por ${_agrupLabel} (por Plano)</div><div class="chart-wrap"><canvas id="chart-venc"></canvas></div></div>
+        <div class="chart-panel"><div class="chart-title" id="chart-title-canc">Canceladas por ${_agrupLabel} (por Plano)</div><div class="chart-wrap"><canvas id="chart-canc"></canvas></div></div>
       </div>
       <div class="panel">
         <div class="panel-header"><span>🗓️</span><span class="panel-title">Taxa de Presença por Responsável</span><span style="margin-left:8px;font-size:11px;color:var(--text3);">(Presenças necessárias vs. realizadas)</span></div>
@@ -3349,8 +3393,8 @@ function _montarGraficosVisaoGeral(agg, cd){
 // v19.69 (Etapa 6): Pendências/Fechadas/Vencidas por Responsável/Departamento — só a aba "Responsáveis"
 function _montarGraficosResponsaveis(agg, cd){
   const { _acoesDash, total, fechadas, emAndamento, vencidas, semPrazo, taxa,
-          pendByGrupo, vencByGrupo, fechByGrupo, buildStackedDatasets,
-          pendRespLabels, vencRespLabels, fechRespLabels } = agg;
+          pendByGrupo, vencByGrupo, fechByGrupo, cancByGrupo, buildStackedDatasets,
+          pendRespLabels, vencRespLabels, fechRespLabels, cancRespLabels } = agg;
   // ── Opções base para Stacked Bar Charts ──
   const stackedOpts = (extraY) => ({
     responsive: true,
@@ -3397,6 +3441,16 @@ function _montarGraficosResponsaveis(agg, cd){
     _charts.venc = new Chart(ctxVenc, {
       type: 'bar',
       data: { labels: vencRespLabels, datasets: buildStackedDatasets(vencRespLabels, vencByGrupo) },
+      options: stackedOpts()
+    });
+  }
+
+  // Gráfico 4 — Canceladas por Responsável/Departamento (Stacked por Plano) — v19.80
+  const ctxCanc = document.getElementById('chart-canc')?.getContext('2d');
+  if (ctxCanc && cancRespLabels.length) {
+    _charts.canc = new Chart(ctxCanc, {
+      type: 'bar',
+      data: { labels: cancRespLabels, datasets: buildStackedDatasets(cancRespLabels, cancByGrupo) },
       options: stackedOpts()
     });
   }
@@ -3675,6 +3729,7 @@ function _montarGraficosDashboard(agg){
         else if (filterType === 'em_andamento') { if (statusSelect) statusSelect.value = 'EM ANDAMENTO'; if (exibirFechadosCheck) exibirFechadosCheck.checked = true; }
         else if (filterType === 'fechadas') { if (statusSelect) statusSelect.value = 'FECHADO'; if (exibirFechadosCheck) exibirFechadosCheck.checked = true; }
         else if (filterType === 'vencidas') { if (statusSelect) statusSelect.value = 'VENCIDO'; if (exibirFechadosCheck) exibirFechadosCheck.checked = true; }
+        else if (filterType === 'canceladas') { if (statusSelect) statusSelect.value = 'CANCELADO'; if (exibirFechadosCheck) exibirFechadosCheck.checked = true; }
         else if (filterType === 'sem_prazo') { if (statusSelect) statusSelect.value = 'SEM_PRAZO'; if (exibirFechadosCheck) exibirFechadosCheck.checked = true; }
         else if (filterType === 'taxa') { if (statusSelect) statusSelect.value = ''; if (exibirFechadosCheck) exibirFechadosCheck.checked = true; }
         _listPageCount = 1;
@@ -4099,8 +4154,8 @@ function _ncAddCorretiva() {
   _ncRenderCorretivas();
 }
 
-function _ncCalcStatus(cr) { const hoje=normalizeDate(new Date()); const prev=normalizeDate(parseDateSafe(cr.data_prevista)); const efet=normalizeDate(parseDateSafe(cr.data_efetiva)); if(efet) return 'FECHADO'; if(!prev) return 'EM ANDAMENTO'; if(prev>=hoje) return 'EM ANDAMENTO'; return 'VENCIDO'; }
-function _ncStatusBadge(s) { const m={'FECHADO':'badge-green','EM ANDAMENTO':'badge-blue','VENCIDO':'badge-red'}; return '<span class="badge '+(m[s]||'badge-gray')+'">'+s+'</span>'; }
+function _ncCalcStatus(cr) { if (cr.cancelado) return 'CANCELADO'; const hoje=normalizeDate(new Date()); const prev=normalizeDate(parseDateSafe(cr.data_prevista)); const efet=normalizeDate(parseDateSafe(cr.data_efetiva)); if(efet) return 'FECHADO'; if(!prev) return 'EM ANDAMENTO'; if(prev>=hoje) return 'EM ANDAMENTO'; return 'VENCIDO'; }
+function _ncStatusBadge(s) { const m={'FECHADO':'badge-green','EM ANDAMENTO':'badge-blue','VENCIDO':'badge-red','CANCELADO':'badge-gray'}; return '<span class="badge '+(m[s]||'badge-gray')+'">'+s+'</span>'; }
 
 function _ncRenderCorretivas() {
   const container = document.getElementById('nc-corretivas-container'); if (!container) return;
@@ -4112,7 +4167,7 @@ function _ncRenderCorretivas() {
     const rOpts = respOpts.replace('value="'+escHtml(cr.responsavel)+'"','value="'+escHtml(cr.responsavel)+'" selected');
     const fuHtml = (cr.followups||[]).map((fu,fIdx)=>'<div style="display:flex;align-items:center;gap:5px;font-size:10px;margin-bottom:2px;padding-left:6px;border-left:2px solid var(--border);"><span style="white-space:nowrap;font-weight:bold;">📅 '+formatDate(fu.data_followup)+' - 👤 '+escHtml(fu.responsavel)+':</span><span style="flex:1;">'+escHtml(fu.comentario)+'</span><button class="btn btn-ghost btn-xs nc-edit-fu" data-idx="'+idx+'" data-fuidx="'+fIdx+'">✏️</button><button class="btn btn-ghost btn-xs nc-del-fu" data-idx="'+idx+'" data-fuidx="'+fIdx+'">🗑️</button></div>').join('');
     const alterBadge = (cr.qtd_alteracoes_data||0)>0 ? '<span class="badge badge-yellow">🔄 '+cr.qtd_alteracoes_data+'</span>' : '';
-    return '<div class="corretiva-block" id="nc-cr-'+idx+'"><div class="corretiva-header"><span style="font-size:11px;color:var(--text3);font-weight:600;">AÇÃO CORRETIVA '+(idx+1)+'</span>'+(_numAcaoValido(cr.numeroAcao)?'<span style="color:var(--accent);font-size:17px;font-weight:800;font-family:var(--font-hd);margin-left:6px;">#'+cr.numeroAcao+'</span>':'')+''+_ncStatusBadge(status)+'<button class="btn btn-danger btn-xs nc-del-cr" data-idx="'+idx+'">🗑️</button><button class="btn btn-ghost btn-xs nc-add-fu" data-idx="'+idx+'">💬 +Follow-up</button>'+(_ncState.editingProblemaId ? '<button class="btn btn-ghost btn-xs nc-notificar" data-idx="'+idx+'" title="Preparar e-mail avisando o responsável desta ação">✉️ Notificar</button>' : '')+'</div><div class="form-row cols-2"><div class="form-group"><label class="form-label">Ação</label><textarea class="form-control nc-cr-desc" data-idx="'+idx+'" rows="2" placeholder="Descreva a ação corretiva...">'+escHtml(cr.acao_descricao||'')+'</textarea></div><div class="form-group"><label class="form-label">Responsável</label><select class="form-control nc-cr-resp" data-idx="'+idx+'">'+rOpts+'</select></div></div><div class="form-row cols-3"><div class="form-group"><label class="form-label">Data Prevista</label><div style="display:flex;align-items:center;gap:6px;"><input class="form-control nc-cr-prev" type="date" data-idx="'+idx+'" value="'+(cr.data_prevista||'')+'" style="flex:1;">'+alterBadge+'</div></div><div class="form-group"><label class="form-label">Data Efetiva</label><input class="form-control nc-cr-efet" type="date" data-idx="'+idx+'" value="'+(cr.data_efetiva||'')+'"></div><div class="form-group"><label class="form-label">Evidência Fechamento</label><div style="display:flex;gap:4px;flex-wrap:wrap;">'+evBtns+'</div><div class="help-text">Máx. 5 MB</div><input type="file" class="nc-ev-corr-file" data-idx="'+idx+'" accept="image/*" style="display:none;"></div></div><div style="margin-top:10px;"><strong>Follow-ups:</strong> '+(fuHtml||'<span style="color:var(--text3);font-size:12px;">Nenhum follow-up</span>')+'</div></div>';
+    return '<div class="corretiva-block" id="nc-cr-'+idx+'"><div class="corretiva-header"><span style="font-size:11px;color:var(--text3);font-weight:600;">AÇÃO CORRETIVA '+(idx+1)+'</span>'+(_numAcaoValido(cr.numeroAcao)?'<span style="color:var(--accent);font-size:17px;font-weight:800;font-family:var(--font-hd);margin-left:6px;">#'+cr.numeroAcao+'</span>':'')+''+_ncStatusBadge(status)+'<button class="btn btn-danger btn-xs nc-del-cr" data-idx="'+idx+'">🗑️</button>'+((_numAcaoValido(cr.numeroAcao) && !cr.cancelado) ? '<button class="btn btn-ghost btn-xs nc-cancelar-cr" data-idx="'+idx+'" title="Cancelar esta ação (pede justificativa, vira Follow-up)">🚫</button>' : '')+'<button class="btn btn-ghost btn-xs nc-add-fu" data-idx="'+idx+'">💬 +Follow-up</button>'+(_ncState.editingProblemaId ? '<button class="btn btn-ghost btn-xs nc-notificar" data-idx="'+idx+'" title="Preparar e-mail avisando o responsável desta ação">✉️ Notificar</button>' : '')+'</div><div class="form-row cols-2"><div class="form-group"><label class="form-label">Ação</label><textarea class="form-control nc-cr-desc" data-idx="'+idx+'" rows="2" placeholder="Descreva a ação corretiva...">'+escHtml(cr.acao_descricao||'')+'</textarea></div><div class="form-group"><label class="form-label">Responsável</label><select class="form-control nc-cr-resp" data-idx="'+idx+'">'+rOpts+'</select></div></div><div class="form-row cols-3"><div class="form-group"><label class="form-label">Data Prevista</label><div style="display:flex;align-items:center;gap:6px;"><input class="form-control nc-cr-prev" type="date" data-idx="'+idx+'" value="'+(cr.data_prevista||'')+'" style="flex:1;">'+alterBadge+'</div></div><div class="form-group"><label class="form-label">Data Efetiva</label><input class="form-control nc-cr-efet" type="date" data-idx="'+idx+'" value="'+(cr.data_efetiva||'')+'"></div><div class="form-group"><label class="form-label">Evidência Fechamento</label><div style="display:flex;gap:4px;flex-wrap:wrap;">'+evBtns+'</div><div class="help-text">Máx. 5 MB</div><input type="file" class="nc-ev-corr-file" data-idx="'+idx+'" accept="image/*" style="display:none;"></div></div><div style="margin-top:10px;"><strong>Follow-ups:</strong> '+(fuHtml||'<span style="color:var(--text3);font-size:12px;">Nenhum follow-up</span>')+'</div></div>';
   }).join('');
   // v19.62: monta os dados do e-mail de notificação de uma ação — reutilizada pelo botão individual e pelo envio em lote
 function _montarEmailAcao(i) {
@@ -4140,6 +4195,20 @@ function _montarEmailAcao(i) {
     window.location.href = `mailto:${encodeURIComponent(dados.email)}?subject=${encodeURIComponent(dados.assunto)}&body=${encodeURIComponent(dados.corpo)}`;
   }));
   container.querySelectorAll('.nc-del-cr').forEach(btn=>btn.addEventListener('click',()=>{ const i=parseInt(btn.dataset.idx); _ncState.acoes_corretivas.splice(i,1); const ne={}; Object.keys(_ncState._evidTmp).forEach(k=>{ const ki=parseInt(k); if(ki<i) ne[ki]=_ncState._evidTmp[k]; else if(ki>i) ne[ki-1]=_ncState._evidTmp[k]; }); _ncState._evidTmp=ne; _ncRenderCorretivas(); }));
+  container.querySelectorAll('.nc-cancelar-cr').forEach(btn=>btn.addEventListener('click', async ()=>{
+    const i = parseInt(btn.dataset.idx);
+    const cr = _ncState.acoes_corretivas[i];
+    if (!cr) return;
+    const justificativa = await _pedirJustificativaCancelamento();
+    if (!justificativa) return;
+    cr.cancelado = true;
+    cr.data_efetiva = today();
+    if (!cr.followups) cr.followups = [];
+    cr.followups.push({ id: uid(), data_followup: today(), responsavel: cr.responsavel || 'Sistema', comentario: 'Ação cancelada: ' + justificativa });
+    _ncFormSujo = true;
+    _ncRenderCorretivas();
+    toast('Ação marcada como cancelada. Clique em Salvar Ação pra confirmar.', 'warning');
+  }));
   container.querySelectorAll('.nc-cr-desc').forEach(el=>el.addEventListener('input',()=>{ if(_ncState.acoes_corretivas[parseInt(el.dataset.idx)]) _ncState.acoes_corretivas[parseInt(el.dataset.idx)].acao_descricao=el.value; }));
   container.querySelectorAll('.nc-cr-resp').forEach(el=>el.addEventListener('change',()=>{ if(_ncState.acoes_corretivas[parseInt(el.dataset.idx)]) _ncState.acoes_corretivas[parseInt(el.dataset.idx)].responsavel=el.value; }));
   container.querySelectorAll('.nc-cr-efet').forEach(el=>el.addEventListener('change',()=>{ if(_ncState.acoes_corretivas[parseInt(el.dataset.idx)]) _ncState.acoes_corretivas[parseInt(el.dataset.idx)].data_efetiva=el.value; }));
