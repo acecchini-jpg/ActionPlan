@@ -478,7 +478,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.83';
+const APP_VERSAO = 'v19.84';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -2828,6 +2828,20 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
     .map(c => ({ subtopico: c.subtopico_descricao || '—', problemaTexto: c.problema_descricao || '—', dataFinalizacao: (c.finalizado_em || '').slice(0, 10) }))
     .sort((a, b) => a.dataFinalizacao.localeCompare(b.dataFinalizacao));
 
+  // ── v19.84: Cursos de 1 Tema Pendentes — não tem prazo próprio, então usamos 7 dias (1 semana)
+  // desde a emissão (criado_em) como prazo implícito. Snapshot de HOJE, não do período selecionado —
+  // mesmo critério que "Ações Pendentes" por responsável (que também não é escopado pelo período).
+  const _hojeAta = today();
+  let cursosPendentesQtd = 0, cursosNoPrazoQtd = 0, cursosVencidosQtd = 0;
+  state.cursos1tema.forEach(c => {
+    if (c.statusCurso === 'Finalizado') return;
+    if (planoId && c.plano_id !== planoId) return;
+    cursosPendentesQtd++;
+    const criadoData = (c.criado_em || '').slice(0, 10);
+    const dias = criadoData ? Math.floor((new Date(_hojeAta) - new Date(criadoData)) / 86400000) : 0;
+    if (dias > 7) cursosVencidosQtd++; else cursosNoPrazoQtd++;
+  });
+
   // ── Destinatários: participantes com e-mail + responsáveis das ações envolvidas + dono do Plano ──
   participantes.forEach(p => { if (p.email) emailsEnvolvidos.add(p.email); });
   if (plano && plano.responsavel) {
@@ -2841,6 +2855,7 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
     participantes,
     atividadesPorDepartamento,
     cursosAplicados,
+    cursosPendentesQtd, cursosNoPrazoQtd, cursosVencidosQtd,
     emails: [...emailsEnvolvidos].sort()
   };
 }
@@ -6152,9 +6167,12 @@ function _montarLinhasAta(dados) {
     });
   });
   add('');
-  add('CURSOS DE 1 TEMA APLICADOS:');
-  if (!dados.cursosAplicados.length) add('Nenhum curso finalizado no período.', { indent: 1 });
-  dados.cursosAplicados.forEach(c => add(`${c.subtopico} - ${c.problemaTexto} em ${formatDate(c.dataFinalizacao)}`, { indent: 1 }));
+  add('CURSOS DE 1 TEMA:');
+  add(`Pendentes: ${dados.cursosPendentesQtd} | No prazo: ${dados.cursosNoPrazoQtd} | Vencidas: ${dados.cursosVencidosQtd}`, { indent: 1 });
+  add('');
+  add('APLICADOS:', { indent: 1 });
+  if (!dados.cursosAplicados.length) add('Nenhum curso finalizado no período.', { indent: 2 });
+  dados.cursosAplicados.forEach(c => add(`${c.subtopico} - ${c.problemaTexto} em ${formatDate(c.dataFinalizacao)}`, { indent: 2 }));
   return linhas;
 }
 // Texto puro — usado em Copiar Texto e no corpo do e-mail (não existe "negrito" em texto puro)
