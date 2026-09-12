@@ -398,18 +398,6 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
   </div>
 </div>
 
-<div class="modal-overlay" id="evidencia-modal">
-  <div class="modal" style="max-width:500px">
-    <div class="modal-header"><span>📎</span><span class="modal-title">Evidência</span><button class="modal-close" id="closeEvidenciaModal">✕</button></div>
-    <div class="modal-body">
-      <div class="file-drop" id="ev-drop">📁 Clique ou arraste arquivo/imagem aqui</div>
-      <input type="file" id="ev-file" style="display:none" accept="image/*,.pdf,.docx,.xlsx">
-      <div id="ev-preview" style="margin-top:10px"></div>
-    </div>
-    <div class="modal-footer"><button class="btn btn-secondary" id="cancelEvidenciaBtn">Cancelar</button><button class="btn btn-primary" id="confirmEvidenciaBtn">✔ Confirmar</button></div>
-  </div>
-</div>
-
 <div class="modal-overlay" id="image-modal">
   <div class="modal" style="width:auto;max-width:90vw;max-height:90vh;">
     <div class="modal-header"><span>🖼️</span><span class="modal-title">Evidência</span><button class="modal-close" id="closeImageModal">✕</button></div>
@@ -478,7 +466,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.86';
+const APP_VERSAO = 'v19.87';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -601,7 +589,7 @@ let _dashAbaAtiva = 'visao-geral';
 let _dashUltimoAgg = null, _dashUltimoCd = null;
 const _dashAbasMontadas = new Set();
 function _resetDashState() { dashState.plano = ''; dashState.semana = ''; dashState.modo = 'ocorrencias'; dashState.operador = null; }
-const state = { config: { ...DEFAULT_FIREBASE_CONFIG }, clientes: [], responsaveis: [], planos: [], subtopicos: [], acoes: [], presencas: [], cursos1tema: [], operadores_turno: [], currentPage: 'dashboard', currentEvidenciaTarget: null, evidenciaDataURL: null, modoAuditoria: false, logoEmpresaUrl: null, };
+const state = { config: { ...DEFAULT_FIREBASE_CONFIG }, clientes: [], responsaveis: [], planos: [], subtopicos: [], acoes: [], presencas: [], cursos1tema: [], operadores_turno: [], currentPage: 'dashboard', modoAuditoria: false, logoEmpresaUrl: null, };
 
 // ==================== FUNÇÕES AUXILIARES (comuns) ====================
 function showLoading(msg) { const ld = document.getElementById('global-loading'); document.getElementById('loading-msg').textContent = msg; ld.classList.add('show'); }
@@ -668,7 +656,6 @@ async function _sincronizarIndiceNumeroAcao(problemaId, corretivasAtuais, corret
   }
 }
 function today() { return new Date().toISOString().slice(0,10); }
-function daysDiff(from, to) { const dtFrom = normalizeDate(parseDateSafe(from)); const dtTo = to ? normalizeDate(parseDateSafe(to)) : normalizeDate(new Date()); if (!dtFrom || !dtTo) return 0; return Math.floor((dtTo - dtFrom) / 86400000); }
 function formatDate(d) { if (!d) return '—'; if (typeof d === 'string') { if (/^\d{4}-\d{2}-\d{2}/.test(d)) { const [y,m,dd]=d.slice(0,10).split('-'); return dd+'/'+m+'/'+y; } if (/^\d{2}\/\d{2}\/\d{4}$/.test(d)) return d; } const dt = parseDateSafe(d); if (!dt) return '—'; return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`; }
 function parseDateSafe(value) { if (value == null || value === '') return null; if (typeof value === 'object') { if (typeof value.toDate === 'function') { const dt = value.toDate(); return isNaN(dt) ? null : dt; } if (typeof value.seconds === 'number') return new Date(value.seconds * 1000); if (value instanceof Date) return isNaN(value) ? null : value; return null; } if (typeof value !== 'string') return null; const s = value.trim(); if (!s) return null; if (/^\d{4}-\d{2}-\d{2}/.test(s)) { const [y, m, d] = s.slice(0,10).split('-').map(Number); if (!y || m < 1 || m > 12 || d < 1 || d > 31) return null; const dt = new Date(y, m-1, d); return isNaN(dt) ? null : dt; } if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) { const [d, m, y] = s.split('/').map(Number); if (!y || m < 1 || m > 12 || d < 1 || d > 31) return null; const dt = new Date(y, m-1, d); return isNaN(dt) ? null : dt; } const dt = new Date(s); return isNaN(dt) ? null : dt; }
 function normalizeDate(dt) { if (!(dt instanceof Date) || isNaN(dt)) return null; return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
@@ -1584,15 +1571,6 @@ function openResponsavelModal(id) {
   });
 }
 function getResponsaveisAtivos() { return [...state.responsaveis].filter(r=>r.ativo!==false).sort((a,b)=>(a.nome||'').localeCompare(b.nome||'','pt-BR',{sensitivity:'base'})); }
-function buildResponsavelSelect(id, value, cls, extraStyle='') {
-  const opts = `<option value="">Selecione...</option>` + getResponsaveisAtivos().map(r=>`<option value="${escHtml(r.nome)}" ${r.nome===value?'selected':''}>${escHtml(r.nome)}</option>`).join('');
-  return `<select id="${id}" class="form-control ${cls}" style="${extraStyle}">${opts}</select>`;
-}
-function buildResponsavelSelectInline(id, value, cls, extraAttrs='') {
-  const idAttr = id ? `id="${id}"` : '';
-  const opts = `<option value="">Selecione...</option>` + getResponsaveisAtivos().map(r=>`<option value="${escHtml(r.nome)}" ${r.nome===value?'selected':''}>${escHtml(r.nome)}</option>`).join('');
-  return `<select ${idAttr} class="form-control ${cls}" ${extraAttrs}>${opts}</select>`;
-}
 
 let _planosSort = { col: 'titulo', asc: true };
 function _sortPlanos(col) { if(_planosSort.col===col) _planosSort.asc=!_planosSort.asc; else { _planosSort.col=col; _planosSort.asc=true; } renderPlanosTable(); }
@@ -1706,8 +1684,7 @@ function openSubtopicoModal(id) {
   });
 }
 
-function openEditProblemaModal(id){ const acao=state.acoes.find(a=>a.id===id); if(!acao) return; currentEditTarget={type:'problema', id}; const modalBody=document.getElementById('edit-modal-body'); const respOpts=`<option value="">Selecione...</option>`+getResponsaveisAtivos().map(r=>`<option value="${escHtml(r.nome)}" ${r.nome===acao.responsavel?'selected':''}>${escHtml(r.nome)}</option>`).join(''); modalBody.innerHTML=`<div class="form-group"><label class="form-label">Problema</label><textarea class="form-control" id="edit-problema-texto" rows="3">${escHtml(acao.problema||'')}</textarea></div><div class="form-group"><label class="form-label">Causa Raiz</label><textarea class="form-control" id="edit-problema-causa" rows="3">${escHtml(acao.causa||'')}</textarea></div><div class="form-group"><label class="form-label">Responsável</label><select class="form-control" id="edit-problema-resp">${respOpts}</select></div><div class="form-group"><label class="form-label">Data Abertura</label><input class="form-control" type="date" id="edit-problema-data" value="${acao.data_abertura}"></div>`; document.getElementById('edit-modal-title').innerText='Editar Problema'; openModal('edit-modal'); }
-function openEditAcaoModal(acaoId, idx){ const acao=state.acoes.find(a=>a.id===acaoId); if(!acao||!acao.acoes_corretivas[idx]) return; const cr=acao.acoes_corretivas[idx]; currentEditTarget={type:'acao', acaoId, idx}; const modalBody=document.getElementById('edit-modal-body'); const respOpts=`<option value="">Selecione...</option>`+getResponsaveisAtivos().map(r=>`<option value="${escHtml(r.nome)}" ${r.nome===cr.responsavel?'selected':''}>${escHtml(r.nome)}</option>`).join(''); modalBody.innerHTML=`<div class="form-group"><label class="form-label">Ação Corretiva</label><textarea class="form-control" id="edit-acao-desc" rows="3">${escHtml(cr.acao_descricao||'')}</textarea></div><div class="form-group"><label class="form-label">Responsável</label><select class="form-control" id="edit-acao-resp">${respOpts}</select></div><div class="form-row cols-2"><div class="form-group"><label class="form-label">Data Prevista</label><input class="form-control" type="date" id="edit-acao-prev" value="${cr.data_prevista||''}"></div><div class="form-group"><label class="form-label">Data Efetiva</label><input class="form-control" type="date" id="edit-acao-efet" value="${cr.data_efetiva||''}"></div></div>`; document.getElementById('edit-modal-title').innerText='Editar Ação Corretiva'; openModal('edit-modal'); }
+
 function openEditFollowupModal(acaoId, corrIdx, fuIdx){ const acao=state.acoes.find(a=>a.id===acaoId); if(!acao||!acao.acoes_corretivas[corrIdx]||!acao.acoes_corretivas[corrIdx].followups[fuIdx]) return; const fu=acao.acoes_corretivas[corrIdx].followups[fuIdx]; currentEditTarget={type:'followup', acaoId, corrIdx, fuIdx}; const modalBody=document.getElementById('edit-modal-body'); modalBody.innerHTML=`<div class="form-group"><label class="form-label">Data</label><input class="form-control" type="date" id="edit-fu-data" value="${fu.data_followup}"></div><div class="form-group"><label class="form-label">Responsável</label><input class="form-control" id="edit-fu-resp" value="${escHtml(fu.responsavel)}"></div><div class="form-group"><label class="form-label">Comentário</label><textarea class="form-control" id="edit-fu-comentario" rows="3">${escHtml(fu.comentario)}</textarea></div>`; document.getElementById('edit-modal-title').innerText='Editar Follow-up'; openModal('edit-modal'); }
 async function saveFollowup() { const data = document.getElementById('fu-data').value, resp = document.getElementById('fu-responsavel').value.trim(), comentario = document.getElementById('fu-comentario').value.trim(); if(!resp || !comentario){ toast('Responsável e comentário obrigatórios','warning'); return; } if (_ncState._fuTarget != null && _ncState._fuTarget.idx != null) { const cr = _ncState.acoes_corretivas[_ncState._fuTarget.idx]; if (cr) { if(!cr.followups) cr.followups=[]; cr.followups.push({id:uid(), data_followup:data, comentario, responsavel:resp}); toast('Follow-up adicionado','success'); closeModal('followup-modal'); _ncState._fuTarget=null; _ncRenderCorretivas(); return; } } const acao = state.acoes.find(a=>a.id===currentFollowupTarget.acaoId); if(acao && acao.acoes_corretivas[currentFollowupTarget.corretivaIdx]){ const cr = acao.acoes_corretivas[currentFollowupTarget.corretivaIdx]; if(!cr.followups) cr.followups = []; cr.followups.push({id:uid(), data_followup:data, comentario, responsavel:resp}); await saveData('acoes', acao.id); toast('Follow-up adicionado','success'); aplicarFiltrosETabela(); } closeModal('followup-modal'); }
 document.getElementById('saveFollowupBtn')?.addEventListener('click',saveFollowup); document.getElementById('closeFollowupModal')?.addEventListener('click',()=>closeModal('followup-modal')); document.getElementById('closeFollowupFooter')?.addEventListener('click',()=>closeModal('followup-modal'));
@@ -1874,33 +1851,12 @@ document.getElementById('cancelEditModal')?.addEventListener('click',()=>{ close
 document.getElementById('closeEditModal')?.addEventListener('click',()=>{ closeModal('edit-modal'); currentEditTarget=null; });
 
 // ==================== EVIDÊNCIA (limite 600KB) ====================
-let _pendingEvidFile = null;
-function openEvidencia(acaoId, field) { state.currentEvidenciaTarget = { acaoId, field }; _pendingEvidFile = null; document.getElementById('ev-preview').innerHTML = ''; openModal('evidencia-modal'); }
-function processEvidenciaFile(file) { if (!file) return; if (!file.type.startsWith('image/') && file.size > 600 * 1024) { toast('Arquivo muito grande! Limite PDF: 600KB.', 'error'); return; } _pendingEvidFile = file; const isImage = file.type.startsWith('image/'); if (isImage) { const reader = new FileReader(); reader.onload = ev => { document.getElementById('ev-preview').innerHTML = `<img src="${ev.target.result}" style="max-width:100%;max-height:200px;border-radius:4px;"><p style="font-size:11px;color:var(--text3);margin-top:4px">${escHtml(file.name)} · ${(file.size/1024).toFixed(1)} KB</p>`; }; reader.readAsDataURL(file); } else { document.getElementById('ev-preview').innerHTML = `<div style="padding:12px;background:var(--bg3);border-radius:4px;">📄 ${escHtml(file.name)} · ${(file.size/1024).toFixed(1)} KB</div>`; } }
-async function confirmEvidencia() { const { acaoId, field } = state.currentEvidenciaTarget || {}; if (!acaoId || !field) return; if (!_pendingEvidFile) { toast('Selecione um arquivo', 'warning'); return; } if (!_pendingEvidFile.type.startsWith('image/') && _pendingEvidFile.size > 5*1024*1024) { toast('Arquivo muito grande! Limite PDF: 5 MB.', 'error'); return; } const acao = state.acoes.find(a => a.id === acaoId); if (!acao) return; try { showLoading('Enviando arquivo…'); const _dataUrl = await compressImage(_pendingEvidFile); /* O3: comprime imagens, PDFs passam direto */ const _pasta = field.startsWith('ev_implantacao_') ? ('corretivas/'+acaoId) : ('evidencias/'+acaoId); const _prefixo = field.startsWith('ev_implantacao_') ? (field.split('_').pop()+'_') : ''; const downloadURL = await uploadToStorage(_pasta+'/'+_prefixo+uid()+_extFromDataUrl(_dataUrl), _dataUrl); let _urlAntiga = null; if (field.startsWith('ev_implantacao_')) { const idx = parseInt(field.split('_').pop()); if (acao.acoes_corretivas[idx]) { _urlAntiga = acao.acoes_corretivas[idx][field]; acao.acoes_corretivas[idx][field] = downloadURL; if (!acao.acoes_corretivas[idx].data_efetiva) acao.acoes_corretivas[idx].data_efetiva = today(); /* v19.14 */ } } else { _urlAntiga = acao[field]; acao[field] = downloadURL; } closeModal('evidencia-modal'); await saveData('acoes', acaoId); if (isStorageUrl(_urlAntiga)) deleteFromStorage(_urlAntiga); /* v19.1.1: evita órfão no Storage ao substituir */ aplicarFiltrosETabela(); renderListagemIfNeeded(); toast('Evidência salva!', 'success'); _pendingEvidFile = null; } catch(e) { toast('Erro ao enviar evidência: ' + e.message, 'error'); } finally { hideLoading(); } }
-function handleEvidenciaSelect(e) { processEvidenciaFile(e.target.files[0]); }
-function handleEvidenciaDrop(e) { processEvidenciaFile(e.dataTransfer.files[0]); }
-document.getElementById('closeEvidenciaModal')?.addEventListener('click',()=>closeModal('evidencia-modal')); document.getElementById('cancelEvidenciaBtn')?.addEventListener('click',()=>closeModal('evidencia-modal')); document.getElementById('confirmEvidenciaBtn')?.addEventListener('click',confirmEvidencia);
-const evDrop=document.getElementById('ev-drop'); if(evDrop){ evDrop.addEventListener('click',()=>document.getElementById('ev-file').click()); evDrop.addEventListener('dragover',e=>e.preventDefault()); evDrop.addEventListener('drop',e=>{ e.preventDefault(); handleEvidenciaDrop(e); }); }
-document.getElementById('ev-file')?.addEventListener('change',handleEvidenciaSelect); document.getElementById('closeImageModal')?.addEventListener('click', () => {
+document.getElementById('closeImageModal')?.addEventListener('click', () => {
   closeModal('image-modal');
   const pdfEl = document.getElementById('modal-pdf');
   if (pdfEl) { pdfEl.src = ''; pdfEl.style.display = 'none'; }
   const imgEl = document.getElementById('modal-image');
   if (imgEl) { imgEl.src = ''; imgEl.style.display = 'none'; }
-});
-
-// ── Ctrl+V: colar imagem diretamente no modal de evidência ──
-document.addEventListener('paste', function(e) {
-  const modal = document.getElementById('evidencia-modal');
-  if (!modal || !modal.classList.contains('open')) return;
-  const items = e.clipboardData ? e.clipboardData.items : [];
-  for (let i = 0; i < items.length; i++) {
-    if (items[i].type.startsWith('image/')) {
-      const file = items[i].getAsFile();
-      if (file) { processEvidenciaFile(file); break; }
-    }
-  }
 });
 
 // ==================== LISTAGEM GERAL ====================
@@ -2082,7 +2038,7 @@ function renderRelatorioPDF(container) {
   document.getElementById('rp-imprimir')?.addEventListener('click', () => window.print());
 }
 // v19.86: evidência de FECHAMENTO de uma ação corretiva via Drag and Drop na Listagem — mesmo campo
-// (ev_implantacao_idx) e mesma regra que já existia em confirmEvidencia()/Novo Cadastro: seta a Data
+// (ev_implantacao_idx) e mesma regra que já existia no upload de evidência do Novo Cadastro: seta a Data
 // Efetiva automaticamente se ainda não tiver (v19.14), sem precisar abrir nenhum modal.
 async function _processarEvidenciaFechamentoListagem(problemaId, idx, file) {
   if (!file) return;
@@ -2915,7 +2871,6 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
 // ==================== DASHBOARD COM INDICADORES ATUALIZADOS ====================
 let _charts = {};
 function destroyCharts(){ Object.values(_charts).forEach(c=>c.destroy()); _charts={}; }
-function getStatusProblema(prob){ const corr=prob.acoes_corretivas||[]; if(!corr.length) return 'SEM AÇÕES'; const sts=corr.map(cr=>calcStatusAcao(cr)); if(sts.includes('VENCIDO')) return 'VENCIDO'; if(sts.includes('EM ANDAMENTO')) return 'EM ANDAMENTO'; return 'FECHADO'; }
 // ── Chart.js plugins (registrados uma única vez no escopo global) ──
 (function _registerChartPlugins() {
   if (typeof Chart === 'undefined') return;
@@ -6619,7 +6574,6 @@ function attachGlobalEvents() { document.querySelectorAll('.nav-item').forEach(e
 })();
 // CUBO (mantido original)
 (function initCube() { const canvas = document.getElementById('cube-canvas'); if (!canvas) return; const ctx = canvas.getContext('2d'); const W = canvas.width, H = canvas.height; const cx = W / 2, cy = H / 2; const SIZE = 28; let distance = 280, zoomBase = 260; let autoAngleY = 0, manualAngleY = 0, angleX = 0.35, angleZ = 0.15; let autoAngleX = 0.35, autoAngleZ = 0.15, autoSpeedX = 0.006, autoSpeedZ = 0.005; let isDragging = false, lastX = 0, lastY = 0, autoRotate = true; let currentZoom = 1.0, targetZoom = 1.0, currentRotationY = 0, targetRotationY = 0; const MIN_ZOOM = 0.4, MAX_ZOOM = 2.2; const VERTS = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]].map(v=>[v[0]*SIZE, v[1]*SIZE, v[2]*SIZE]); const EDGES = [[0,1,false],[1,2,false],[2,3,false],[3,0,false],[4,5,true],[5,6,false],[6,7,false],[7,4,false],[0,4,false],[1,5,false],[2,6,false],[3,7,false]]; function rotY(v,a){ const [x,y,z]=v; return [x*Math.cos(a)-z*Math.sin(a), y, x*Math.sin(a)+z*Math.cos(a)]; } function rotX(v,a){ const [x,y,z]=v; return [x, y*Math.cos(a)-z*Math.sin(a), y*Math.sin(a)+z*Math.cos(a)]; } function rotZ(v,a){ const [x,y,z]=v; return [x*Math.cos(a)-y*Math.sin(a), x*Math.sin(a)+y*Math.cos(a), z]; } function project([x,y,z]){ const scale=(zoomBase*currentZoom)/(distance+z); return [cx+x*scale, cy+y*scale]; } function getLineColor(red){ return red?'#ef4444':(document.body.classList.contains('dark-theme')?'rgba(255,255,255,0.65)':'rgba(30,41,59,0.55)'); } function handleStart(e){ e.preventDefault(); isDragging=true; autoRotate=false; const p=e.touches?e.touches[0]:e; lastX=p.clientX; lastY=p.clientY; canvas.style.cursor='grabbing'; } function handleMove(e){ if(!isDragging) return; e.preventDefault(); const p=e.touches?e.touches[0]:e; const dx=p.clientX-lastX, dy=p.clientY-lastY; if(Math.abs(dx)>Math.abs(dy)){ const rd=dx*0.008; manualAngleY+=rd; targetRotationY=manualAngleY; currentRotationY=manualAngleY; autoAngleY=manualAngleY; } else { const zd=dy*0.008; targetZoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,targetZoom-zd)); } lastX=p.clientX; lastY=p.clientY; } function handleEnd(e){ isDragging=false; canvas.style.cursor='grab'; setTimeout(()=>{ if(!isDragging) autoRotate=true; },2000); } function handleDoubleClick(e){ e.preventDefault(); targetZoom=1.0; manualAngleY=0; autoAngleY=0; targetRotationY=0; currentRotationY=0; autoRotate=true; } function animateZoomAndRotation(){ currentZoom+=(targetZoom-currentZoom)*0.1; currentRotationY+=(targetRotationY-currentRotationY)*0.12; if(autoRotate&&!isDragging){ autoAngleY+=0.008; currentRotationY=autoAngleY; targetRotationY=autoAngleY; } else if(!autoRotate&&!isDragging) currentRotationY=manualAngleY; autoAngleX+=autoSpeedX; autoAngleZ+=autoSpeedZ; angleX=autoAngleX; angleZ=autoAngleZ; } function drawCube(){ ctx.clearRect(0,0,W,H); animateZoomAndRotation(); const projected=VERTS.map(v=>rotY(v,currentRotationY)).map(v=>rotX(v,angleX)).map(v=>rotZ(v,angleZ)).map(project); EDGES.forEach(([i,j,red])=>{ ctx.beginPath(); ctx.moveTo(...projected[i]); ctx.lineTo(...projected[j]); ctx.strokeStyle=getLineColor(red); ctx.lineWidth=red?2.5:1.2; ctx.stroke(); }); requestAnimationFrame(drawCube); } canvas.style.cursor='grab'; canvas.addEventListener('mousedown',handleStart); window.addEventListener('mousemove',handleMove); window.addEventListener('mouseup',handleEnd); canvas.addEventListener('touchstart',handleStart); window.addEventListener('touchmove',handleMove); window.addEventListener('touchend',handleEnd); canvas.addEventListener('dblclick',handleDoubleClick); canvas.addEventListener('contextmenu',e=>e.preventDefault()); drawCube(); })();
-async function deleteData(col, id) { await deleteFireDoc(col, id); }
 </script>
 </body>
 </html>
