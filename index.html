@@ -478,7 +478,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.84';
+const APP_VERSAO = 'v19.85';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -4708,6 +4708,33 @@ function renderCurso1Tema(container) {
     toast(curso.statusCurso === 'Finalizado' ? '✅ Curso finalizado automaticamente!' : 'Checkpoint salvo.', 'success');
   });
 
+  // v19.85: Drag and Drop da evidência em qualquer ponto da linha (área maior que o botão sozinho).
+  // Delegado no tbody — funciona mesmo depois de uma linha ser re-renderizada (row.outerHTML = ...).
+  tbody.addEventListener('dragover', function(e) {
+    const row = e.target.closest('tr[data-curso-id]');
+    if (!row) return;
+    e.preventDefault(); // obrigatório pro navegador permitir o drop
+    row.style.outline = '2px dashed var(--accent)';
+    row.style.outlineOffset = '-2px';
+  });
+  tbody.addEventListener('dragleave', function(e) {
+    const row = e.target.closest('tr[data-curso-id]');
+    if (row) row.style.outline = '';
+  });
+  tbody.addEventListener('drop', function(e) {
+    const row = e.target.closest('tr[data-curso-id]');
+    if (!row) return;
+    e.preventDefault();
+    row.style.outline = '';
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+    if (!(file.type.startsWith('image/') || file.type === 'application/pdf')) {
+      toast('Arraste uma imagem ou PDF.', 'warning');
+      return;
+    }
+    _processarEvidenciaCurso(row.dataset.cursoId, file);
+  });
+
   tbody.addEventListener('click', async function(e) {
     const btn = e.target.closest('button[data-curso-action]');
     if (!btn) return;
@@ -4832,44 +4859,45 @@ function _renderCursoRow(c) {
   </tr>`;
 }
 
+// v19.85: processamento da evidência do Curso 1 Tema, extraído pra ser reutilizável tanto pelo
+// <input type=file> (clique no botão) quanto pelo Drag and Drop na linha inteira.
+async function _processarEvidenciaCurso(cursoId, file) {
+  if (!file) return;
+  if (!file.type.startsWith('image/') && file.size > 5*1024*1024) { toast('Arquivo muito grande! Limite PDF: 5 MB.', 'error'); return; }
+  try {
+    showLoading('Enviando arquivo…');
+    const _duCurso = await compressImage(file);
+    const _urlCurso = await uploadToStorage('cursos/'+cursoId+'/'+uid()+_extFromDataUrl(_duCurso), _duCurso);
+    const curso = state.cursos1tema.find(c => c.id === cursoId);
+    if (!curso) return;
+    const _urlAntigaCurso = curso.evidenciaCursoUrl; // v19.1.1: evita órfão no Storage ao substituir
+    curso.evidenciaCursoUrl = _urlCurso;
+    // Auto-marca T1, T2 e T3 ao enviar evidência
+    curso.t1 = true; curso.t2 = true; curso.t3 = true;
+    curso.statusCurso = 'Finalizado';
+    if (!curso.finalizado_em) curso.finalizado_em = new Date().toISOString(); // v19.72: data real de conclusão
+    await saveData('cursos1tema', cursoId);
+    if (isStorageUrl(_urlAntigaCurso)) deleteFromStorage(_urlAntigaCurso);
+    // re-render row
+    const tbody = document.getElementById('curso1tema-tbody');
+    if (tbody) {
+      const row = tbody.querySelector(`tr[data-curso-id="${cursoId}"]`);
+      if (row) row.outerHTML = _renderCursoRow(curso);
+      _rebindCursoUpload(cursoId);
+    }
+    toast('Evidência salva! T1, T2 e T3 marcados automaticamente. ✅', 'success');
+  } catch(err) {
+    toast('Erro ao enviar evidência: ' + err.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
 function _rebindCursoUpload(cursoId) {
   const inp = document.getElementById(`curso-ev-inp-${cursoId}`);
   if (!inp || inp._bound) return;
   inp._bound = true;
-  inp.addEventListener('change', async function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/') && file.size > 5*1024*1024) { toast('Arquivo muito grande! Limite PDF: 5 MB.', 'error'); return; }
-    try {
-      showLoading('Enviando arquivo…');
-      const _duCurso = await compressImage(file);
-      const _urlCurso = await uploadToStorage('cursos/'+cursoId+'/'+uid()+_extFromDataUrl(_duCurso), _duCurso);
-      {
-        const ev = { target: { result: _urlCurso } };
-        const curso = state.cursos1tema.find(c => c.id === cursoId);
-        if (!curso) return;
-        const _urlAntigaCurso = curso.evidenciaCursoUrl; // v19.1.1: evita órfão no Storage ao substituir
-        curso.evidenciaCursoUrl = ev.target.result;
-        // Auto-marca T1, T2 e T3 ao enviar evidência
-        curso.t1 = true; curso.t2 = true; curso.t3 = true;
-        curso.statusCurso = 'Finalizado';
-        if (!curso.finalizado_em) curso.finalizado_em = new Date().toISOString(); // v19.72: data real de conclusão
-        await saveData('cursos1tema', cursoId);
-        if (isStorageUrl(_urlAntigaCurso)) deleteFromStorage(_urlAntigaCurso);
-        // re-render row
-        const tbody = document.getElementById('curso1tema-tbody');
-        if (tbody) {
-          const row = tbody.querySelector(`tr[data-curso-id="${cursoId}"]`);
-          if (row) row.outerHTML = _renderCursoRow(curso);
-          _rebindCursoUpload(cursoId);
-        }
-        toast('Evidência salva! T1, T2 e T3 marcados automaticamente. ✅', 'success');
-      }
-    } catch(err) {
-      toast('Erro ao enviar evidência: ' + err.message, 'error');
-    } finally {
-      hideLoading();
-    }
+  inp.addEventListener('change', function(e) {
+    _processarEvidenciaCurso(cursoId, e.target.files[0]);
   });
 }
 
