@@ -478,7 +478,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.85';
+const APP_VERSAO = 'v19.86';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -2081,6 +2081,33 @@ function renderRelatorioPDF(container) {
   document.getElementById('rp-voltar')?.addEventListener('click', () => { state.currentPage = 'listagem'; render(); });
   document.getElementById('rp-imprimir')?.addEventListener('click', () => window.print());
 }
+// v19.86: evidência de FECHAMENTO de uma ação corretiva via Drag and Drop na Listagem — mesmo campo
+// (ev_implantacao_idx) e mesma regra que já existia em confirmEvidencia()/Novo Cadastro: seta a Data
+// Efetiva automaticamente se ainda não tiver (v19.14), sem precisar abrir nenhum modal.
+async function _processarEvidenciaFechamentoListagem(problemaId, idx, file) {
+  if (!file) return;
+  if (!file.type.startsWith('image/') && file.size > 5*1024*1024) { toast('Arquivo muito grande! Limite PDF: 5 MB.', 'error'); return; }
+  const prob = state.acoes.find(a => a.id === problemaId);
+  const cr = prob?.acoes_corretivas?.[idx];
+  if (!cr) { toast('Ação não encontrada.', 'error'); return; }
+  try {
+    showLoading('Enviando evidência…');
+    const _du = await compressImage(file);
+    const _campo = 'ev_implantacao_' + idx;
+    const _url = await uploadToStorage('corretivas/'+problemaId+'/'+idx+'_'+uid()+_extFromDataUrl(_du), _du);
+    const _urlAntiga = cr[_campo];
+    cr[_campo] = _url;
+    if (!cr.data_efetiva) cr.data_efetiva = today(); // v19.14: mesma regra de sempre
+    await saveData('acoes', problemaId);
+    if (isStorageUrl(_urlAntiga)) deleteFromStorage(_urlAntiga);
+    aplicarFiltrosETabela();
+    toast('Evidência de fechamento salva! Data Efetiva preenchida automaticamente.', 'success');
+  } catch(err) {
+    toast('Erro ao enviar evidência: ' + err.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
 function renderListagem(container) {
   // ── CORREÇÃO 1: Proteção contra container nulo/undefined ──
   if (!container) { console.warn('[renderListagem] container não encontrado no DOM — abortando.'); return; }
@@ -2426,7 +2453,32 @@ function aplicarFiltrosETabela() {
   // ocultos por nível voltavam a aparecer nesses redesenhos.
   if (typeof aplicarPermissoesUI === 'function') setTimeout(aplicarPermissoesUI, 0);
   const _ltbody = document.getElementById('listagem-tbody');
-  if (_ltbody && !_ltbody._delegated) { _ltbody._delegated = true; _ltbody.addEventListener('click', async function(e) { const btn = e.target.closest('button,[data-ev-id]'); if (!btn) {
+  if (_ltbody && !_ltbody._delegated) { _ltbody._delegated = true;
+    // v19.86: Drag and Drop da evidência de fechamento em qualquer ponto da linha da ação.
+    _ltbody.addEventListener('dragover', function(e) {
+      const tr = e.target.closest('tr[id^="row-"]');
+      if (!tr || tr.id === 'row-carregar-mais' || tr.id.endsWith('-noaction')) return;
+      e.preventDefault();
+      tr.style.outline = '2px dashed var(--accent)';
+      tr.style.outlineOffset = '-2px';
+    });
+    _ltbody.addEventListener('dragleave', function(e) {
+      const tr = e.target.closest('tr[id^="row-"]');
+      if (tr) tr.style.outline = '';
+    });
+    _ltbody.addEventListener('drop', function(e) {
+      const tr = e.target.closest('tr[id^="row-"]');
+      if (!tr || tr.id === 'row-carregar-mais' || tr.id.endsWith('-noaction')) return;
+      e.preventDefault();
+      tr.style.outline = '';
+      const file = e.dataTransfer?.files?.[0];
+      if (!file) return;
+      if (!(file.type.startsWith('image/') || file.type === 'application/pdf')) { toast('Arraste uma imagem ou PDF.', 'warning'); return; }
+      const m = tr.id.match(/^row-(.+)-(\d+)$/);
+      if (!m) return;
+      _processarEvidenciaFechamentoListagem(m[1], parseInt(m[2], 10), file);
+    });
+    _ltbody.addEventListener('click', async function(e) { const btn = e.target.closest('button,[data-ev-id]'); if (!btn) {
     // v19.40: clique em qualquer lugar da linha (fora dos botões) abre editar, igual ao lápis
     const tr = e.target.closest('tr');
     if (tr && tr.id && tr.id !== 'row-carregar-mais' && !tr.classList.contains('followup-row')) {
