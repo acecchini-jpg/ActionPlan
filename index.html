@@ -466,7 +466,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.88';
+const APP_VERSAO = 'v19.89';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -3978,8 +3978,7 @@ function renderNovoCadastro(container) {
         </div>
         <div class="form-group" style="margin-top:14px;">
           <label class="form-label">Problema</label>
-          <textarea class="form-control" id="nc-problema" rows="2" placeholder="Descreva o problema detalhadamente...">
-        </textarea>
+          <textarea class="form-control" id="nc-problema" rows="2" placeholder="Descreva o problema detalhadamente..."></textarea>
       </div>
       <div id="nc-op-turno-row" style="display:none;">
         <div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;margin-bottom:8px;align-items:end;" id="nc-op-row-base">
@@ -4016,8 +4015,7 @@ function renderNovoCadastro(container) {
       <div class="form-row" style="grid-template-columns:1fr auto auto auto;gap:14px;margin-bottom:14px;align-items:start;">
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">Causa Raiz</label>
-          <textarea class="form-control" id="nc-causa" rows="2" placeholder="Causa raiz do problema...">
-        </textarea>
+          <textarea class="form-control" id="nc-causa" rows="2" placeholder="Causa raiz do problema..."></textarea>
       </div>
       <div class="form-group" style="margin-bottom:0;min-width:150px;">
         <label class="form-label">Classificação 6M <span style="color:var(--red);">*</span>
