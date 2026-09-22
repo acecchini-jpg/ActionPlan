@@ -466,7 +466,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.90';
+const APP_VERSAO = 'v19.91';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -3001,7 +3001,9 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
   let cursosPendentesQtd = 0, cursosNoPrazoQtd = 0, cursosVencidosQtd = 0, cursosFechadosQtd = 0;
   state.cursos1tema.forEach(c => {
     if (planoId && c.plano_id !== planoId) return;
-    if (c.statusCurso === 'Finalizado') { cursosFechadosQtd++; return; } // v19.90: contador próprio, snapshot de HOJE (mesmo critério dos demais)
+    // v19.91: "Fechados" conta só os finalizados DENTRO do período selecionado (não é snapshot de hoje,
+    // ao contrário de Pendentes/No Prazo/Vencidas — pedido explícito do usuário).
+    if (c.statusCurso === 'Finalizado') { if (_inPeriodo((c.finalizado_em || '').slice(0, 10))) cursosFechadosQtd++; return; }
     cursosPendentesQtd++;
     const criadoData = (c.criado_em || '').slice(0, 10);
     const dias = criadoData ? Math.floor((new Date(_hojeAta) - new Date(criadoData)) / 86400000) : 0;
