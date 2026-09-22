@@ -466,7 +466,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.89';
+const APP_VERSAO = 'v19.90';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -2931,12 +2931,14 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
     const subtopico = state.subtopicos.find(s => s.id === prob.subtopico_id);
     (prob.acoes_corretivas || []).forEach(cr => {
       const nome = cr.responsavel || 'N/D';
-      if (!statsPorResp[nome]) statsPorResp[nome] = { pendentes: 0, vencidas: 0, emAndamento: 0, acoes: [] };
+      if (!statsPorResp[nome]) statsPorResp[nome] = { pendentes: 0, vencidas: 0, emAndamento: 0, fechadas: 0, acoes: [] };
       // v19.75: "Ações Pendentes" = Vencidas + Em Andamento, do ESCOPO TODO (Plano filtrado, sem
-      // filtro de data). Fechadas NÃO entram mais nessa conta (antes entravam como "Total Ações").
+      // filtro de data). Fechadas NÃO entram nessa conta (antes entravam como "Total Ações"),
+      // mas v19.90 volta a contá-las à parte, como "Ações Fechadas" (contador próprio, sem afetar Pendentes).
       const _status = calcStatusAcao(cr);
       if (_status === 'VENCIDO') { statsPorResp[nome].vencidas++; statsPorResp[nome].pendentes++; }
       else if (_status === 'EM ANDAMENTO') { statsPorResp[nome].emAndamento++; statsPorResp[nome].pendentes++; }
+      else if (_status === 'FECHADO') { statsPorResp[nome].fechadas++; }
 
       const eventos = [];
       const tagAcao = ` (ação #${_numAcaoValido(cr.numeroAcao) ? cr.numeroAcao : ''})`;
@@ -2996,10 +2998,10 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
   // desde a emissão (criado_em) como prazo implícito. Snapshot de HOJE, não do período selecionado —
   // mesmo critério que "Ações Pendentes" por responsável (que também não é escopado pelo período).
   const _hojeAta = today();
-  let cursosPendentesQtd = 0, cursosNoPrazoQtd = 0, cursosVencidosQtd = 0;
+  let cursosPendentesQtd = 0, cursosNoPrazoQtd = 0, cursosVencidosQtd = 0, cursosFechadosQtd = 0;
   state.cursos1tema.forEach(c => {
-    if (c.statusCurso === 'Finalizado') return;
     if (planoId && c.plano_id !== planoId) return;
+    if (c.statusCurso === 'Finalizado') { cursosFechadosQtd++; return; } // v19.90: contador próprio, snapshot de HOJE (mesmo critério dos demais)
     cursosPendentesQtd++;
     const criadoData = (c.criado_em || '').slice(0, 10);
     const dias = criadoData ? Math.floor((new Date(_hojeAta) - new Date(criadoData)) / 86400000) : 0;
@@ -3019,7 +3021,7 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
     participantes,
     atividadesPorDepartamento,
     cursosAplicados,
-    cursosPendentesQtd, cursosNoPrazoQtd, cursosVencidosQtd,
+    cursosPendentesQtd, cursosNoPrazoQtd, cursosVencidosQtd, cursosFechadosQtd,
     emails: [...emailsEnvolvidos].sort()
   };
 }
@@ -6329,7 +6331,10 @@ async function _renderUsuariosPainel() {
 function _montarLinhasAta(dados) {
   const linhas = [];
   const add = (texto, opts) => linhas.push({ texto, indent: (opts && opts.indent) || 0, bold: !!(opts && opts.bold) });
-  add(`Ata de Reunião — ${dados.planoTitulo} — de ${formatDate(dados.dataDe)} até ${formatDate(dados.dataAte)}`, { bold: true });
+  // v19.90: se De === Até, exibe uma única data em vez de "de X até Y"
+  add(dados.dataDe === dados.dataAte
+    ? `Ata de Reunião — ${dados.planoTitulo} — ${formatDate(dados.dataDe)}`
+    : `Ata de Reunião — ${dados.planoTitulo} — de ${formatDate(dados.dataDe)} até ${formatDate(dados.dataAte)}`, { bold: true });
   add('');
   add('PARTICIPANTES:');
   if (!dados.participantes.length) add('Nenhum participante necessário registrado no período.', { indent: 1 });
@@ -6343,13 +6348,13 @@ function _montarLinhasAta(dados) {
     dep.responsaveis.forEach((r, idx) => {
       if (idx > 0) add(''); // v19.77: só separa com linha em branco ENTRE pessoas, não logo após o departamento
       add(r.nome, { indent: 1 }); // v19.77: nomes indentados dentro da área do departamento
-      add(`Ações Pendentes: ${r.pendentes} | No prazo: ${r.emAndamento} | Vencidas: ${r.vencidas}`, { indent: 1 });
+      add(`Ações Fechadas: ${r.fechadas} | Pendentes: ${r.pendentes} | No prazo: ${r.emAndamento} | Vencidas: ${r.vencidas}`, { indent: 1 });
       if (!r.acoes.length) {
         add('Sem evolução nas ações.', { indent: 1 });
       } else {
         r.acoes.forEach(ac => {
           add(`Item #${ac.numeroAcao} - ${ac.subtopico} - ${ac.problemaTexto}`, { indent: 1 });
-          add(`Ação: ${ac.acaoDescricao}`, { indent: 1 });
+          add(`Ação: ${ac.acaoDescricao}`, { indent: 2 }); // v19.90: identada dentro do item
           ac.eventos.forEach(ev => add(`${ev.texto} em ${formatDate(ev.data)}`, { indent: 2 }));
         });
       }
@@ -6357,7 +6362,7 @@ function _montarLinhasAta(dados) {
   });
   add('');
   add('CURSOS DE 1 TEMA:');
-  add(`Pendentes: ${dados.cursosPendentesQtd} | No prazo: ${dados.cursosNoPrazoQtd} | Vencidas: ${dados.cursosVencidosQtd}`, { indent: 1 });
+  add(`Fechados: ${dados.cursosFechadosQtd} | Pendentes: ${dados.cursosPendentesQtd} | No prazo: ${dados.cursosNoPrazoQtd} | Vencidas: ${dados.cursosVencidosQtd}`, { indent: 1 });
   add('');
   add('APLICADOS:', { indent: 1 });
   if (!dados.cursosAplicados.length) add('Nenhum curso finalizado no período.', { indent: 2 });
@@ -6376,7 +6381,9 @@ function _montarHtmlAta(dados) {
   }).join('\n');
 }
 function renderAtaReuniao(container) {
-  const planosOpts = `<option value="">Todos os Planos</option>` + [...state.planos].sort((a,b)=>(a.titulo||'').localeCompare(b.titulo||'','pt-BR')).map(p=>`<option value="${p.id}">${escHtml(p.titulo)}</option>`).join('');
+  // v19.90: GP12 como padrão selecionado (é o Plano mais comum) — cai em "Todos os Planos" se não existir um GP12
+  const _planoGp12Default = state.planos.find(p => /gp\s*-?\s*12/i.test(p.titulo || ''));
+  const planosOpts = `<option value="">Todos os Planos</option>` + [...state.planos].sort((a,b)=>(a.titulo||'').localeCompare(b.titulo||'','pt-BR')).map(p=>`<option value="${p.id}"${_planoGp12Default && p.id === _planoGp12Default.id ? ' selected' : ''}>${escHtml(p.titulo)}</option>`).join('');
   container.innerHTML = `<div class="panel">
     <div class="panel-header"><span>📝</span><span class="panel-title">Ata de Reunião</span></div>
     <div class="panel-body">
@@ -6421,7 +6428,9 @@ function _renderResultadoAta(dados) {
   `;
   document.getElementById('ata-copiar-texto')?.addEventListener('click', () => copyToClipboard(texto, 'Ata copiada! Cole no seu e-mail.'));
   document.getElementById('ata-abrir-email')?.addEventListener('click', () => {
-    const assunto = `Ata de Reunião — ${dados.planoTitulo} — ${formatDate(dados.dataDe)} a ${formatDate(dados.dataAte)}`;
+    const assunto = dados.dataDe === dados.dataAte
+      ? `Ata de Reunião — ${dados.planoTitulo} — ${formatDate(dados.dataDe)}`
+      : `Ata de Reunião — ${dados.planoTitulo} — ${formatDate(dados.dataDe)} a ${formatDate(dados.dataAte)}`;
     const destinatarios = dados.emails.join(';'); // v19.74: ";" em vez de "," — vírgula dava problema em alguns clientes de e-mail
     const mailto = `mailto:${encodeURIComponent(destinatarios)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(texto)}`;
     // v19.73: mailto: tem limite prático de tamanho (varia por cliente, ~2000 chars é um teto seguro) —
