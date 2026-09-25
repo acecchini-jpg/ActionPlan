@@ -466,7 +466,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.92';
+const APP_VERSAO = 'v19.93';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -2294,6 +2294,10 @@ function renderListagem(container) {
       ws.getRow(1).font = { bold: true };
       ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8E8E8' } };
       ws.getColumn(_evIdx + 1).width = 14; // antes das imagens: âncora usa a largura atual
+      // v19.93: "Problema" e "Ação Corretiva" aparecem truncados em 80 caracteres na tela (legibilidade
+      // da tabela) — na exportação, buscamos o texto INTEGRAL direto dos dados (não do innerText truncado).
+      const _problemaIdx = headers.findIndex(h => /^problema$/i.test(h));
+      const _acaoIdx = headers.findIndex(h => /ação corretiva/i.test(h));
       let _fotoCount = 0;
       let _fotoFalhas = 0;
       for (const tr of rows) {
@@ -2303,11 +2307,21 @@ function renderListagem(container) {
         if (!tds.length) continue;
         const cells = tds.slice(0, headers.length).map((td, i) => i === _evIdx ? '' : td.innerText.trim());
         while (cells.length < headers.length) cells.push('');
-        const excelRow = ws.addRow(cells);
         // ── Foto do problema embutida na célula Evidência ──
-        let _pid = tr.querySelector('[data-problema-id]')?.dataset.problemaId;
-        if (!_pid && tr.id) { const _m = tr.id.match(/^row-(.+?)-(?:\d+|noaction)$/); if (_m) _pid = _m[1]; }
+        // tr.id (formato "row-{problemaId}-{idx|noaction}") sempre traz os dois juntos —
+        // fonte primária. Fallback ao atributo do botão só se o id não bater no padrão.
+        let _pid = null, _idxAcao = null;
+        if (tr.id) { const _m = tr.id.match(/^row-(.+?)-(\d+|noaction)$/); if (_m) { _pid = _m[1]; _idxAcao = _m[2]; } }
+        if (!_pid) _pid = tr.querySelector('[data-problema-id]')?.dataset.problemaId;
         const _prob = _pid ? state.acoes.find(a => a.id === _pid) : null;
+        if (_prob) {
+          if (_problemaIdx !== -1) cells[_problemaIdx] = _prob.problema || '—';
+          if (_acaoIdx !== -1 && _idxAcao !== null && _idxAcao !== 'noaction') {
+            const _crFull = _prob.acoes_corretivas?.[parseInt(_idxAcao)];
+            if (_crFull) cells[_acaoIdx] = _crFull.acao_descricao || '—';
+          }
+        }
+        const excelRow = ws.addRow(cells);
         const _ev = _prob?.evidencia_problema;
         let _evParaEmbutir = null;
         if (_ev && typeof _ev === 'string' && _ev.startsWith('data:image')) {
