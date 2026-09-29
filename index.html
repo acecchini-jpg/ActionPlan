@@ -466,7 +466,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.94';
+const APP_VERSAO = 'v19.95';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -1882,7 +1882,7 @@ function openEditModalListagem(problemaId, idx) {
       if (c.data_prevista && novaData && novaData !== c.data_prevista) {
         if (!c.followups) c.followups = [];
         c.qtd_alteracoes_data = (c.qtd_alteracoes_data || 0) + 1;
-        c.followups.push({ id: uid(), data_followup: today(), responsavel: c.responsavel || 'Sistema', comentario: 'Data alterada para ' + formatDate(novaData) });
+        c.followups.push({ id: uid(), data_followup: today(), responsavel: c.responsavel || 'Sistema', comentario: 'Data alterada de ' + formatDate(c.data_prevista) + ' para ' + formatDate(novaData) }); // v19.95: registra a data de origem, não só o destino
       }
       _aud('data_prevista' + _tag, c.data_prevista, novaData);
       c.data_prevista = novaData;
@@ -2963,8 +2963,9 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
       (cr.followups || []).filter(f => f.automatico && f.comentario === 'Nova ação adicionada.' && _inPeriodo((f.data_followup || '').slice(0, 10)))
         .forEach(f => eventos.push({ data: f.data_followup, texto: `Ação Adicionada por ${f.responsavel || 'Sistema'}` }));
 
-      // 2) Follow-ups manuais (exclui os automáticos e o de "Data alterada para X", que já vira o evento de Prazo abaixo)
-      (cr.followups || []).filter(f => !f.automatico && !/^Data alterada para /.test(f.comentario || '') && _inPeriodo((f.data_followup || '').slice(0, 10)))
+      // 2) Follow-ups manuais (exclui os automáticos e o de "Data alterada de X para Y", que já vira o evento de Prazo abaixo)
+      // v19.95: regex atualizado para o novo texto "Data alterada de X para Y" (antes só "Data alterada para X")
+      (cr.followups || []).filter(f => !f.automatico && !/^Data alterada de .+ para /.test(f.comentario || '') && _inPeriodo((f.data_followup || '').slice(0, 10)))
         .forEach(f => eventos.push({ data: f.data_followup, texto: `Follow-up por ${f.responsavel || '—'}: "${f.comentario || ''}"` }));
 
       // 3) Responsável / Prazo alterados — vem do histórico do PROBLEMA, filtrado pelo campo desta ação
@@ -4409,7 +4410,7 @@ function _montarEmailAcao(i) {
   container.querySelectorAll('.nc-cr-desc').forEach(el=>el.addEventListener('input',()=>{ if(_ncState.acoes_corretivas[parseInt(el.dataset.idx)]) _ncState.acoes_corretivas[parseInt(el.dataset.idx)].acao_descricao=el.value; }));
   container.querySelectorAll('.nc-cr-resp').forEach(el=>el.addEventListener('change',()=>{ if(_ncState.acoes_corretivas[parseInt(el.dataset.idx)]) _ncState.acoes_corretivas[parseInt(el.dataset.idx)].responsavel=el.value; }));
   container.querySelectorAll('.nc-cr-efet').forEach(el=>el.addEventListener('change',()=>{ if(_ncState.acoes_corretivas[parseInt(el.dataset.idx)]) _ncState.acoes_corretivas[parseInt(el.dataset.idx)].data_efetiva=el.value; }));
-  container.querySelectorAll('.nc-cr-prev').forEach(el=>el.addEventListener('change',()=>{ const i=parseInt(el.dataset.idx); const cr=_ncState.acoes_corretivas[i]; if(!cr) return; const nd=el.value, da=cr.data_prevista||''; if(da&&nd&&nd!==da){ if(!cr.followups) cr.followups=[]; cr.qtd_alteracoes_data=(cr.qtd_alteracoes_data||0)+1; cr.followups.push({id:uid(),data_followup:today(),responsavel:cr.responsavel||'Sistema',comentario:'Data alterada para '+formatDate(nd)}); } cr.data_prevista=nd; _ncRenderCorretivas(); }));
+  container.querySelectorAll('.nc-cr-prev').forEach(el=>el.addEventListener('change',()=>{ const i=parseInt(el.dataset.idx); const cr=_ncState.acoes_corretivas[i]; if(!cr) return; const nd=el.value, da=cr.data_prevista||''; if(da&&nd&&nd!==da){ if(!cr.followups) cr.followups=[]; cr.qtd_alteracoes_data=(cr.qtd_alteracoes_data||0)+1; cr.followups.push({id:uid(),data_followup:today(),responsavel:cr.responsavel||'Sistema',comentario:'Data alterada de '+formatDate(da)+' para '+formatDate(nd)}); } cr.data_prevista=nd; _ncRenderCorretivas(); }));
   container.querySelectorAll('.nc-ev-corr-btn').forEach(btn=>btn.addEventListener('click',()=>{ const fi=container.querySelector('.nc-ev-corr-file[data-idx="'+btn.dataset.idx+'"]'); if(fi) fi.click(); }));
   container.querySelectorAll('.nc-ev-corr-file').forEach(fi=>fi.addEventListener('change',async e=>{ const i=parseInt(fi.dataset.idx); const file=e.target.files[0]; if(!file) return; if(!file.type.startsWith('image/') && file.size>5*1024*1024){toast('Arquivo muito grande! Limite PDF: 5 MB.','error');return;} try { showLoading('Enviando arquivo…'); const _du=await compressImage(file); const _probId = _ncState.editingProblemaId || _ncState._novoId || uid(); const _url = await uploadToStorage('corretivas/'+_probId+'/'+i+'_'+uid()+_extFromDataUrl(_du), _du); const _urlAntiga = _ncState._evidTmp[i]; _ncState._evidTmp[i]=_url; if (isStorageUrl(_urlAntiga)) deleteFromStorage(_urlAntiga); /* v19.1.1: evita órfão no Storage ao substituir */ if (_ncState.acoes_corretivas[i] && !_ncState.acoes_corretivas[i].data_efetiva) _ncState.acoes_corretivas[i].data_efetiva = today(); /* v19.14 */ _ncRenderCorretivas(); toast('Evidência carregada!','success'); } catch(err) { toast('Erro ao enviar evidência: ' + err.message, 'error'); } finally { hideLoading(); } }));
   container.querySelectorAll('.nc-ev-view').forEach(btn=>btn.addEventListener('click',()=>{ const src=_ncState._evidTmp[parseInt(btn.dataset.idx)]; if(src) showEvidenciaModal(src); }));
