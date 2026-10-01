@@ -466,7 +466,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.95';
+const APP_VERSAO = 'v19.96';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -688,6 +688,21 @@ function copyToClipboard(text, successMsg) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(() => toast(msg, 'success')).catch(fallback);
   } else { fallback(); }
+}
+// v19.96: copia HTML formatado (negrito, cor, tabela) para colar em Outlook/Teams/Word — com
+// fallback automático para texto simples se o navegador não suportar ClipboardItem.
+function copyRichToClipboard(html, plainText, successMsg) {
+  const msg = successMsg || 'Copiado!';
+  const fallbackPlain = () => copyToClipboard(plainText, 'Copiado em texto simples (formatação não suportada neste navegador).');
+  if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
+    try {
+      const item = new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([plainText], { type: 'text/plain' })
+      });
+      navigator.clipboard.write([item]).then(() => toast(msg, 'success')).catch(fallbackPlain);
+    } catch (e) { fallbackPlain(); }
+  } else { fallbackPlain(); }
 }
 // ── O3: Compressão de imagem client-side (máx 1280px, JPEG 0.8) ──
 function compressImage(file, maxDim, quality) {
@@ -2939,6 +2954,7 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
   state.responsaveis.forEach(r => { _respDeptMap[r.nome] = r.departamento || 'Sem Departamento'; });
   const statsPorResp = {}; // nome -> { total, vencidas, emAndamento, acoes:[{numeroAcao,subtopico,problemaTexto,eventos}] }
   const emailsEnvolvidos = new Set();
+  const resumoAtualizacoes = []; // v19.96: lista achatada de todos os eventos do período, p/ a tabela "Atualizações do Período"
 
   state.acoes.forEach(prob => {
     if (planoId && prob.plano_id !== planoId) return;
@@ -2981,6 +2997,9 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
 
       if (eventos.length) {
         eventos.sort((a, b) => (a.data || '').localeCompare(b.data || ''));
+        const _numAcaoLabel = `Item #${_numAcaoValido(cr.numeroAcao) ? cr.numeroAcao : '—'}`;
+        // v19.96: cada evento também alimenta o resumo achatado "Atualizações do Período"
+        eventos.forEach(ev => resumoAtualizacoes.push({ data: ev.data, nome, item: _numAcaoLabel, texto: ev.texto }));
         statsPorResp[nome].acoes.push({
           numeroAcao: _numAcaoValido(cr.numeroAcao) ? cr.numeroAcao : '—',
           subtopico: subtopico ? subtopico.descricao : '—',
@@ -3034,6 +3053,9 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
     if (_rPlano && _rPlano.email) emailsEnvolvidos.add(_rPlano.email);
   }
 
+  // v19.96: resumo ordenado por data (mais antiga primeiro), depois por nome
+  resumoAtualizacoes.sort((a, b) => (a.data || '').localeCompare(b.data || '') || a.nome.localeCompare(b.nome, 'pt-BR'));
+
   return {
     planoTitulo: plano ? plano.titulo : 'Todos os Planos',
     dataDe, dataAte,
@@ -3041,7 +3063,8 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
     atividadesPorDepartamento,
     cursosAplicados,
     cursosPendentesQtd, cursosNoPrazoQtd, cursosVencidosQtd, cursosFechadosQtd,
-    emails: [...emailsEnvolvidos].sort()
+    emails: [...emailsEnvolvidos].sort(),
+    resumoAtualizacoes
   };
 }
 
@@ -6347,9 +6370,19 @@ async function _renderUsuariosPainel() {
 // v19.73: monta o texto simples da Ata — usado tanto na tela (dentro de .pdm-box) quanto em Copiar/E-mail
 // v19.77: monta a Ata como uma lista de linhas estruturadas ({texto, indent, bold}) — uma única
 // fonte de verdade usada tanto pro texto puro (Copiar/E-mail) quanto pra exibição em tela (negrito).
+// v19.96: ícone por tipo de evento — usado nas linhas de ação e no resumo do topo
+function _iconEvento(texto) {
+  if (/^Ação Encerrada/.test(texto)) return '✅ ';
+  if (/^Ação Cancelada/.test(texto)) return '❌ ';
+  if (/^Ação Adicionada/.test(texto)) return '➕ ';
+  if (/^Follow-up/.test(texto)) return '💬 ';
+  if (/^Responsável Alterado/.test(texto)) return '👤 ';
+  if (/^Prazo Alterado/.test(texto)) return '🔄 ';
+  return '• ';
+}
 function _montarLinhasAta(dados) {
   const linhas = [];
-  const add = (texto, opts) => linhas.push({ texto, indent: (opts && opts.indent) || 0, bold: !!(opts && opts.bold) });
+  const add = (texto, opts) => linhas.push({ texto, indent: (opts && opts.indent) || 0, bold: !!(opts && opts.bold), italic: !!(opts && opts.italic) });
   // v19.90: se De === Até, exibe uma única data em vez de "de X até Y"
   add(dados.dataDe === dados.dataAte
     ? `Ata de Reunião — ${dados.planoTitulo} — ${formatDate(dados.dataDe)}`
@@ -6357,48 +6390,90 @@ function _montarLinhasAta(dados) {
   add('');
   add('PARTICIPANTES:');
   if (!dados.participantes.length) add('Nenhum participante necessário registrado no período.', { indent: 1 });
-  dados.participantes.forEach(p => add(`${p.nome} (${p.departamento}) — ${p.label}`, { indent: 1 }));
+  dados.participantes.forEach(p => add(`• ${p.nome} (${p.departamento}) — ${p.label}`, { indent: 1 })); // v19.96: bullet point
   add('');
   add('ATIVIDADES:');
   if (!dados.atividadesPorDepartamento.length) add('Nenhuma atividade registrada no período.', { indent: 1 });
   dados.atividadesPorDepartamento.forEach(dep => {
     add('');
     add(dep.departamento.toUpperCase() + ':', { bold: true }); // v19.77: negrito, sem linha em branco logo depois
+    add('─'.repeat(36)); // v19.96: linha somente embaixo do nome do departamento (sem cor, a pedido do usuário)
     dep.responsaveis.forEach((r, idx) => {
       if (idx > 0) add(''); // v19.77: só separa com linha em branco ENTRE pessoas, não logo após o departamento
-      add(r.nome, { indent: 1 }); // v19.77: nomes indentados dentro da área do departamento
-      add(`Ações Fechadas: ${r.fechadas} | Pendentes: ${r.pendentes} | No prazo: ${r.emAndamento} | Vencidas: ${r.vencidas}`, { indent: 1 });
+      add(`• ${r.nome}`, { indent: 1 }); // v19.96: bullet point no nome do responsável
+      add(`✅ Fechadas: ${r.fechadas} | ⏳ Pendentes: ${r.pendentes} | 🕒 No prazo: ${r.emAndamento} | ⚠️ Vencidas: ${r.vencidas}`, { indent: 1 }); // v19.96: ícones por status
       if (!r.acoes.length) {
         add('Sem evolução nas ações.', { indent: 1 });
       } else {
         r.acoes.forEach(ac => {
-          // v19.94: identação das informações de cada ação dobrada (pedido do usuário)
-          add(`Item #${ac.numeroAcao} - ${ac.subtopico} - ${ac.problemaTexto}`, { indent: 2 });
+          // v19.96: Item/Produto em negrito com ícone; Não Conformidade em linha própria
+          add(`📌 Item #${ac.numeroAcao} — Produto: ${ac.subtopico}`, { indent: 2, bold: true });
+          add(`Não Conformidade: ${ac.problemaTexto}`, { indent: 2, italic: true });
           add(`Ação: ${ac.acaoDescricao}`, { indent: 4 });
-          ac.eventos.forEach(ev => add(`${ev.texto} em ${formatDate(ev.data)}`, { indent: 4 }));
+          ac.eventos.forEach(ev => add(`${_iconEvento(ev.texto)}${ev.texto} em ${formatDate(ev.data)}`, { indent: 4 }));
         });
       }
     });
   });
   add('');
   add('CURSOS DE 1 TEMA:');
-  add(`Fechados: ${dados.cursosFechadosQtd} | Pendentes: ${dados.cursosPendentesQtd} | No prazo: ${dados.cursosNoPrazoQtd} | Vencidas: ${dados.cursosVencidosQtd}`, { indent: 1 });
+  add(`✅ Fechados: ${dados.cursosFechadosQtd} | ⏳ Pendentes: ${dados.cursosPendentesQtd} | 🕒 No prazo: ${dados.cursosNoPrazoQtd} | ⚠️ Vencidas: ${dados.cursosVencidosQtd}`, { indent: 1 }); // v19.96: ícones por status
   add('');
   add('APLICADOS:', { indent: 1 });
   if (!dados.cursosAplicados.length) add('Nenhum curso finalizado no período.', { indent: 2 });
   dados.cursosAplicados.forEach(c => add(`${c.subtopico} - ${c.problemaTexto} em ${formatDate(c.dataFinalizacao)}`, { indent: 2 }));
   return linhas;
 }
+// v19.96: tabela de "Atualizações do Período" em HTML (cores fixas em hex — usada tanto na tela
+// quanto na Cópia Formatada, por isso não usa var(--...), que não existe fora do app).
+function _montarTabelaResumoHtml(lista) {
+  if (!lista || !lista.length) return '';
+  const linhas = lista.map(r => `<tr>
+      <td style="padding:6px 10px;border-bottom:1px solid #d1d5db;white-space:nowrap;font-size:12px;color:#475569;">${escHtml(formatDate(r.data))}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #d1d5db;font-size:12px;color:#1e293b;">${escHtml(r.nome)}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #d1d5db;font-size:12px;color:#1e293b;white-space:nowrap;">${escHtml(r.item)}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #d1d5db;font-size:12px;color:#1e293b;">${_iconEvento(r.texto)}${escHtml(r.texto)}</td>
+    </tr>`).join('');
+  return `<table style="width:100%;border-collapse:collapse;margin:10px 0 16px;font-family:Arial,Helvetica,sans-serif;">
+    <thead><tr>
+      <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #f97316;font-size:11px;color:#f97316;text-transform:uppercase;">Data</th>
+      <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #f97316;font-size:11px;color:#f97316;text-transform:uppercase;">Responsável</th>
+      <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #f97316;font-size:11px;color:#f97316;text-transform:uppercase;">Item</th>
+      <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #f97316;font-size:11px;color:#f97316;text-transform:uppercase;">Atualização</th>
+    </tr></thead>
+    <tbody>${linhas}</tbody>
+  </table>`;
+}
 // Texto puro — usado em Copiar Texto e no corpo do e-mail (não existe "negrito" em texto puro)
 function _montarTextoAta(dados) {
-  return _montarLinhasAta(dados).map(l => '  '.repeat(l.indent) + l.texto).join('\n');
+  const corpo = _montarLinhasAta(dados).map(l => '  '.repeat(l.indent) + l.texto).join('\n');
+  if (!dados.resumoAtualizacoes || !dados.resumoAtualizacoes.length) return corpo;
+  // v19.96: bloco "Atualizações do Período" inserido logo após o título (lista com bullets — tabela
+  // alinhada por coluna não é confiável em texto puro/e-mail de fonte proporcional)
+  const resumoTxt = 'ATUALIZAÇÕES DO PERÍODO:\n' + dados.resumoAtualizacoes
+    .map(r => `  • ${formatDate(r.data)} — ${r.nome} — ${r.item} — ${_iconEvento(r.texto)}${r.texto}`).join('\n');
+  const partes = corpo.split('\n');
+  partes.splice(1, 0, '', resumoTxt);
+  return partes.join('\n');
 }
-// HTML — usado só na exibição em tela; departamento em negrito
+// HTML — usado na tela E na Cópia Formatada (cores fixas em hex, ver _montarTabelaResumoHtml)
 function _montarHtmlAta(dados) {
-  return _montarLinhasAta(dados).map(l => {
+  const linhasHtml = _montarLinhasAta(dados).map(l => {
     const txt = escHtml('  '.repeat(l.indent) + l.texto);
-    return l.bold ? `<strong>${txt}</strong>` : txt;
-  }).join('\n');
+    let html = l.bold ? `<strong>${txt}</strong>` : txt;
+    if (l.italic) html = `<span style="color:#64748b;font-style:italic;">${html}</span>`;
+    return html;
+  });
+  if (dados.resumoAtualizacoes && dados.resumoAtualizacoes.length) {
+    linhasHtml.splice(1, 0, _montarTabelaResumoHtml(dados.resumoAtualizacoes));
+  }
+  return linhasHtml.join('\n');
+}
+// v19.96: versão para "Copiar Formatado" — mesmo HTML da tela, envolvido em estilos inline
+// autocontidos (Arial, cores em hex) para colar com formatação em Outlook/Teams/Word.
+function _montarHtmlAtaRico(dados) {
+  const corpo = _montarHtmlAta(dados).replace(/\n/g, '<br>');
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#1e293b;">${corpo}</div>`;
 }
 function renderAtaReuniao(container) {
   // v19.90: GP12 como padrão selecionado (é o Plano mais comum) — cai em "Todos os Planos" se não existir um GP12
@@ -6442,11 +6517,14 @@ function _renderResultadoAta(dados) {
       <span style="font-size:12px;color:var(--text2);">${dados.participantes.length} participante(s) · ${totalResponsaveis} responsável(is) · ${totalEventos} evento(s) em ${totalAcoes} ação(ões) · ${dados.cursosAplicados.length} curso(s) finalizado(s)</span>
       <span style="flex:1;"></span>
       <button class="btn btn-secondary btn-sm" id="ata-copiar-texto">📋 Copiar Texto</button>
+      <button class="btn btn-secondary btn-sm" id="ata-copiar-formatado">🎨 Copiar Formatado</button>
       <button class="btn btn-primary btn-sm" id="ata-abrir-email">✉️ Abrir E-mail</button>
     </div>
     <div class="pdm-box" id="ata-texto-box" style="max-height:60vh;">${_montarHtmlAta(dados)}</div>
   `;
   document.getElementById('ata-copiar-texto')?.addEventListener('click', () => copyToClipboard(texto, 'Ata copiada! Cole no seu e-mail.'));
+  // v19.96: copia com negrito/cor/tabela — para colar em Outlook/Teams/Word (mailto não aceita HTML)
+  document.getElementById('ata-copiar-formatado')?.addEventListener('click', () => copyRichToClipboard(_montarHtmlAtaRico(dados), texto, 'Ata formatada copiada! Cole no seu e-mail.'));
   document.getElementById('ata-abrir-email')?.addEventListener('click', () => {
     const assunto = dados.dataDe === dados.dataAte
       ? `Ata de Reunião — ${dados.planoTitulo} — ${formatDate(dados.dataDe)}`
@@ -6456,7 +6534,7 @@ function _renderResultadoAta(dados) {
     // v19.73: mailto: tem limite prático de tamanho (varia por cliente, ~2000 chars é um teto seguro) —
     // Atas longas estourariam e o e-mail abriria cortado sem avisar; por isso barramos antes com uma margem.
     if (mailto.length > 1800) {
-      toast('A Ata é grande demais para abrir direto no e-mail (limite do link mailto:). Use "📋 Copiar Texto" e cole no seu e-mail.', 'warning');
+      toast('A Ata é grande demais para abrir direto no e-mail (limite do link mailto:). Use "🎨 Copiar Formatado" e cole no seu e-mail.', 'warning'); // v19.96: aponta para a opção com formatação
       return;
     }
     window.location.href = mailto;
