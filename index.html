@@ -466,7 +466,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.102';
+const APP_VERSAO = 'v19.104';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -2948,7 +2948,9 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
     // recorrência, já que ela não tem ação própria associada e esse contexto ajuda na reunião.
     // "Fechadas" em vez de "Em Aberto" — uma ação vencida já está coberta por "Vencidas", então
     // misturar as duas em "Em Aberto" confundia (uma mesma ação contava nas duas).
-    const _todasAcoesDoProblema = prob.acoes_corretivas || [];
+    // v19.103: ações canceladas saem da contagem de "Registradas" — uma ação cancelada não é mais
+    // uma ação ativa do problema, então contá-la como "registrada" inflava o total sem sentido.
+    const _todasAcoesDoProblema = (prob.acoes_corretivas || []).filter(c => calcStatusAcao(c) !== 'CANCELADO');
     const _totalAcoesProblema = _todasAcoesDoProblema.length;
     const _vencidasAcoesProblema = _todasAcoesDoProblema.filter(c => calcStatusAcao(c) === 'VENCIDO').length;
     const _fechadasAcoesProblema = _todasAcoesDoProblema.filter(c => calcStatusAcao(c) === 'FECHADO').length;
@@ -6399,7 +6401,7 @@ function _montarLinhasAta(dados) {
   add('');
   add('PARTICIPANTES:');
   if (!dados.participantes.length) add('Nenhum participante necessário registrado no período.', { indent: 1 });
-  dados.participantes.forEach(p => add(`• ${p.nome} (${p.departamento}) — ${p.label}`, { indent: 1 })); // v19.96: bullet point
+  dados.participantes.forEach(p => add(`🔹 ${p.nome} (${p.departamento}) — ${p.label}`, { indent: 1 })); // v19.104: símbolo maior
   add('');
   // v19.99: recorrência não tem ação corretiva associada — fica num bloco próprio, logo após a
   // presença. Entra na Ata do dia em que foi REGISTRADA (não do dia da produção, que pode ser outro).
@@ -6424,10 +6426,13 @@ function _montarLinhasAta(dados) {
     add('─'.repeat(36)); // v19.96: linha somente embaixo do nome do departamento (sem cor, a pedido do usuário)
     dep.responsaveis.forEach((r, idx) => {
       if (idx > 0) add(''); // v19.77: só separa com linha em branco ENTRE pessoas, não logo após o departamento
-      add(`• ${r.nome}`, { indent: 1 }); // v19.96: bullet point no nome do responsável
-      add(`✅ Fechadas: ${r.fechadas} | ⏳ Pendentes: ${r.pendentes} | 🕒 No prazo: ${r.emAndamento} | ⚠️ Vencidas: ${r.vencidas}`, { indent: 1 }); // v19.96: ícones por status
+      // v19.104: símbolo maior (🔹 em vez de •) — o bullet simples ficava sem destaque perto dos
+      // demais ícones (emoji), que renderizam maiores. As informações do responsável (status e
+      // ações) ganham +1 nível de identação em relação ao nome, para o nome se destacar como título.
+      add(`🔹 ${r.nome}`, { indent: 1 });
+      add(`✅ Fechadas: ${r.fechadas} | ⏳ Pendentes: ${r.pendentes} | 🕒 No prazo: ${r.emAndamento} | ⚠️ Vencidas: ${r.vencidas}`, { indent: 2 });
       if (!r.acoes.length) {
-        add('Sem evolução nas ações.', { indent: 1 });
+        add('Sem evolução nas ações.', { indent: 2 });
       } else {
         r.acoes.forEach(ac => {
           // v19.97: identação das informações de cada ação dobrada NOVAMENTE (pedido do usuário: 2→4, 4→8)
@@ -6440,7 +6445,9 @@ function _montarLinhasAta(dados) {
     });
   });
   add('');
-  add('CURSOS DE 1 TEMA:');
+  // v19.104: CURSOS DE 1 TEMA ganha o mesmo destaque de área/departamento (negrito + linha embaixo)
+  add('CURSOS DE 1 TEMA:', { bold: true });
+  add('─'.repeat(36));
   add(`✅ Fechados: ${dados.cursosFechadosQtd} | ⏳ Pendentes: ${dados.cursosPendentesQtd} | 🕒 No prazo: ${dados.cursosNoPrazoQtd} | ⚠️ Vencidas: ${dados.cursosVencidosQtd}`, { indent: 1 }); // v19.96: ícones por status
   add('');
   add('APLICADOS:', { indent: 1 });
