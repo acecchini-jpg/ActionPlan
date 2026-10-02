@@ -466,7 +466,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.104';
+const APP_VERSAO = 'v19.105';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -659,6 +659,19 @@ function today() { return new Date().toISOString().slice(0,10); }
 function formatDate(d) { if (!d) return '—'; if (typeof d === 'string') { if (/^\d{4}-\d{2}-\d{2}/.test(d)) { const [y,m,dd]=d.slice(0,10).split('-'); return dd+'/'+m+'/'+y; } if (/^\d{2}\/\d{2}\/\d{4}$/.test(d)) return d; } const dt = parseDateSafe(d); if (!dt) return '—'; return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`; }
 function parseDateSafe(value) { if (value == null || value === '') return null; if (typeof value === 'object') { if (typeof value.toDate === 'function') { const dt = value.toDate(); return isNaN(dt) ? null : dt; } if (typeof value.seconds === 'number') return new Date(value.seconds * 1000); if (value instanceof Date) return isNaN(value) ? null : value; return null; } if (typeof value !== 'string') return null; const s = value.trim(); if (!s) return null; if (/^\d{4}-\d{2}-\d{2}/.test(s)) { const [y, m, d] = s.slice(0,10).split('-').map(Number); if (!y || m < 1 || m > 12 || d < 1 || d > 31) return null; const dt = new Date(y, m-1, d); return isNaN(dt) ? null : dt; } if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) { const [d, m, y] = s.split('/').map(Number); if (!y || m < 1 || m > 12 || d < 1 || d > 31) return null; const dt = new Date(y, m-1, d); return isNaN(dt) ? null : dt; } const dt = new Date(s); return isNaN(dt) ? null : dt; }
 function normalizeDate(dt) { if (!(dt instanceof Date) || isNaN(dt)) return null; return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
+// v19.105: próximo dia útil (pula sábado e domingo) — ex.: sexta-feira → segunda-feira
+function _proximoDiaUtil(dataStr) {
+  const [y, m, d] = dataStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  do { dt.setDate(dt.getDate() + 1); } while (dt.getDay() === 0 || dt.getDay() === 6);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+// v19.105: se a Ata de hoje já foi emitida (copiada), uma recorrência adicionada agora não entra mais
+// nela — registra automaticamente pro próximo dia útil, sem depender do usuário lembrar de ajustar.
+function _calcRegistradoEmPadrao() {
+  const hoje = today();
+  return state.ultimaAtaEmitidaEm === hoje ? _proximoDiaUtil(hoje) : hoje;
+}
 function calcStatusAcao(cr) { if (cr.cancelado) return 'CANCELADO'; const hoje = normalizeDate(new Date()); const prevista = normalizeDate(parseDateSafe(cr.data_prevista)); const efetiva = normalizeDate(parseDateSafe(cr.data_efetiva)); if (efetiva) return 'FECHADO'; if (!prevista) return 'EM ANDAMENTO'; if (prevista >= hoje) return 'EM ANDAMENTO'; return 'VENCIDO'; }
 function statusBadge(s) { const map={'FECHADO':'badge-green','EM ANDAMENTO':'badge-blue','VENCIDO':'badge-red','CANCELADO':'badge-gray'}; return `<span class="badge ${map[s]||'badge-gray'}">${s}</span>`; }
 function nextAcaoId() { let max=0; state.acoes.forEach(a=>{ if(a.id_global>max) max=a.id_global; }); return max+1; }
@@ -943,6 +956,7 @@ function setupRealtimeListeners() { showLoading('Sincronizando dados…'); const
     const _unsubAuditoria = db.collection('config_sistema').doc('geral').onSnapshot(doc => {
       state.modoAuditoria = doc.exists ? (doc.data().modo_auditoria === true) : false;
       state.logoEmpresaUrl = doc.exists ? (doc.data().logo_empresa_url || null) : null; // v19.35
+      state.ultimaAtaEmitidaEm = doc.exists ? (doc.data().ultima_ata_emitida_em || null) : null; // v19.105
       render();
     }, err => console.warn('Erro ao sincronizar modo auditoria:', err));
     _snapUnsubs.push(_unsubAuditoria);
@@ -4147,9 +4161,10 @@ function renderNovoCadastro(container) {
   document.getElementById('nc-add-corretiva-rodape').addEventListener('click', _ncAddCorretiva);
   // ── Wire: botão adicionar reincidência ──
   document.getElementById('nc-add-reincidencia')?.addEventListener('click', () => {
-    // v19.99: "registrado_em" é carimbado na criação e nunca mais muda — é a data que a Ata usa pra
-    // decidir em qual reunião a recorrência aparece (a "data_producao" pode ser de outro dia)
-    _ncState.recorrencias.push({ id: uid(), operador: '', data_producao: today(), registrado_em: today(), turnos: [], quantidade: '' });
+    // v19.99: "registrado_em" é a data que a Ata usa pra decidir em qual reunião a recorrência aparece
+    // (a "data_producao" pode ser de outro dia). v19.105: se a Ata de hoje já foi emitida, cai
+    // automaticamente pro próximo dia útil (pode ser ajustado manualmente no ícone 📅 da linha).
+    _ncState.recorrencias.push({ id: uid(), operador: '', data_producao: today(), registrado_em: _calcRegistradoEmPadrao(), turnos: [], quantidade: '' });
     // Primeira reincidência → marca checkbox automaticamente
     if (_ncState.recorrencias.length === 1) {
       const cbR = document.getElementById('nc-reincidente');
@@ -4314,7 +4329,7 @@ function _ncRenderReincidencias() {
   if (!cont) return;
   if (!_ncState.recorrencias.length) { cont.innerHTML = ''; return; }
   cont.innerHTML = _ncState.recorrencias.map((r, i) => `
-    <div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;margin-top:6px;align-items:end;"
+    <div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr auto auto;gap:10px;margin-top:6px;align-items:end;"
          id="nc-reinc-row-${i}">
       <div class="form-group" style="margin-bottom:0;">
         ${i===0?'<label class="form-label" style="font-size:10px;color:var(--text3);">Operador</label>':''}
@@ -4341,6 +4356,12 @@ function _ncRenderReincidencias() {
       <div class="form-group" style="margin-bottom:0;">
         ${i===0?'<label class="form-label" style="font-size:10px;color:var(--text3);">Quantidade</label>':''}
         <input class="form-control nc-reinc-qtd" type="number" min="0" data-idx="${i}" placeholder="Qtd." value="${escHtml(String(r.quantidade||''))}">
+      </div>
+      <div style="padding-bottom:2px;position:relative;">
+        <button type="button" class="btn btn-ghost btn-xs nc-reinc-regdata-btn" data-idx="${i}"
+          title="Registrado em: ${formatDate(r.registrado_em)} — data usada pra decidir em qual Ata esta recorrência aparece. Clique para ajustar manualmente.">📅</button>
+        <input type="date" class="nc-reinc-regdata-input" data-idx="${i}" value="${escHtml(r.registrado_em||'')}"
+          style="position:absolute;opacity:0;width:1px;height:1px;left:0;top:0;pointer-events:none;">
       </div>
       <div style="padding-bottom:2px;">
         <button type="button" class="btn btn-danger btn-xs nc-del-reinc" data-idx="${i}" title="Remover reincidência">🗑️</button>
@@ -4371,6 +4392,17 @@ function _ncRenderReincidencias() {
       else { r.turnos = r.turnos.filter(x => x !== key); }
     }));
   });
+  // v19.105: ícone de calendário — ajuste manual do "registrado em" (casos excepcionais; o padrão
+  // automático já cobre o dia a dia, ver _calcRegistradoEmPadrao)
+  cont.querySelectorAll('.nc-reinc-regdata-btn').forEach(btn => btn.addEventListener('click', () => {
+    const idx = +btn.dataset.idx;
+    const inp = cont.querySelector(`.nc-reinc-regdata-input[data-idx="${idx}"]`);
+    if (inp && inp.showPicker) inp.showPicker(); else if (inp) inp.focus();
+  }));
+  cont.querySelectorAll('.nc-reinc-regdata-input').forEach(inp => inp.addEventListener('change', () => {
+    _ncState.recorrencias[+inp.dataset.idx].registrado_em = inp.value;
+    _ncRenderReincidencias(); // re-renderiza pra atualizar o texto do tooltip
+  }));
   cont.querySelectorAll('.nc-del-reinc').forEach(btn => btn.addEventListener('click', () => {
     _ncState.recorrencias.splice(+btn.dataset.idx, 1);
     // Se não há mais reincidências, desmarca o checkbox
@@ -6520,7 +6552,14 @@ function _renderResultadoAta(dados) {
   // v19.97: removidos "Copiar Formatado" e "Abrir E-mail" (resultado não ficou OK) — só Copiar Texto.
   // v19.97: white-space:normal (sobrepõe o "pre" padrão do .pdm-box) + cada linha vira um bloco
   // com padding-left — assim uma linha longa quebra e a continuação fica alinhada dentro da identação.
-  document.getElementById('ata-copiar-texto')?.addEventListener('click', () => copyToClipboard(texto, 'Ata copiada! Cole no seu e-mail.'));
+  document.getElementById('ata-copiar-texto')?.addEventListener('click', () => {
+    copyToClipboard(texto, 'Ata copiada! Cole no seu e-mail.');
+    // v19.105: marca que a Ata de hoje foi emitida — só quando o período gerado cobre hoje. A partir
+    // daqui, uma recorrência nova é registrada automaticamente pro próximo dia útil (ver _calcRegistradoEmPadrao).
+    if (dados.dataAte === today() && db) {
+      db.collection('config_sistema').doc('geral').set({ ultima_ata_emitida_em: today(), atualizado_em: new Date().toISOString(), atualizado_por: _userProfile?.email || 'sistema' }, { merge: true }).catch(err => console.warn('Erro ao registrar emissão da Ata:', err));
+    }
+  });
 }
 function renderPresenca(container) {
   const planosOpts = `<option value="">— Selecione o Plano —</option>` + state.planos.map(p=>`<option value="${p.id}">${escHtml(p.titulo)}</option>`).join('');
