@@ -466,7 +466,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.100';
+const APP_VERSAO = 'v19.101';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -2944,12 +2944,12 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
   state.acoes.forEach(prob => {
     if (planoId && prob.plano_id !== planoId) return;
     const subtopico = state.subtopicos.find(s => s.id === prob.subtopico_id);
-    // v19.100: totais do ITEM (problema) — somando TODAS as suas ações corretivas, não só a do
-    // responsável sendo exibido no momento (um item pode ter ações de pessoas diferentes).
-    const _todasAcoesDoItem = prob.acoes_corretivas || [];
-    const _totalAcoesItem = _todasAcoesDoItem.length;
-    const _vencidasAcoesItem = _todasAcoesDoItem.filter(c => calcStatusAcao(c) === 'VENCIDO').length;
-    const _abertasAcoesItem = _todasAcoesDoItem.filter(c => { const s = calcStatusAcao(c); return s === 'VENCIDO' || s === 'EM ANDAMENTO'; }).length;
+    // v19.101: totais do PROBLEMA (todas as ações corretivas cadastradas nele) — exibidos em cada
+    // recorrência, já que ela não tem ação própria associada e esse contexto ajuda na reunião.
+    const _todasAcoesDoProblema = prob.acoes_corretivas || [];
+    const _totalAcoesProblema = _todasAcoesDoProblema.length;
+    const _vencidasAcoesProblema = _todasAcoesDoProblema.filter(c => calcStatusAcao(c) === 'VENCIDO').length;
+    const _abertasAcoesProblema = _todasAcoesDoProblema.filter(c => { const s = calcStatusAcao(c); return s === 'VENCIDO' || s === 'EM ANDAMENTO'; }).length;
     // v19.99: a recorrência precisa aparecer na Ata do dia em que foi REGISTRADA no sistema
     // (registrado_em), não no dia da produção (data_producao) — podem ser dias diferentes.
     // Fallback para data_producao em registros antigos, salvos antes de existir "registrado_em".
@@ -2962,7 +2962,8 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
         registradoEm: r.registrado_em || null,
         dataProducao: r.data_producao,
         turnos: (r.turnos || []).join(', ') || '—',
-        quantidade: r.quantidade || '—'
+        quantidade: r.quantidade || '—',
+        totalAcoesProblema: _totalAcoesProblema, abertasAcoesProblema: _abertasAcoesProblema, vencidasAcoesProblema: _vencidasAcoesProblema // v19.101
       });
     });
     (prob.acoes_corretivas || []).forEach(cr => {
@@ -3008,7 +3009,6 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
           subtopico: subtopico ? subtopico.descricao : '—',
           problemaTexto: prob.problema || '—',
           acaoDescricao: cr.acao_descricao || '—',
-          totalAcoesItem: _totalAcoesItem, abertasAcoesItem: _abertasAcoesItem, vencidasAcoesItem: _vencidasAcoesItem, // v19.100
           eventos
         });
         const _rEmail = state.responsaveis.find(r => r.nome === cr.responsavel);
@@ -6410,6 +6410,8 @@ function _montarLinhasAta(dados) {
     add(`🔁 ${r.subtopico} — ${r.defeito}`, { indent: 1 });
     const _regPrefixo = _mostrarRegistradoEm ? `Registrado em: ${r.registradoEm ? formatDate(r.registradoEm) : '—'} | ` : '';
     add(`${_regPrefixo}Data de Produção: ${formatDate(r.dataProducao)} | Turno: ${r.turnos} | Quantidade de Peças: ${r.quantidade}`, { indent: 2 });
+    // v19.101: total de ações cadastradas para o PROBLEMA desta recorrência, abertas e vencidas
+    add(`📊 Ações Registradas: ${r.totalAcoesProblema} | Em Aberto: ${r.abertasAcoesProblema} | Vencidas: ${r.vencidasAcoesProblema}`, { indent: 2 });
   });
   add('');
   add('ATIVIDADES:');
@@ -6429,8 +6431,6 @@ function _montarLinhasAta(dados) {
           // v19.97: identação das informações de cada ação dobrada NOVAMENTE (pedido do usuário: 2→4, 4→8)
           add(`📌 Item #${ac.numeroAcao} — Produto: ${ac.subtopico}`, { indent: 4, bold: true });
           add(`Não Conformidade: ${ac.problemaTexto}`, { indent: 4, italic: true });
-          // v19.100: totais do ITEM (todas as ações corretivas do problema, não só a desta pessoa)
-          add(`📊 Ações Registradas: ${ac.totalAcoesItem} | Em Aberto: ${ac.abertasAcoesItem} | Vencidas: ${ac.vencidasAcoesItem}`, { indent: 4 });
           add(`Ação: ${ac.acaoDescricao}`, { indent: 8 });
           ac.eventos.forEach(ev => add(`${_iconEvento(ev.texto)}${ev.texto} em ${formatDate(ev.data)}`, { indent: 8 }));
         });
