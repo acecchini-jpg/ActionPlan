@@ -466,7 +466,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.97';
+const APP_VERSAO = 'v19.100';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -2939,10 +2939,32 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
   state.responsaveis.forEach(r => { _respDeptMap[r.nome] = r.departamento || 'Sem Departamento'; });
   const statsPorResp = {}; // nome -> { total, vencidas, emAndamento, acoes:[{numeroAcao,subtopico,problemaTexto,eventos}] }
   const emailsEnvolvidos = new Set();
+  const recorrenciasAdicionadas = []; // v19.98: recorrências não têm ação associada — não cabem no bloco por responsável
 
   state.acoes.forEach(prob => {
     if (planoId && prob.plano_id !== planoId) return;
     const subtopico = state.subtopicos.find(s => s.id === prob.subtopico_id);
+    // v19.100: totais do ITEM (problema) — somando TODAS as suas ações corretivas, não só a do
+    // responsável sendo exibido no momento (um item pode ter ações de pessoas diferentes).
+    const _todasAcoesDoItem = prob.acoes_corretivas || [];
+    const _totalAcoesItem = _todasAcoesDoItem.length;
+    const _vencidasAcoesItem = _todasAcoesDoItem.filter(c => calcStatusAcao(c) === 'VENCIDO').length;
+    const _abertasAcoesItem = _todasAcoesDoItem.filter(c => { const s = calcStatusAcao(c); return s === 'VENCIDO' || s === 'EM ANDAMENTO'; }).length;
+    // v19.99: a recorrência precisa aparecer na Ata do dia em que foi REGISTRADA no sistema
+    // (registrado_em), não no dia da produção (data_producao) — podem ser dias diferentes.
+    // Fallback para data_producao em registros antigos, salvos antes de existir "registrado_em".
+    (prob.recorrencias || []).forEach(r => {
+      const _dataFiltro = r.registrado_em || r.data_producao;
+      if (!_inPeriodo((_dataFiltro || '').slice(0, 10))) return;
+      recorrenciasAdicionadas.push({
+        subtopico: subtopico ? subtopico.descricao : '—',
+        defeito: prob.problema || '—',
+        registradoEm: r.registrado_em || null,
+        dataProducao: r.data_producao,
+        turnos: (r.turnos || []).join(', ') || '—',
+        quantidade: r.quantidade || '—'
+      });
+    });
     (prob.acoes_corretivas || []).forEach(cr => {
       const nome = cr.responsavel || 'N/D';
       if (!statsPorResp[nome]) statsPorResp[nome] = { pendentes: 0, vencidas: 0, emAndamento: 0, fechadas: 0, acoes: [] };
@@ -2986,6 +3008,7 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
           subtopico: subtopico ? subtopico.descricao : '—',
           problemaTexto: prob.problema || '—',
           acaoDescricao: cr.acao_descricao || '—',
+          totalAcoesItem: _totalAcoesItem, abertasAcoesItem: _abertasAcoesItem, vencidasAcoesItem: _vencidasAcoesItem, // v19.100
           eventos
         });
         const _rEmail = state.responsaveis.find(r => r.nome === cr.responsavel);
@@ -3034,10 +3057,15 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
     if (_rPlano && _rPlano.email) emailsEnvolvidos.add(_rPlano.email);
   }
 
+  // v19.98: recorrências ordenadas por data de produção (mais antiga primeiro)
+  // v19.99: ordena pela data que a colocou no período (registrado_em, com fallback pra data_producao)
+  recorrenciasAdicionadas.sort((a, b) => (a.registradoEm || a.dataProducao || '').localeCompare(b.registradoEm || b.dataProducao || ''));
+
   return {
     planoTitulo: plano ? plano.titulo : 'Todos os Planos',
     dataDe, dataAte,
     participantes,
+    recorrenciasAdicionadas,
     atividadesPorDepartamento,
     cursosAplicados,
     cursosPendentesQtd, cursosNoPrazoQtd, cursosVencidosQtd, cursosFechadosQtd,
@@ -4115,7 +4143,9 @@ function renderNovoCadastro(container) {
   document.getElementById('nc-add-corretiva-rodape').addEventListener('click', _ncAddCorretiva);
   // ── Wire: botão adicionar reincidência ──
   document.getElementById('nc-add-reincidencia')?.addEventListener('click', () => {
-    _ncState.recorrencias.push({ id: uid(), operador: '', data_producao: today(), turnos: [], quantidade: '' });
+    // v19.99: "registrado_em" é carimbado na criação e nunca mais muda — é a data que a Ata usa pra
+    // decidir em qual reunião a recorrência aparece (a "data_producao" pode ser de outro dia)
+    _ncState.recorrencias.push({ id: uid(), operador: '', data_producao: today(), registrado_em: today(), turnos: [], quantidade: '' });
     // Primeira reincidência → marca checkbox automaticamente
     if (_ncState.recorrencias.length === 1) {
       const cbR = document.getElementById('nc-reincidente');
@@ -6369,6 +6399,19 @@ function _montarLinhasAta(dados) {
   if (!dados.participantes.length) add('Nenhum participante necessário registrado no período.', { indent: 1 });
   dados.participantes.forEach(p => add(`• ${p.nome} (${p.departamento}) — ${p.label}`, { indent: 1 })); // v19.96: bullet point
   add('');
+  // v19.99: recorrência não tem ação corretiva associada — fica num bloco próprio, logo após a
+  // presença. Entra na Ata do dia em que foi REGISTRADA (não do dia da produção, que pode ser outro).
+  add('RECORRÊNCIAS ADICIONADAS:');
+  if (!dados.recorrenciasAdicionadas.length) add('Nenhuma recorrência registrada no período.', { indent: 1 });
+  // v19.100: "Registrado em" só faz sentido quando a Ata cobre mais de 1 dia — numa Ata de um dia
+  // só, é óbvio que a recorrência foi registrada naquele dia (é o próprio critério de inclusão).
+  const _mostrarRegistradoEm = dados.dataDe !== dados.dataAte;
+  dados.recorrenciasAdicionadas.forEach(r => {
+    add(`🔁 ${r.subtopico} — ${r.defeito}`, { indent: 1 });
+    const _regPrefixo = _mostrarRegistradoEm ? `Registrado em: ${r.registradoEm ? formatDate(r.registradoEm) : '—'} | ` : '';
+    add(`${_regPrefixo}Data de Produção: ${formatDate(r.dataProducao)} | Turno: ${r.turnos} | Quantidade de Peças: ${r.quantidade}`, { indent: 2 });
+  });
+  add('');
   add('ATIVIDADES:');
   if (!dados.atividadesPorDepartamento.length) add('Nenhuma atividade registrada no período.', { indent: 1 });
   dados.atividadesPorDepartamento.forEach(dep => {
@@ -6386,6 +6429,8 @@ function _montarLinhasAta(dados) {
           // v19.97: identação das informações de cada ação dobrada NOVAMENTE (pedido do usuário: 2→4, 4→8)
           add(`📌 Item #${ac.numeroAcao} — Produto: ${ac.subtopico}`, { indent: 4, bold: true });
           add(`Não Conformidade: ${ac.problemaTexto}`, { indent: 4, italic: true });
+          // v19.100: totais do ITEM (todas as ações corretivas do problema, não só a desta pessoa)
+          add(`📊 Ações Registradas: ${ac.totalAcoesItem} | Em Aberto: ${ac.abertasAcoesItem} | Vencidas: ${ac.vencidasAcoesItem}`, { indent: 4 });
           add(`Ação: ${ac.acaoDescricao}`, { indent: 8 });
           ac.eventos.forEach(ev => add(`${_iconEvento(ev.texto)}${ev.texto} em ${formatDate(ev.data)}`, { indent: 8 }));
         });
