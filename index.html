@@ -466,7 +466,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.105';
+const APP_VERSAO = 'v19.106';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -6489,14 +6489,18 @@ function _montarLinhasAta(dados) {
 }
 // Texto puro — usado em Copiar Texto (não existe "negrito" em texto puro; a quebra de linha longa
 // sempre volta pra coluna 0 em texto puro — isso só dá pra resolver na tela, ver _montarHtmlAta)
+// v19.106: 3 espaços por nível (era 2) — um ícone + espaço (🔁 , 🔹 , 📌 ) ocupa ~3 posições de
+// caractere numa fonte monoespaçada, então o próximo nível de identação passa a cair alinhado
+// bem embaixo do texto que vem depois do ícone na linha de cima, em vez de só "um pouco mais" à direita.
 function _montarTextoAta(dados) {
-  return _montarLinhasAta(dados).map(l => '  '.repeat(l.indent) + l.texto).join('\n');
+  return _montarLinhasAta(dados).map(l => '   '.repeat(l.indent) + l.texto).join('\n');
 }
 // HTML — usado só na tela. v19.97: cada linha vira um bloco com padding-left (em vez de espaços
 // soltos dentro de um <pre>), para que uma linha longa quebre e a continuação fique alinhada
-// DENTRO da identação, e não de volta na coluna 0.
+// DENTRO da identação, e não de volta na coluna 0. v19.106: PX_POR_NIVEL acompanha a mudança acima
+// (3 caracteres monoespaçados de ~7px cada, na fonte Courier New 11.5px do .pdm-box).
 function _montarHtmlAta(dados) {
-  const PX_POR_NIVEL = 14;
+  const PX_POR_NIVEL = 21;
   return _montarLinhasAta(dados).map(l => {
     const txt = l.texto === '' ? '&nbsp;' : escHtml(l.texto);
     let html = l.bold ? `<strong>${txt}</strong>` : txt;
