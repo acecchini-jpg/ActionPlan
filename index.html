@@ -466,7 +466,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.107';
+const APP_VERSAO = 'v19.108';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -2947,8 +2947,12 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
     let label;
     if (reunioes <= 1) label = taxa === 100 ? 'Presente' : (taxa === 0 ? 'Ausente' : `${taxa}%`);
     else label = `${taxa}%`;
-    return { nome, departamento: resp ? (resp.departamento || '—') : '—', email: resp ? (resp.email || '') : '', taxa, reunioes, label };
+    // v19.108: ícone só quando há 1 reunião (Presente/Ausente); com várias, vale o percentual
+    const icone = reunioes <= 1 ? (taxa === 100 ? '✅' : (taxa === 0 ? '❌' : '')) : '';
+    return { nome, departamento: resp ? (resp.departamento || '—') : '—', email: resp ? (resp.email || '') : '', taxa, reunioes, label, icone };
   });
+  // v19.108: presentes primeiro, ausentes no fim — ordem decrescente de percentual (empate: nome)
+  participantes.sort((a, b) => (b.taxa - a.taxa) || a.nome.localeCompare(b.nome, 'pt-BR'));
 
   // ── Atividades: por Departamento > por Responsável (todos, com totais gerais) > eventos do período ──
   const _respDeptMap = {};
@@ -6436,7 +6440,7 @@ function _montarLinhasAta(dados) {
   add('');
   add('PARTICIPANTES:');
   if (!dados.participantes.length) add('Nenhum participante necessário registrado no período.', { indent: 1 });
-  dados.participantes.forEach(p => add(`🔹 ${p.nome} (${p.departamento}) — ${p.label}`, { indent: 1 })); // v19.104: símbolo maior
+  dados.participantes.forEach(p => add(`${p.icone || '🔹'} ${p.nome} (${p.departamento}) — ${p.label}`, { indent: 1 })); // v19.104: símbolo maior
   add('');
   // v19.99: recorrência não tem ação corretiva associada — fica num bloco próprio, logo após a
   // presença. Entra na Ata do dia em que foi REGISTRADA (não do dia da produção, que pode ser outro).
