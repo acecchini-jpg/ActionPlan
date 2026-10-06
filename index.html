@@ -320,6 +320,11 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 .dash-tab-btn { background:none; border:none; border-bottom:2px solid transparent; padding:10px 18px; font-family:var(--font-hd); font-size:14px; font-weight:600; color:var(--text2); cursor:pointer; transition:color .15s,border-color .15s; }
 .dash-tab-btn:hover { color:var(--text); }
 .dash-tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+.nc-info{position:relative;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;flex:none;border-radius:50%;cursor:pointer;color:var(--accent);font-size:18px;line-height:1;user-select:none;}
+.nc-info:hover,.nc-info:focus{background:var(--bg3,rgba(128,128,128,.15));outline:none;}
+.nc-info-tip{display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:50;width:max-content;max-width:300px;padding:8px 10px;border-radius:6px;background:var(--bg2,#222);color:var(--text,#eee);border:1px solid var(--border,#555);box-shadow:0 4px 14px rgba(0,0,0,.35);font-size:12px;font-weight:400;line-height:1.4;white-space:pre-line;text-align:left;}
+.nc-info:hover .nc-info-tip,.nc-info:focus .nc-info-tip{display:block;}
 </style>
 </head>
 <body>
@@ -466,7 +471,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.108';
+const APP_VERSAO = 'v19.109';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -4037,9 +4042,12 @@ function renderNovoCadastro(container) {
         </div>
         <div class="form-group">
           <label class="form-label">Sub-Tópico</label>
-          <select class="form-control" id="nc-subtopico">
-            <option value="">Selecione o plano...</option>
-          </select>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <select class="form-control" id="nc-subtopico" style="flex:1;min-width:0;">
+              <option value="">Selecione o plano...</option>
+            </select>
+            <span class="nc-info" id="nc-sub-info" style="display:none;" tabindex="0" role="button" aria-label="Detalhes do Sub-Tópico — clique para copiar o código" onclick="_ncCopiarCodigoSub()">ⓘ<span class="nc-info-tip" id="nc-sub-info-tip"></span></span>
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Data de Abertura</label>
@@ -4163,6 +4171,7 @@ function renderNovoCadastro(container) {
     </div>
   </div>`;
   document.getElementById('nc-plano').addEventListener('change', _ncOnPlanoChange);
+  document.getElementById('nc-subtopico').addEventListener('change', _ncAtualizarInfoSub);
   // nc-cancelar e nc-salvar usam onclick inline no HTML; não existem como ids separados
   document.getElementById('nc-add-corretiva').addEventListener('click', _ncAddCorretiva);
   document.getElementById('nc-add-corretiva-rodape').addEventListener('click', _ncAddCorretiva);
@@ -4234,6 +4243,7 @@ function renderNovoCadastro(container) {
     document.getElementById('nc-plano').value = _editingProb.plano_id || '';
     _ncOnPlanoChange();
     document.getElementById('nc-subtopico').value = _editingProb.subtopico_id || '';
+    _ncAtualizarInfoSub();
     document.getElementById('nc-data-abertura').value = _editingProb.data_abertura || today();
     document.getElementById('nc-responsavel').value = _editingProb.responsavel || '';
     document.getElementById('nc-problema').value = _editingProb.problema || '';
@@ -4283,6 +4293,26 @@ function _ncOnPlanoChange() {
   // v19.7: auto-preenche o Responsável com o padrão do Plano — só se o campo ainda estiver vazio (continua editável)
   const respSel = document.getElementById('nc-responsavel');
   if (respSel && !respSel.value && plano && plano.responsavel) respSel.value = plano.responsavel;
+  _ncAtualizarInfoSub();
+}
+
+// v19.109: ⓘ ao lado do Sub-Tópico — tooltip com descrição longa + código do produto; clique copia o código
+function _ncAtualizarInfoSub() {
+  const info = document.getElementById('nc-sub-info');
+  const tip = document.getElementById('nc-sub-info-tip');
+  const sel = document.getElementById('nc-subtopico');
+  if (!info || !tip || !sel) return;
+  const sub = state.subtopicos.find(x => x.id === sel.value);
+  if (!sub) { info.style.display = 'none'; tip.textContent = ''; return; }
+  const cod = (sub.codigo_subitem || '').trim();
+  tip.textContent = (sub.descricao_longa ? sub.descricao_longa + '\n' : '') + (cod ? 'Código: ' + cod + '  (clique para copiar)' : 'Sem código cadastrado');
+  info.style.display = '';
+}
+function _ncCopiarCodigoSub() {
+  const sub = state.subtopicos.find(x => x.id === document.getElementById('nc-subtopico')?.value);
+  const cod = (sub?.codigo_subitem || '').trim();
+  if (!cod) { toast('Este Sub-Tópico não tem código cadastrado.', 'warning'); return; }
+  copyToClipboard(cod, 'Código ' + cod + ' copiado!');
 }
 
 // v19.1.3: alterna o botão entre "📎 Upload" e "🔍 Ver / 🔄 Subst." conforme haja evidência
