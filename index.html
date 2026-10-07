@@ -471,7 +471,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.109';
+const APP_VERSAO = 'v19.110';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -653,12 +653,40 @@ async function _sincronizarIndiceNumeroAcao(problemaId, corretivasAtuais, corret
   const numerosAnteriores = new Set();
   (corretivasAnteriores || []).forEach(cr => { if (_numAcaoValido(cr.numeroAcao)) numerosAnteriores.add(String(cr.numeroAcao)); });
   const todos = new Set([...Object.keys(porNumero), ...numerosAnteriores]);
+  const falhas = [];
   for (const num of todos) {
     try {
       if (porNumero[num]) await db.collection('indice_numeroacao').doc(num).set({ entradas: porNumero[num] });
       else await db.collection('indice_numeroacao').doc(num).delete();
-    } catch(e) { console.warn('Erro ao sincronizar índice de número da ação:', num, e); }
+    } catch(e) { console.warn('Erro ao sincronizar índice de número da ação:', num, e); falhas.push(num); }
   }
+  // v19.110: antes a falha era silenciosa (só console) — a consulta do Excel ficava desatualizada sem ninguém saber
+  if (falhas.length) toast('Não consegui atualizar o índice de consulta (Excel) da(s) ação(ões) ' + falhas.join(', ') + '. Use "Reconstruir índice" em Backup.', 'warning');
+}
+// v19.110: reconstrói a coleção 'indice_numeroacao' inteira a partir de state.acoes (corrige índices velhos
+// e remove entradas órfãs de números que não existem mais).
+async function _reconstruirIndiceNumeroAcao() {
+  if (!db) { toast('Firebase não configurado', 'warning'); return null; }
+  const porNumero = {};
+  state.acoes.forEach(prob => (prob.acoes_corretivas || []).forEach((cr, idx) => {
+    if (!_numAcaoValido(cr.numeroAcao)) return;
+    const num = String(cr.numeroAcao);
+    if (!porNumero[num]) porNumero[num] = [];
+    porNumero[num].push({ problema_id: prob.id, idx, data_prevista: cr.data_prevista || '', data_efetiva: cr.data_efetiva || '' });
+  }));
+  let gravados = 0, removidos = 0, falhas = 0;
+  for (const num of Object.keys(porNumero)) {
+    try { await db.collection('indice_numeroacao').doc(num).set({ entradas: porNumero[num] }); gravados++; }
+    catch(e) { console.warn('Reindex falhou:', num, e); falhas++; }
+  }
+  try {
+    const snap = await db.collection('indice_numeroacao').get();
+    for (const d of snap.docs) {
+      if (porNumero[d.id]) continue;
+      try { await d.ref.delete(); removidos++; } catch(e) { console.warn('Reindex: falha ao remover órfão', d.id, e); falhas++; }
+    }
+  } catch(e) { console.warn('Reindex: não consegui listar o índice para remover órfãos', e); }
+  return { gravados, removidos, falhas };
 }
 function today() { return new Date().toISOString().slice(0,10); }
 function formatDate(d) { if (!d) return '—'; if (typeof d === 'string') { if (/^\d{4}-\d{2}-\d{2}/.test(d)) { const [y,m,dd]=d.slice(0,10).split('-'); return dd+'/'+m+'/'+y; } if (/^\d{2}\/\d{2}\/\d{4}$/.test(d)) return d; } const dt = parseDateSafe(d); if (!dt) return '—'; return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`; }
@@ -1808,7 +1836,7 @@ function openSubtopicoModal(id) {
 function openEditFollowupModal(acaoId, corrIdx, fuIdx){ const acao=state.acoes.find(a=>a.id===acaoId); if(!acao||!acao.acoes_corretivas[corrIdx]||!acao.acoes_corretivas[corrIdx].followups[fuIdx]) return; const fu=acao.acoes_corretivas[corrIdx].followups[fuIdx]; currentEditTarget={type:'followup', acaoId, corrIdx, fuIdx}; const modalBody=document.getElementById('edit-modal-body'); modalBody.innerHTML=`<div class="form-group"><label class="form-label">Data</label><input class="form-control" type="date" id="edit-fu-data" value="${fu.data_followup}"></div><div class="form-group"><label class="form-label">Responsável</label><input class="form-control" id="edit-fu-resp" value="${escHtml(fu.responsavel)}"></div><div class="form-group"><label class="form-label">Comentário</label><textarea class="form-control" id="edit-fu-comentario" rows="3">${escHtml(fu.comentario)}</textarea></div>`; document.getElementById('edit-modal-title').innerText='Editar Follow-up'; openModal('edit-modal'); }
 async function saveFollowup() { const data = document.getElementById('fu-data').value, resp = document.getElementById('fu-responsavel').value.trim(), comentario = document.getElementById('fu-comentario').value.trim(); if(!resp || !comentario){ toast('Responsável e comentário obrigatórios','warning'); return; } if (_ncState._fuTarget != null && _ncState._fuTarget.idx != null) { const cr = _ncState.acoes_corretivas[_ncState._fuTarget.idx]; if (cr) { if(!cr.followups) cr.followups=[]; cr.followups.push({id:uid(), data_followup:data, comentario, responsavel:resp}); toast('Follow-up adicionado','success'); closeModal('followup-modal'); _ncState._fuTarget=null; _ncRenderCorretivas(); return; } } const acao = state.acoes.find(a=>a.id===currentFollowupTarget.acaoId); if(acao && acao.acoes_corretivas[currentFollowupTarget.corretivaIdx]){ const cr = acao.acoes_corretivas[currentFollowupTarget.corretivaIdx]; if(!cr.followups) cr.followups = []; cr.followups.push({id:uid(), data_followup:data, comentario, responsavel:resp}); await saveData('acoes', acao.id); toast('Follow-up adicionado','success'); aplicarFiltrosETabela(); } closeModal('followup-modal'); }
 document.getElementById('saveFollowupBtn')?.addEventListener('click',saveFollowup); document.getElementById('closeFollowupModal')?.addEventListener('click',()=>closeModal('followup-modal')); document.getElementById('closeFollowupFooter')?.addEventListener('click',()=>closeModal('followup-modal'));
-document.getElementById('saveEditBtn')?.addEventListener('click',async()=>{ if(!currentEditTarget) return; if(currentEditTarget.type==='problema'){ const acao=state.acoes.find(a=>a.id===currentEditTarget.id); if(!acao) return; acao.problema=document.getElementById('edit-problema-texto').value; acao.causa=document.getElementById('edit-problema-causa').value; acao.responsavel=document.getElementById('edit-problema-resp').value; acao.data_abertura=document.getElementById('edit-problema-data').value; await saveData('acoes',acao.id); aplicarFiltrosETabela(); } else if(currentEditTarget.type==='acao'){ const acao=state.acoes.find(a=>a.id===currentEditTarget.acaoId); if(!acao||!acao.acoes_corretivas[currentEditTarget.idx]) return; const cr=acao.acoes_corretivas[currentEditTarget.idx]; cr.acao_descricao=document.getElementById('edit-acao-desc').value; cr.responsavel=document.getElementById('edit-acao-resp').value; cr.data_prevista=document.getElementById('edit-acao-prev').value; cr.data_efetiva=document.getElementById('edit-acao-efet').value; await saveData('acoes',acao.id); aplicarFiltrosETabela(); } else if(currentEditTarget.type==='followup'){ const acao=state.acoes.find(a=>a.id===currentEditTarget.acaoId); if(!acao||!acao.acoes_corretivas[currentEditTarget.corrIdx]||!acao.acoes_corretivas[currentEditTarget.corrIdx].followups[currentEditTarget.fuIdx]) return; const fu=acao.acoes_corretivas[currentEditTarget.corrIdx].followups[currentEditTarget.fuIdx]; fu.data_followup=document.getElementById('edit-fu-data').value; fu.responsavel=document.getElementById('edit-fu-resp').value; fu.comentario=document.getElementById('edit-fu-comentario').value; await saveData('acoes',acao.id); aplicarFiltrosETabela(); } closeModal('edit-modal'); currentEditTarget=null; toast('Salvo com sucesso','success'); });
+document.getElementById('saveEditBtn')?.addEventListener('click',async()=>{ if(!currentEditTarget) return; if(currentEditTarget.type==='problema'){ const acao=state.acoes.find(a=>a.id===currentEditTarget.id); if(!acao) return; acao.problema=document.getElementById('edit-problema-texto').value; acao.causa=document.getElementById('edit-problema-causa').value; acao.responsavel=document.getElementById('edit-problema-resp').value; acao.data_abertura=document.getElementById('edit-problema-data').value; await saveData('acoes',acao.id); aplicarFiltrosETabela(); } else if(currentEditTarget.type==='acao'){ const acao=state.acoes.find(a=>a.id===currentEditTarget.acaoId); if(!acao||!acao.acoes_corretivas[currentEditTarget.idx]) return; const cr=acao.acoes_corretivas[currentEditTarget.idx]; cr.acao_descricao=document.getElementById('edit-acao-desc').value; cr.responsavel=document.getElementById('edit-acao-resp').value; cr.data_prevista=document.getElementById('edit-acao-prev').value; cr.data_efetiva=document.getElementById('edit-acao-efet').value; await saveData('acoes',acao.id); await _sincronizarIndiceNumeroAcao(acao.id, acao.acoes_corretivas, null); aplicarFiltrosETabela(); } else if(currentEditTarget.type==='followup'){ const acao=state.acoes.find(a=>a.id===currentEditTarget.acaoId); if(!acao||!acao.acoes_corretivas[currentEditTarget.corrIdx]||!acao.acoes_corretivas[currentEditTarget.corrIdx].followups[currentEditTarget.fuIdx]) return; const fu=acao.acoes_corretivas[currentEditTarget.corrIdx].followups[currentEditTarget.fuIdx]; fu.data_followup=document.getElementById('edit-fu-data').value; fu.responsavel=document.getElementById('edit-fu-resp').value; fu.comentario=document.getElementById('edit-fu-comentario').value; await saveData('acoes',acao.id); aplicarFiltrosETabela(); } closeModal('edit-modal'); currentEditTarget=null; toast('Salvo com sucesso','success'); });
 // ── Expõe globalmente para que o dashboard e outros módulos possam invocar com segurança ──
 window.aplicarFiltrosETabela = aplicarFiltrosETabela;
 function renderListagemIfNeeded() {
@@ -2175,6 +2203,7 @@ async function _processarEvidenciaFechamentoListagem(problemaId, idx, file) {
     cr[_campo] = _url;
     if (!cr.data_efetiva) cr.data_efetiva = today(); // v19.14: mesma regra de sempre
     await saveData('acoes', problemaId);
+    await _sincronizarIndiceNumeroAcao(problemaId, prob.acoes_corretivas, null); // v19.110: índice do Excel
     if (isStorageUrl(_urlAntiga)) deleteFromStorage(_urlAntiga);
     aplicarFiltrosETabela();
     toast('Evidência de fechamento salva! Data Efetiva preenchida automaticamente.', 'success');
@@ -5546,7 +5575,20 @@ function renderFazerBackup(container) {
         <div style="background:var(--bg3);border-radius:4px;height:8px;overflow:hidden;display:none;margin-bottom:14px;" id="backup-progress-wrap"><div id="backup-progress" style="background:var(--accent);height:100%;width:0%;transition:width .2s;"></div></div>
         <button class="btn btn-primary" id="btn-gerar-backup">💾 Gerar e Baixar Backup</button>
       </div>
+      <div class="panel-body" style="border-top:1px solid var(--border);">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:10px;">Índice de consulta por número de ação (usado pela macro do Excel). Reconstrua se a planilha mostrar datas desatualizadas.</div>
+        <button class="btn btn-secondary" id="btn-reconstruir-indice">🔄 Reconstruir índice de números</button>
+      </div>
     </div>`;
+  document.getElementById('btn-reconstruir-indice')?.addEventListener('click', async () => {
+    if (!(await showConfirm('Reconstruir o índice de consulta de todas as ações a partir dos dados atuais?'))) return;
+    try {
+      showLoading('Reconstruindo índice…');
+      const res = await _reconstruirIndiceNumeroAcao();
+      if (res) toast('Índice reconstruído: ' + res.gravados + ' número(s) gravado(s), ' + res.removidos + ' órfão(s) removido(s)' + (res.falhas ? ', ' + res.falhas + ' falha(s) — veja o console' : '') + '.', res.falhas ? 'warning' : 'success');
+    } catch(err) { toast('Erro ao reconstruir índice: ' + err.message, 'error'); }
+    finally { hideLoading(); }
+  });
   document.getElementById('btn-gerar-backup').addEventListener('click', async () => {
     const incluirFotos = document.getElementById('backup-incluir-fotos')?.checked;
     const payload = {
