@@ -471,7 +471,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.110';
+const APP_VERSAO = 'v19.111';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -2993,6 +2993,7 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
   state.responsaveis.forEach(r => { _respDeptMap[r.nome] = r.departamento || 'Sem Departamento'; });
   const statsPorResp = {}; // nome -> { total, vencidas, emAndamento, acoes:[{numeroAcao,subtopico,problemaTexto,eventos}] }
   const emailsEnvolvidos = new Set();
+  const novosItensAdicionados = []; // v19.111: Problemas cadastrados do zero no período (mesmo formato das recorrências)
   const recorrenciasAdicionadas = []; // v19.98: recorrências não têm ação associada — não cabem no bloco por responsável
 
   state.acoes.forEach(prob => {
@@ -3011,6 +3012,19 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
     // v19.99: a recorrência precisa aparecer na Ata do dia em que foi REGISTRADA no sistema
     // (registrado_em), não no dia da produção (data_producao) — podem ser dias diferentes.
     // Fallback para data_producao em registros antigos, salvos antes de existir "registrado_em".
+    // v19.111: item novo (não é só recorrência de um existente) — entra pela Data de Abertura. O mesmo item
+    // continua aparecendo normalmente em ATIVIDADES, por responsável.
+    if (_inPeriodo((prob.data_abertura || '').slice(0, 10))) {
+      novosItensAdicionados.push({
+        subtopico: subtopico ? subtopico.descricao : '—',
+        defeito: prob.problema || '—',
+        dataAbertura: prob.data_abertura,
+        dataProducao: prob.data_producao,
+        turnos: (prob.turnos || []).join(', ') || '—',
+        quantidade: prob.quantidade || '—',
+        totalAcoesProblema: _totalAcoesProblema, fechadasAcoesProblema: _fechadasAcoesProblema, vencidasAcoesProblema: _vencidasAcoesProblema
+      });
+    }
     (prob.recorrencias || []).forEach(r => {
       const _dataFiltro = r.registrado_em || r.data_producao;
       if (!_inPeriodo((_dataFiltro || '').slice(0, 10))) return;
@@ -3119,12 +3133,15 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
   // v19.99: ordena pela data que a colocou no período (registrado_em, com fallback pra data_producao)
   recorrenciasAdicionadas.sort((a, b) => (a.registradoEm || a.dataProducao || '').localeCompare(b.registradoEm || b.dataProducao || ''));
 
+  novosItensAdicionados.sort((a, b) => (a.dataAbertura || '').localeCompare(b.dataAbertura || ''));
+
   return {
     planoTitulo: plano ? plano.titulo : 'Todos os Planos',
     planoId: planoId || '', // v19.107: usado para gravar o ponto de corte por Plano ao copiar a Ata
     dataDe, dataAte,
     participantes,
     recorrenciasAdicionadas,
+    novosItensAdicionados,
     atividadesPorDepartamento,
     cursosAplicados,
     cursosPendentesQtd, cursosNoPrazoQtd, cursosVencidosQtd, cursosFechadosQtd,
@@ -3326,6 +3343,10 @@ function _calcularAgregacoesDashboard(){
   const _planosDash = dashState.plano ? state.planos.filter(p=>p.id===dashState.plano)      : state.planos;
   let total=0,fechadas=0,emAndamento=0,vencidas=0,canceladas=0,semAcoes=0,semPrazo=0;
   const cursosPendentes = state.cursos1tema.filter(c => c.statusCurso !== 'Finalizado').length; // v19.14
+  // v19.111: total de linhas de recorrência dos itens de Planos que exigem operador (GP12) — mesmo escopo
+  // (filtro de Plano e modo auditoria) dos demais cards.
+  const _idsPlanosOp = new Set(state.planos.filter(p => p.necessita_op_qtd).map(p => p.id));
+  const recorrenciasGP12 = _acoesDash.filter(p => _idsPlanosOp.has(p.plano_id)).reduce((n, p) => n + (p.recorrencias || []).length, 0);
   const byResp={}; const byPlano={};
   // Inicializa byPlano com planos filtrados
   _planosDash.forEach(p=>{ byPlano[p.id]={titulo:p.titulo,pendentes:0,fechadas:0,vencidas:0,canceladas:0,emAberto:0}; });
@@ -3427,13 +3448,13 @@ function _calcularAgregacoesDashboard(){
   const vencRespLabels = Object.keys(vencByGrupo).filter(k=>_sumMap(vencByGrupo,k)>0).sort((a,b)=>_sumMap(vencByGrupo,b)-_sumMap(vencByGrupo,a));
   const fechRespLabels = Object.keys(fechByGrupo).filter(k=>_sumMap(fechByGrupo,k)>0).sort((a,b)=>_sumMap(fechByGrupo,b)-_sumMap(fechByGrupo,a));
   const cancRespLabels = Object.keys(cancByGrupo).filter(k=>_sumMap(cancByGrupo,k)>0).sort((a,b)=>_sumMap(cancByGrupo,b)-_sumMap(cancByGrupo,a));
-  return { _acoesDash, total, fechadas, emAndamento, vencidas, canceladas, semPrazo, cursosPendentes, byPlano, taxa,
+  return { _acoesDash, total, fechadas, emAndamento, vencidas, canceladas, semPrazo, cursosPendentes, recorrenciasGP12, byPlano, taxa,
            pendByGrupo, vencByGrupo, fechByGrupo, cancByGrupo, _agrupLabel, buildStackedDatasets,
            pendRespLabels, vencRespLabels, fechRespLabels, cancRespLabels };
 }
 // v19.67 (Etapa 4.2): só a montagem do HTML do Dashboard (barra de filtro fixa + conteúdo). Sem Chart.js, sem eventos.
 function _montarHtmlDashboard(container, agg){
-  const { total, fechadas, emAndamento, vencidas, canceladas, semPrazo, cursosPendentes, byPlano, taxa, _agrupLabel } = agg;
+  const { total, fechadas, emAndamento, vencidas, canceladas, semPrazo, cursosPendentes, recorrenciasGP12, byPlano, taxa, _agrupLabel } = agg;
   // ── Tabela Status por Plano com coluna % Presença ──
   const linhasPlanos = Object.entries(byPlano).map(([pid, p])=>{
     const tot = p.pendentes+p.fechadas+p.vencidas+(p.canceladas||0); // v19.80: inclui Canceladas no Total, mesma base da Taxa de Fechamento
@@ -3521,6 +3542,7 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
       <div class="kpi-card" data-filter="sem_prazo"><div class="kpi-value" style="color:var(--text2)">${semPrazo}</div><div class="kpi-label">Sem Prazo Def.</div></div>
       <div class="kpi-card" data-filter="canceladas"><div class="kpi-value" style="color:var(--text3)">${canceladas}</div><div class="kpi-label">Canceladas</div></div>
       <div class="kpi-card" data-filter="cursos_pendentes"><div class="kpi-value" style="color:var(--yellow)">${cursosPendentes}</div><div class="kpi-label">Curso 1 Tema Pend.</div></div>
+      <div class="kpi-card" data-filter="recorrencias_gp12" title="Total de linhas de recorrência (Planos que exigem operador)"><div class="kpi-value" style="color:var(--accent)">${recorrenciasGP12}</div><div class="kpi-label">Recorrências GP12</div></div>
     </div>
     <div class="dash-tabs">
       <button class="dash-tab-btn" data-aba="visao-geral">🎯 Visão Geral</button>
@@ -3992,6 +4014,7 @@ function _montarGraficosDashboard(agg){
     card.removeEventListener('click', card._dashboardHandler);
     const handler = () => {
       if (card.dataset.filter === 'cursos_pendentes') { navigate('curso1tema'); return; } // v19.14
+      if (card.dataset.filter === 'recorrencias_gp12') { return; } // v19.111: informativo, sem drill-down
       navigate('listagem');
       setTimeout(() => {
         const filterType = card.dataset.filter;
@@ -6526,6 +6549,16 @@ function _montarLinhasAta(dados) {
     const _regPrefixo = _mostrarRegistradoEm ? `Registrado em: ${r.registradoEm ? formatDate(r.registradoEm) : '—'} | ` : '';
     add(`${_regPrefixo}Data de Produção: ${formatDate(r.dataProducao)} | Turno: ${r.turnos} | Quantidade de Peças: ${r.quantidade}`, { indent: 2 });
     // v19.101: total de ações cadastradas para o PROBLEMA desta recorrência, abertas e vencidas
+    add(`📊 Ações Registradas: ${r.totalAcoesProblema} | Fechadas: ${r.fechadasAcoesProblema} | Vencidas: ${r.vencidasAcoesProblema}`, { indent: 2 });
+  });
+  add('');
+  // v19.111: itens cadastrados do zero no período — mesmo formato das recorrências, bloco logo abaixo
+  add('NOVOS ITENS ADICIONADOS:');
+  if (!dados.novosItensAdicionados.length) add('Nenhum novo item registrado no período.', { indent: 1 });
+  dados.novosItensAdicionados.forEach(r => {
+    add(`🆕 ${r.subtopico} — ${r.defeito}`, { indent: 1 });
+    const _abPrefixo = _mostrarRegistradoEm ? `Aberto em: ${r.dataAbertura ? formatDate(r.dataAbertura) : '—'} | ` : '';
+    add(`${_abPrefixo}Data de Produção: ${formatDate(r.dataProducao)} | Turno: ${r.turnos} | Quantidade de Peças: ${r.quantidade}`, { indent: 2 });
     add(`📊 Ações Registradas: ${r.totalAcoesProblema} | Fechadas: ${r.fechadasAcoesProblema} | Vencidas: ${r.vencidasAcoesProblema}`, { indent: 2 });
   });
   add('');
