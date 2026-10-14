@@ -117,12 +117,12 @@ to{transform:translateX(0);opacity:1}
 .loading-box{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:24px 32px;display:flex;align-items:center;gap:14px;font-weight:600}
 
 /* CORREÇÃO 1: Dashboard cards lado a lado com rolagem horizontal */
-.kpi-grid { display: flex; flex-wrap: nowrap; gap: 14px; overflow-x: auto; margin-bottom: 20px; padding-bottom: 4px; }
-.kpi-card { flex: 0 0 auto; min-width: 160px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; position: relative; overflow: hidden; cursor: pointer; transition: all 0.2s ease; }
+.kpi-grid { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; margin-bottom: 20px; padding-bottom: 4px; }
+.kpi-card { flex: 1 1 0; min-width: 84px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 6px 10px 8px; position: relative; overflow: hidden; cursor: pointer; transition: all 0.2s ease; }
 .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); background: var(--bg3); }
 .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--accent); }
-.kpi-value { font-family: var(--font-hd); font-size: 36px; font-weight: 800; line-height: 1; }
-.kpi-label { font-size: 12px; color: var(--text2); margin-top: 6px; text-transform: uppercase; letter-spacing: .5px; font-weight: 600; }
+.kpi-value { font-family: var(--font-hd); font-size: 32px; font-weight: 800; line-height: 1; }
+.kpi-label { font-size: 10px; color: var(--text2); margin-top: 6px; text-transform: uppercase; letter-spacing: 0; overflow-wrap: break-word; font-weight: 600; }
 
 .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}.chart-panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px}.chart-title{font-family:var(--font-hd);font-size:14px;font-weight:700;margin-bottom:14px;color:var(--text2);text-transform:uppercase;letter-spacing:1px}.chart-wrap{position:relative;height:240px}.config-field{margin-bottom:16px}.config-field label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}.config-field input{width:100%;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-size:13px;font-family:var(--font-mono);}.corretiva-block{background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border);padding:12px;margin-top:16px;margin-left:20px;}.corretiva-header{display:flex;align-items:center;gap:8px;margin-bottom:10px}.empty-state{text-align:center;padding:48px;color:var(--text3)}.empty-icon{font-size:40px;margin-bottom:12px;opacity:.5}.empty-text{font-family:var(--font-hd);font-size:18px;color:var(--text2);margin-bottom:6px}.action-num{font-family:var(--font-hd);font-size:20px;font-weight:800;color:var(--accent);background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3);padding:2px 8px;border-radius:3px}.followup-item{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:8px;margin-left:40px;}.followup-meta{font-size:11px;color:var(--text3);margin-bottom:4px;display:flex;gap:12px}.file-drop{border:2px dashed var(--border2);border-radius:var(--radius);padding:20px;text-align:center;cursor:pointer;color:var(--text2);transition:border .15s,background .15s;font-size:13px;}.file-drop:hover{border-color:var(--accent);background:rgba(249,115,22,.05)}.file-preview{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--text2)}.file-thumb{width:40px;height:40px;object-fit:cover;border-radius:3px;border:1px solid var(--border2)}.help-text{font-size:11px;color:var(--text3);margin-top:4px;}.followup-row{background-color:var(--bg3);}.followup-row td{padding:8px 12px;border-top:1px solid var(--border);}.followup-content{margin-left:30px;font-size:12px;}.acao-buttons{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;white-space:nowrap;}.problema-cell{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}.evidencia-thumb{width:36px;height:36px;object-fit:cover;border-radius:4px;cursor:pointer;border:1px solid var(--border2);}.evidencia-thumb:hover{transform:scale(1.05);border-color:var(--accent);}
 
@@ -471,7 +471,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.111';
+const APP_VERSAO = 'v19.112';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -3542,7 +3542,7 @@ const presencaRespRows = responsaveisAtivos.map(r=>{
       <div class="kpi-card" data-filter="sem_prazo"><div class="kpi-value" style="color:var(--text2)">${semPrazo}</div><div class="kpi-label">Sem Prazo Def.</div></div>
       <div class="kpi-card" data-filter="canceladas"><div class="kpi-value" style="color:var(--text3)">${canceladas}</div><div class="kpi-label">Canceladas</div></div>
       <div class="kpi-card" data-filter="cursos_pendentes"><div class="kpi-value" style="color:var(--yellow)">${cursosPendentes}</div><div class="kpi-label">Curso 1 Tema Pend.</div></div>
-      <div class="kpi-card" data-filter="recorrencias_gp12" title="Total de linhas de recorrência (Planos que exigem operador)"><div class="kpi-value" style="color:var(--accent)">${recorrenciasGP12}</div><div class="kpi-label">Recorrências GP12</div></div>
+      <div class="kpi-card" data-filter="recorrencias_gp12" title="Total de linhas de recorrência (Planos que exigem operador)"><div class="kpi-value" style="color:var(--accent)">${recorrenciasGP12}</div><div class="kpi-label">Recorr. GP12</div></div>
     </div>
     <div class="dash-tabs">
       <button class="dash-tab-btn" data-aba="visao-geral">🎯 Visão Geral</button>
