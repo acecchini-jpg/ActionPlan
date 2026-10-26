@@ -471,7 +471,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.112';
+const APP_VERSAO = 'v19.114';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -2694,7 +2694,7 @@ function renderAnalise(container) {
       const planNome = plano ? plano.titulo : '—';
       (prob.acoes_corretivas || []).forEach(cr => {
         const status = calcStatusAcao(cr);
-        if (status === 'FECHADO') return;
+        if (status === 'FECHADO' || status === 'CANCELADO') return;
         const dtAbertura = parseDateSafe(prob.data_abertura);
         const diasAberto = dtAbertura ? Math.floor((new Date() - dtAbertura) / 86400000) : 0;
         const numAcao = _numAcaoValido(cr.numeroAcao) ? String(cr.numeroAcao) : '?';
@@ -2853,7 +2853,7 @@ function taxaSemaforoClass(taxa) {
   if (taxa === null || taxa === undefined) return 'taxa-sem-dado';
   const t = Number(taxa); // coerção segura contra strings do Firestore
   if (isNaN(t)) return 'taxa-sem-dado';
-  if (t > 90)  return 'taxa-verde';    // > 90%
+  if (t >= 90) return 'taxa-verde';    // >= 90%
   if (t >= 75) return 'taxa-amarelo';  // 75% a 90% inclusive
   return 'taxa-vermelho';              // < 75%
 }
