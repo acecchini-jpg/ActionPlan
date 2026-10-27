@@ -250,7 +250,7 @@ to{transform:translateX(0);opacity:1}
   .kpi-card { min-width: 140px; }
 }
 /* ── Controle de Presença ── */
-.presenca-row { display:grid; grid-template-columns:2fr 1fr 1fr; gap:0; align-items:center; padding:10px 16px; border-bottom:1px solid var(--border); transition:background .12s; }
+.presenca-row { display:grid; grid-template-columns:2fr 1fr 1fr 1.4fr; gap:0; align-items:center; padding:10px 16px; border-bottom:1px solid var(--border); transition:background .12s; }
 .presenca-row:hover { background:rgba(249,115,22,.04); }
 .presenca-row:last-child { border-bottom:none; }
 .presenca-check { display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; }
@@ -471,7 +471,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.114';
+const APP_VERSAO = 'v19.115';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -771,6 +771,38 @@ function compressImage(file, maxDim, quality) {
   });
 }
 // ── O4: Modal de confirmação estilizado (substitui confirm nativo) ──
+// v19.115: pede um texto ao usuário (mesmo visual do showConfirm). Resolve com a string ou null se cancelar.
+function showPromptTexto(message, opts) {
+  return new Promise(resolve => {
+    const o = opts || {};
+    let overlay = document.getElementById('app-prompt-overlay');
+    if (overlay) overlay.remove();
+    overlay = document.createElement('div');
+    overlay.id = 'app-prompt-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML = `
+      <div class="panel" style="width:min(460px,95vw);margin:0;box-shadow:0 8px 32px rgba(0,0,0,.4);">
+        <div class="panel-header"><span>${o.icon || '📝'}</span><span class="panel-title">${escHtml(o.title || 'Informe')}</span></div>
+        <div class="panel-body">
+          <p style="font-size:13px;color:var(--text1);white-space:pre-line;margin-bottom:10px;">${escHtml(message)}</p>
+          <textarea class="form-control" id="app-prompt-input" rows="3" maxlength="300" placeholder="${escHtml(o.placeholder || '')}" style="margin-bottom:14px;">${escHtml(o.valor || '')}</textarea>
+          <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button class="btn btn-ghost" id="app-prompt-no">Cancelar</button>
+            <button class="btn btn-primary" id="app-prompt-yes">${escHtml(o.okText || 'Confirmar')}</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const inp = overlay.querySelector('#app-prompt-input');
+    setTimeout(() => inp.focus(), 0);
+    const done = val => { overlay.remove(); resolve(val); };
+    const ok = () => { const v = inp.value.trim(); if (!v) { inp.style.borderColor = 'var(--red)'; inp.focus(); return; } done(v); };
+    overlay.querySelector('#app-prompt-yes').addEventListener('click', ok);
+    overlay.querySelector('#app-prompt-no').addEventListener('click', () => done(null));
+    overlay.addEventListener('click', e => { if (e.target === overlay) done(null); });
+    inp.addEventListener('keydown', e => { if (e.key === 'Escape') done(null); else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ok(); } });
+  });
+}
 function showConfirm(message, opts) {
   return new Promise(resolve => {
     const o = opts || {};
@@ -2982,8 +3014,19 @@ function _gerarDadosAta(dataDe, dataAte, planoId) {
     if (reunioes <= 1) label = taxa === 100 ? 'Presente' : (taxa === 0 ? 'Ausente' : `${taxa}%`);
     else label = `${taxa}%`;
     // v19.108: ícone só quando há 1 reunião (Presente/Ausente); com várias, vale o percentual
-    const icone = reunioes <= 1 ? (taxa === 100 ? '✅' : (taxa === 0 ? '❌' : '')) : '';
-    return { nome, departamento: resp ? (resp.departamento || '—') : '—', email: resp ? (resp.email || '') : '', taxa, reunioes, label, icone };
+    let icone = reunioes <= 1 ? (taxa === 100 ? '✅' : (taxa === 0 ? '❌' : '')) : '';
+    // v19.115: ausências justificadas (só texto da Ata — taxa e demais cálculos continuam contando como ausência)
+    const justificativas = [];
+    atasPeriodo.forEach(a => {
+      const pt = (a.participantes || []).find(x => String(x.nome).trim() === nome);
+      if (pt && (pt.necessario === true || pt.necessario === 'true') && !(pt.presente === true || pt.presente === 'true') && (pt.justificado === true || pt.justificado === 'true'))
+        justificativas.push({ data: a.data, motivo: String(pt.motivo_justificativa || '').trim() || 'não informado' });
+    });
+    if (justificativas.length) {
+      if (reunioes <= 1 && taxa === 0) { label = 'Justificado - Motivo: ' + justificativas[0].motivo; icone = '📝'; }
+      else label = `${taxa}% (Justificado em ` + justificativas.map(j => `${formatDate(j.data)} - Motivo: ${j.motivo}`).join('; ') + ')';
+    }
+    return { nome, departamento: resp ? (resp.departamento || '—') : '—', email: resp ? (resp.email || '') : '', taxa, reunioes, label, icone, justificativas };
   });
   // v19.108: presentes primeiro, ausentes no fim — ordem decrescente de percentual (empate: nome)
   participantes.sort((a, b) => (b.taxa - a.taxa) || a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -6706,10 +6749,11 @@ function renderPresenca(container) {
           </div>
         </div>
         <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:18px;">
-          <div style="display:grid;grid-template-columns:2fr 1fr 1fr;padding:8px 16px;background:var(--bg3);border-bottom:2px solid var(--border2);">
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1.4fr;padding:8px 16px;background:var(--bg3);border-bottom:2px solid var(--border2);">
             <span style="font-family:var(--font-hd);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;">Responsável</span>
             <span style="font-family:var(--font-hd);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;text-align:center;">✅ Presente</span>
             <span style="font-family:var(--font-hd);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;text-align:center;">⭐ Necessário</span>
+            <span style="font-family:var(--font-hd);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;text-align:center;">📝 Justificado</span>
           </div>
           <div id="presenca-lista">
             ${responsaveisOrdenados.length ? responsaveisOrdenados.map(r=>`
@@ -6726,6 +6770,13 @@ function renderPresenca(container) {
                     <input type="checkbox" class="chk-necessario" data-nome="${escHtml(r.nome)}">
                     <span style="font-size:12px;color:var(--text2);">Necessário</span>
                   </label>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:center;">
+                  <label class="presenca-check" title="Ausência justificada (não altera nenhum cálculo — só aparece na Ata)">
+                    <input type="checkbox" class="chk-justificado" data-nome="${escHtml(r.nome)}">
+                    <span style="font-size:12px;color:var(--text2);">Justificado</span>
+                  </label>
+                  <span class="just-motivo" data-nome="${escHtml(r.nome)}" style="display:none;font-size:10px;color:var(--text3);max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
                 </div>
               </div>`).join('') : '<div style="padding:24px;text-align:center;color:var(--text3);">Nenhum responsável ativo cadastrado.</div>'}
           </div>
@@ -6756,14 +6807,29 @@ function renderPresenca(container) {
     if (!nome) return;
     const chkNec = document.querySelector(`.chk-necessario[data-nome="${CSS.escape(nome)}"]`);
     if (!chkNec) return;
+    const chkJus = document.querySelector(`.chk-justificado[data-nome="${CSS.escape(nome)}"]`); // v19.115
     if (chkPresente.checked) {
       chkNec.checked = true;
       chkNec.disabled = true;
       chkNec.title = 'Bloqueado: presença confirmada implica necessidade obrigatória';
+      if (chkJus) { _setJustificativa(nome, false, ''); chkJus.disabled = true; } // presente não tem o que justificar
     } else {
       chkNec.disabled = false;
       chkNec.title = 'Presença necessária';
+      if (chkJus) chkJus.disabled = false;
     }
+  }
+  // v19.115: justificativa de ausência — só informativa (aparece na Ata); não entra em nenhum cálculo
+  function _setJustificativa(nome, on, motivo) {
+    const chk = document.querySelector(`.chk-justificado[data-nome="${CSS.escape(nome)}"]`);
+    const sp = document.querySelector(`.just-motivo[data-nome="${CSS.escape(nome)}"]`);
+    if (!chk) return;
+    chk.checked = !!on;
+    chk.dataset.motivo = on ? (motivo || '') : '';
+    if (sp) { sp.textContent = on ? motivo : ''; sp.title = on ? motivo : ''; sp.style.display = on ? '' : 'none'; }
+  }
+  function _refreshJustUI() {
+    document.querySelectorAll('.chk-justificado').forEach(c => { if (!c.checked) _setJustificativa(c.dataset.nome, false, ''); });
   }
   function _syncAllPresencaRows() {
     document.querySelectorAll('.chk-presente').forEach(_syncPresencaRow);
@@ -6774,6 +6840,13 @@ function renderPresenca(container) {
     _presLista.addEventListener('change', (ev) => {
       const t = ev.target;
       if (t && t.classList && t.classList.contains('chk-presente')) _syncPresencaRow(t);
+      if (t && t.classList && t.classList.contains('chk-justificado')) { // v19.115
+        const nome = t.dataset.nome;
+        if (!t.checked) { _setJustificativa(nome, false, ''); return; }
+        t.checked = false; // só marca se o usuário informar o motivo
+        showPromptTexto('Motivo da ausência justificada de ' + nome + ':', { title: 'Justificar ausência', placeholder: 'Ex.: férias, atestado, viagem a serviço…' })
+          .then(motivo => { if (motivo) _setJustificativa(nome, true, motivo); });
+      }
     });
   }
 
@@ -6785,7 +6858,7 @@ function renderPresenca(container) {
     const docId = `${data}_${planoId}`;
     const ata = state.presencas.find(p => p.id === docId);
     // Sempre limpa antes para evitar resíduo de seleção anterior
-    document.querySelectorAll('.chk-presente,.chk-necessario').forEach(c=>{ c.checked=false; c.disabled=false; });
+    document.querySelectorAll('.chk-presente,.chk-necessario,.chk-justificado').forEach(c=>{ c.checked=false; c.disabled=false; }); _refreshJustUI();
     if (ata) {
       (ata.participantes || []).forEach(part => {
         const chkPresente = document.querySelector(`.chk-presente[data-nome="${CSS.escape(part.nome)}"]`);
@@ -6794,6 +6867,7 @@ function renderPresenca(container) {
         if (chkNecessario) chkNecessario.checked = !!part.necessario;
       });
       _syncAllPresencaRows();
+      (ata.participantes || []).forEach(part => { if ((part.justificado === true || part.justificado === 'true') && !part.presente) _setJustificativa(part.nome, true, part.motivo_justificativa || ''); }); // v19.115
       document.getElementById('presenca-status').textContent = `✏️ Editando ata existente de ${formatDate(data)}`;
     } else {
       document.getElementById('presenca-status').textContent = '';
@@ -6812,6 +6886,12 @@ function renderPresenca(container) {
       nome: r.nome,
       presente: !!document.querySelector(`.chk-presente[data-nome="${CSS.escape(r.nome)}"]`)?.checked,
       necessario: !!document.querySelector(`.chk-necessario[data-nome="${CSS.escape(r.nome)}"]`)?.checked,
+      // v19.115: justificativa só é gravada para quem NÃO está presente (guarda o motivo no histórico da ata)
+      ...(() => {
+        const cj = document.querySelector(`.chk-justificado[data-nome="${CSS.escape(r.nome)}"]`);
+        const pres = !!document.querySelector(`.chk-presente[data-nome="${CSS.escape(r.nome)}"]`)?.checked;
+        return (cj && cj.checked && !pres) ? { justificado: true, motivo_justificativa: cj.dataset.motivo || '' } : {};
+      })(),
     }));
     // Chave composta: YYYY-MM-DD_planoId (Melhoria B: evita duplicatas)
     const docId = `${data}_${planoId}`;
@@ -6837,7 +6917,7 @@ function renderPresenca(container) {
     _syncAllPresencaRows();
   });
   document.getElementById('btn-desmarcar-todos').addEventListener('click', () => {
-    document.querySelectorAll('.chk-presente,.chk-necessario').forEach(c=>{ c.checked=false; c.disabled=false; });
+    document.querySelectorAll('.chk-presente,.chk-necessario,.chk-justificado').forEach(c=>{ c.checked=false; c.disabled=false; }); _refreshJustUI();
   });
 
   // Histórico (Melhoria A)
@@ -6881,7 +6961,7 @@ function renderPresenca(container) {
         document.getElementById('presenca-data').value = ata.data || '';
         document.getElementById('presenca-plano').value = ata.plano_id || '';
         // Reset todos
-        document.querySelectorAll('.chk-presente,.chk-necessario').forEach(c=>{ c.checked=false; c.disabled=false; });
+        document.querySelectorAll('.chk-presente,.chk-necessario,.chk-justificado').forEach(c=>{ c.checked=false; c.disabled=false; }); _refreshJustUI();
         (ata.participantes||[]).forEach(part => {
           const cp = document.querySelector(`.chk-presente[data-nome="${CSS.escape(part.nome)}"]`);
           const cn = document.querySelector(`.chk-necessario[data-nome="${CSS.escape(part.nome)}"]`);
@@ -6889,6 +6969,7 @@ function renderPresenca(container) {
           if (cn) cn.checked = !!part.necessario;
         });
         _syncAllPresencaRows();
+        (ata.participantes || []).forEach(part => { if ((part.justificado === true || part.justificado === 'true') && !part.presente) _setJustificativa(part.nome, true, part.motivo_justificativa || ''); }); // v19.115
         document.getElementById('presenca-status').textContent = `✏️ Editando ata de ${formatDate(ata.data)}`;
         panel.style.display = 'none';
         window.scrollTo({top:0,behavior:'smooth'});
