@@ -250,7 +250,7 @@ to{transform:translateX(0);opacity:1}
   .kpi-card { min-width: 140px; }
 }
 /* ── Controle de Presença ── */
-.presenca-row { display:grid; grid-template-columns:2fr 1fr 1fr 1.4fr; gap:0; align-items:center; padding:10px 16px; border-bottom:1px solid var(--border); transition:background .12s; }
+.presenca-row { display:grid; grid-template-columns:1.6fr 1fr 2.2fr 1fr; gap:0; align-items:center; padding:10px 16px; border-bottom:1px solid var(--border); transition:background .12s; }
 .presenca-row:hover { background:rgba(249,115,22,.04); }
 .presenca-row:last-child { border-bottom:none; }
 .presenca-check { display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; }
@@ -471,7 +471,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.115';
+const APP_VERSAO = 'v19.116';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -6749,11 +6749,11 @@ function renderPresenca(container) {
           </div>
         </div>
         <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:18px;">
-          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1.4fr;padding:8px 16px;background:var(--bg3);border-bottom:2px solid var(--border2);">
+          <div style="display:grid;grid-template-columns:1.6fr 1fr 2.2fr 1fr;padding:8px 16px;background:var(--bg3);border-bottom:2px solid var(--border2);">
             <span style="font-family:var(--font-hd);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;">Responsável</span>
             <span style="font-family:var(--font-hd);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;text-align:center;">✅ Presente</span>
-            <span style="font-family:var(--font-hd);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;text-align:center;">⭐ Necessário</span>
             <span style="font-family:var(--font-hd);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;text-align:center;">📝 Justificado</span>
+            <span style="font-family:var(--font-hd);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;text-align:center;">⭐ Necessário</span>
           </div>
           <div id="presenca-lista">
             ${responsaveisOrdenados.length ? responsaveisOrdenados.map(r=>`
@@ -6765,18 +6765,17 @@ function renderPresenca(container) {
                     <span style="font-size:12px;color:var(--text2);">Presente</span>
                   </label>
                 </div>
+                <div style="display:flex;justify-content:flex-start;min-width:0;">
+                  <label class="presenca-check" title="Ausência justificada (não altera nenhum cálculo — só aparece na Ata)" style="min-width:0;max-width:100%;">
+                    <input type="checkbox" class="chk-justificado" data-nome="${escHtml(r.nome)}">
+                    <span class="just-label" data-nome="${escHtml(r.nome)}" style="font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Justificado</span>
+                  </label>
+                </div>
                 <div style="display:flex;justify-content:center;">
                   <label class="presenca-check" title="Presença necessária">
                     <input type="checkbox" class="chk-necessario" data-nome="${escHtml(r.nome)}">
                     <span style="font-size:12px;color:var(--text2);">Necessário</span>
                   </label>
-                </div>
-                <div style="display:flex;flex-direction:column;align-items:center;">
-                  <label class="presenca-check" title="Ausência justificada (não altera nenhum cálculo — só aparece na Ata)">
-                    <input type="checkbox" class="chk-justificado" data-nome="${escHtml(r.nome)}">
-                    <span style="font-size:12px;color:var(--text2);">Justificado</span>
-                  </label>
-                  <span class="just-motivo" data-nome="${escHtml(r.nome)}" style="display:none;font-size:10px;color:var(--text3);max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
                 </div>
               </div>`).join('') : '<div style="padding:24px;text-align:center;color:var(--text3);">Nenhum responsável ativo cadastrado.</div>'}
           </div>
@@ -6809,24 +6808,36 @@ function renderPresenca(container) {
     if (!chkNec) return;
     const chkJus = document.querySelector(`.chk-justificado[data-nome="${CSS.escape(nome)}"]`); // v19.115
     if (chkPresente.checked) {
-      chkNec.checked = true;
-      chkNec.disabled = true;
-      chkNec.title = 'Bloqueado: presença confirmada implica necessidade obrigatória';
       if (chkJus) { _setJustificativa(nome, false, ''); chkJus.disabled = true; } // presente não tem o que justificar
     } else {
-      chkNec.disabled = false;
-      chkNec.title = 'Presença necessária';
       if (chkJus) chkJus.disabled = false;
     }
+    _travarNecessario(nome); // v19.116: Presente ou Justificado => Necessário obrigatório
   }
   // v19.115: justificativa de ausência — só informativa (aparece na Ata); não entra em nenhum cálculo
   function _setJustificativa(nome, on, motivo) {
     const chk = document.querySelector(`.chk-justificado[data-nome="${CSS.escape(nome)}"]`);
-    const sp = document.querySelector(`.just-motivo[data-nome="${CSS.escape(nome)}"]`);
+    const sp = document.querySelector(`.just-label[data-nome="${CSS.escape(nome)}"]`);
     if (!chk) return;
     chk.checked = !!on;
     chk.dataset.motivo = on ? (motivo || '') : '';
-    if (sp) { sp.textContent = on ? motivo : ''; sp.title = on ? motivo : ''; sp.style.display = on ? '' : 'none'; }
+    if (sp) { sp.textContent = on ? 'Justificado: ' + motivo : 'Justificado'; sp.title = on ? 'Justificado: ' + motivo : ''; }
+    _travarNecessario(nome); // v19.116: Justificado também obriga "Necessário"
+  }
+  // v19.116: Presente OU Justificado => Necessário marcado e travado
+  function _travarNecessario(nome) {
+    const chkNec = document.querySelector(`.chk-necessario[data-nome="${CSS.escape(nome)}"]`);
+    const chkP = document.querySelector(`.chk-presente[data-nome="${CSS.escape(nome)}"]`);
+    const chkJ = document.querySelector(`.chk-justificado[data-nome="${CSS.escape(nome)}"]`);
+    if (!chkNec) return;
+    if ((chkP && chkP.checked) || (chkJ && chkJ.checked)) {
+      chkNec.checked = true;
+      chkNec.disabled = true;
+      chkNec.title = (chkP && chkP.checked) ? 'Bloqueado: presença confirmada implica necessidade obrigatória' : 'Bloqueado: ausência justificada implica necessidade obrigatória';
+    } else {
+      chkNec.disabled = false;
+      chkNec.title = 'Presença necessária';
+    }
   }
   function _refreshJustUI() {
     document.querySelectorAll('.chk-justificado').forEach(c => { if (!c.checked) _setJustificativa(c.dataset.nome, false, ''); });
