@@ -471,7 +471,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.116';
+const APP_VERSAO = 'v19.117';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -1573,7 +1573,13 @@ function _perguntarSubstitutoResponsavel(respDesativado) {
 // escopo=false → todas as ações, inclusive fechadas (usado no rename — é a mesma pessoa, não uma troca)
 async function _substituirResponsavelEmAcoes(nomeAntigo, nomeNovo, apenasPendentes) {
   let problemasAfetados = 0, acoesAfetadas = 0;
-  for (const prob of state.acoes) {
+  // v19.117: o onSnapshot substitui state.acoes por objetos novos a cada gravação; iterar os objetos
+  // antigos fazia o saveData gravar a cópia nova (sem a alteração). Agora percorremos os IDs e
+  // buscamos o objeto ATUAL a cada passo.
+  const _idsProblemas = state.acoes.map(p => p.id);
+  for (const _pid of _idsProblemas) {
+    const prob = state.acoes.find(p => p.id === _pid);
+    if (!prob) continue;
     let mudou = false;
     if (prob.responsavel === nomeAntigo) { prob.responsavel = nomeNovo; mudou = true; }
     (prob.acoes_corretivas || []).forEach(cr => {
