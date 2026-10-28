@@ -471,7 +471,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.117';
+const APP_VERSAO = 'v19.118';
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -1581,7 +1581,7 @@ async function _substituirResponsavelEmAcoes(nomeAntigo, nomeNovo, apenasPendent
     const prob = state.acoes.find(p => p.id === _pid);
     if (!prob) continue;
     let mudou = false;
-    if (prob.responsavel === nomeAntigo) { prob.responsavel = nomeNovo; mudou = true; }
+    if (prob.responsavel === nomeAntigo && !(apenasPendentes && _problemaTotalmenteFechado(prob))) { prob.responsavel = nomeNovo; mudou = true; } // v19.118: problema totalmente fechado mantém o responsável na desativação
     (prob.acoes_corretivas || []).forEach(cr => {
       if (cr.responsavel === nomeAntigo && (!apenasPendentes || !cr.data_efetiva)) { cr.responsavel = nomeNovo; mudou = true; acoesAfetadas++; }
     });
@@ -1657,6 +1657,10 @@ function openResponsavelModal(id) {
     }
   });
 }
+// v19.118: responsável inativo — campo somente leitura quando a ação/problema está encerrado; opção "(inativo)" quando ainda pendente
+function _respEhInativo(nome) { return !!nome && !getResponsaveisAtivos().some(r => r.nome === nome); }
+function _optRespInativo(nome) { return '<option value="' + escHtml(nome) + '" selected>' + escHtml(nome) + ' (inativo)</option>'; }
+function _problemaTotalmenteFechado(prob) { const l = prob.acoes_corretivas || []; return l.length > 0 && l.every(c => !!c.data_efetiva); }
 function getResponsaveisAtivos() { return [...state.responsaveis].filter(r=>r.ativo!==false).sort((a,b)=>(a.nome||'').localeCompare(b.nome||'','pt-BR',{sensitivity:'base'})); }
 
 let _planosSort = { col: 'titulo', asc: true };
@@ -1893,8 +1897,13 @@ function openEditModalListagem(problemaId, idx) {
   const cr = (prob.acoes_corretivas || [])[idx];
   if (!cr) return;
   _editListagemTarget = { problemaId, idx, openedUpdatedAt: prob.updated_at || null };
-  const respOpts = `<option value="">Selecione...</option>` + getResponsaveisAtivos().map(r => `<option value="${escHtml(r.nome)}" ${r.nome === cr.responsavel ? 'selected' : ''}>${escHtml(r.nome)}</option>`).join('');
-  const respProbOpts = `<option value="">Selecione...</option>` + getResponsaveisAtivos().map(r => `<option value="${escHtml(r.nome)}" ${r.nome === prob.responsavel ? 'selected' : ''}>${escHtml(r.nome)}</option>`).join('');
+  const respOpts = `<option value="">Selecione...</option>` + getResponsaveisAtivos().map(r => `<option value="${escHtml(r.nome)}" ${r.nome === cr.responsavel ? 'selected' : ''}>${escHtml(r.nome)}</option>`).join('') + (_respEhInativo(cr.responsavel) ? _optRespInativo(cr.responsavel) : '');
+  const respProbOpts = `<option value="">Selecione...</option>` + getResponsaveisAtivos().map(r => `<option value="${escHtml(r.nome)}" ${r.nome === prob.responsavel ? 'selected' : ''}>${escHtml(r.nome)}</option>`).join('') + (_respEhInativo(prob.responsavel) ? _optRespInativo(prob.responsavel) : '');
+  // v19.118: responsável inativo + encerrado => campo somente leitura (mesmo id; o salvamento lê .value e preserva o nome)
+  const _roAcao = _respEhInativo(cr.responsavel) && !!cr.data_efetiva;
+  const _roProb = _respEhInativo(prob.responsavel) && _problemaTotalmenteFechado(prob);
+  const _campoResp = (id, nome, opts, ro) => ro ? `<input class="form-control" id="${id}" value="${escHtml(nome)}" readonly title="Responsável inativo — item encerrado">` : `<select class="form-control" id="${id}">${opts}</select>`;
+  const _inatTag = (ro) => ro ? ' <span style="color:var(--text3);font-weight:400;">(inativo)</span>' : '';
   const modalBody = document.getElementById('edit-modal-body');
   modalBody.innerHTML = `
     <fieldset style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:14px;">
@@ -1902,7 +1911,7 @@ function openEditModalListagem(problemaId, idx) {
       <div class="form-group"><label class="form-label">Descrição do Problema</label><textarea class="form-control" id="elm-problema-texto" rows="2">${escHtml(prob.problema || '')}</textarea></div>
       <div class="form-group"><label class="form-label">Causa Raiz</label><textarea class="form-control" id="elm-problema-causa" rows="2">${escHtml(prob.causa || '')}</textarea></div>
       <div class="form-row cols-2">
-        <div class="form-group"><label class="form-label">Responsável (Problema)</label><select class="form-control" id="elm-problema-resp">${respProbOpts}</select></div>
+        <div class="form-group"><label class="form-label">Responsável (Problema)${_inatTag(_roProb)}</label>${_campoResp('elm-problema-resp', prob.responsavel, respProbOpts, _roProb)}</div>
         <div class="form-group"><label class="form-label">Data Abertura</label><input class="form-control" type="date" id="elm-problema-data" value="${prob.data_abertura || ''}"></div>
       </div>
     </fieldset>
@@ -1915,7 +1924,7 @@ function openEditModalListagem(problemaId, idx) {
         </div>
       </div>
       <div class="form-group"><label class="form-label">Descrição da Ação</label><textarea class="form-control" id="elm-acao-desc" rows="2">${escHtml(cr.acao_descricao || '')}</textarea></div>
-      <div class="form-group"><label class="form-label">Responsável</label><select class="form-control" id="elm-acao-resp">${respOpts}</select></div>
+      <div class="form-group"><label class="form-label">Responsável${_inatTag(_roAcao)}</label>${_campoResp('elm-acao-resp', cr.responsavel, respOpts, _roAcao)}</div>
       <div class="form-row cols-2">
         <div class="form-group"><label class="form-label">Data Prevista</label><input class="form-control" type="date" id="elm-acao-prev" value="${cr.data_prevista || ''}"></div>
         <div class="form-group"><label class="form-label">Data Efetiva</label><input class="form-control" type="date" id="elm-acao-efet" value="${cr.data_efetiva || ''}"></div>
@@ -4566,10 +4575,11 @@ function _ncRenderCorretivas() {
   container.innerHTML = _ncState.acoes_corretivas.map((cr,idx) => {
     const status = _ncCalcStatus(cr);
     const evBtns = _ncState._evidTmp[idx] ? '<button class="btn btn-ghost btn-xs nc-ev-view" data-idx="'+idx+'">🔍 Ver</button><button class="btn btn-ghost btn-xs nc-ev-corr-btn" data-idx="'+idx+'">🔄 Subst.</button>' : '<button class="btn btn-ghost btn-xs nc-ev-corr-btn" data-idx="'+idx+'">📎 Upload</button>';
-    const rOpts = respOpts.replace('value="'+escHtml(cr.responsavel)+'"','value="'+escHtml(cr.responsavel)+'" selected');
+    const _inatCr = _respEhInativo(cr.responsavel), _roCr = _inatCr && !!cr.data_efetiva; // v19.118
+    const rOpts = _inatCr ? respOpts + _optRespInativo(cr.responsavel) : respOpts.replace('value="'+escHtml(cr.responsavel)+'"','value="'+escHtml(cr.responsavel)+'" selected');
     const fuHtml = (cr.followups||[]).map((fu,fIdx)=>'<div style="display:flex;align-items:center;gap:5px;font-size:10px;margin-bottom:2px;padding-left:6px;border-left:2px solid var(--border);"><span style="white-space:nowrap;font-weight:bold;">📅 '+formatDate(fu.data_followup)+' - 👤 '+escHtml(fu.responsavel)+':</span><span style="flex:1;">'+escHtml(fu.comentario)+'</span><button class="btn btn-ghost btn-xs nc-edit-fu" data-idx="'+idx+'" data-fuidx="'+fIdx+'">✏️</button><button class="btn btn-ghost btn-xs nc-del-fu" data-idx="'+idx+'" data-fuidx="'+fIdx+'">🗑️</button></div>').join('');
     const alterBadge = (cr.qtd_alteracoes_data||0)>0 ? '<span class="badge badge-yellow">🔄 '+cr.qtd_alteracoes_data+'</span>' : '';
-    return '<div class="corretiva-block" id="nc-cr-'+idx+'"><div class="corretiva-header"><span style="font-size:11px;color:var(--text3);font-weight:600;">AÇÃO CORRETIVA '+(idx+1)+'</span>'+(_numAcaoValido(cr.numeroAcao)?'<span style="color:var(--accent);font-size:17px;font-weight:800;font-family:var(--font-hd);margin-left:6px;">#'+cr.numeroAcao+'</span>':'')+''+_ncStatusBadge(status)+'<button class="btn btn-danger btn-xs nc-del-cr" data-idx="'+idx+'">🗑️</button>'+((_numAcaoValido(cr.numeroAcao) && !cr.cancelado) ? '<button class="btn btn-ghost btn-xs nc-cancelar-cr" data-idx="'+idx+'" title="Cancelar esta ação (pede justificativa, vira Follow-up)">🚫</button>' : '')+'<button class="btn btn-ghost btn-xs nc-add-fu" data-idx="'+idx+'">💬 +Follow-up</button>'+(_ncState.editingProblemaId ? '<button class="btn btn-ghost btn-xs nc-notificar" data-idx="'+idx+'" title="Preparar e-mail avisando o responsável desta ação">✉️ Notificar</button>' : '')+'</div><div class="form-row cols-2"><div class="form-group"><label class="form-label">Ação</label><textarea class="form-control nc-cr-desc" data-idx="'+idx+'" rows="2" placeholder="Descreva a ação corretiva...">'+escHtml(cr.acao_descricao||'')+'</textarea></div><div class="form-group"><label class="form-label">Responsável</label><select class="form-control nc-cr-resp" data-idx="'+idx+'">'+rOpts+'</select></div></div><div class="form-row cols-3"><div class="form-group"><label class="form-label">Data Prevista</label><div style="display:flex;align-items:center;gap:6px;"><input class="form-control nc-cr-prev" type="date" data-idx="'+idx+'" value="'+(cr.data_prevista||'')+'" style="flex:1;">'+alterBadge+'</div></div><div class="form-group"><label class="form-label">Data Efetiva</label><input class="form-control nc-cr-efet" type="date" data-idx="'+idx+'" value="'+(cr.data_efetiva||'')+'"></div><div class="form-group"><label class="form-label">Evidência Fechamento</label><div style="display:flex;gap:4px;flex-wrap:wrap;">'+evBtns+'</div><div class="help-text">Máx. 5 MB</div><input type="file" class="nc-ev-corr-file" data-idx="'+idx+'" accept="image/*" style="display:none;"></div></div><div style="margin-top:10px;"><strong>Follow-ups:</strong> '+(fuHtml||'<span style="color:var(--text3);font-size:12px;">Nenhum follow-up</span>')+'</div></div>';
+    return '<div class="corretiva-block" id="nc-cr-'+idx+'"><div class="corretiva-header"><span style="font-size:11px;color:var(--text3);font-weight:600;">AÇÃO CORRETIVA '+(idx+1)+'</span>'+(_numAcaoValido(cr.numeroAcao)?'<span style="color:var(--accent);font-size:17px;font-weight:800;font-family:var(--font-hd);margin-left:6px;">#'+cr.numeroAcao+'</span>':'')+''+_ncStatusBadge(status)+'<button class="btn btn-danger btn-xs nc-del-cr" data-idx="'+idx+'">🗑️</button>'+((_numAcaoValido(cr.numeroAcao) && !cr.cancelado) ? '<button class="btn btn-ghost btn-xs nc-cancelar-cr" data-idx="'+idx+'" title="Cancelar esta ação (pede justificativa, vira Follow-up)">🚫</button>' : '')+'<button class="btn btn-ghost btn-xs nc-add-fu" data-idx="'+idx+'">💬 +Follow-up</button>'+(_ncState.editingProblemaId ? '<button class="btn btn-ghost btn-xs nc-notificar" data-idx="'+idx+'" title="Preparar e-mail avisando o responsável desta ação">✉️ Notificar</button>' : '')+'</div><div class="form-row cols-2"><div class="form-group"><label class="form-label">Ação</label><textarea class="form-control nc-cr-desc" data-idx="'+idx+'" rows="2" placeholder="Descreva a ação corretiva...">'+escHtml(cr.acao_descricao||'')+'</textarea></div><div class="form-group"><label class="form-label">Responsável'+(_roCr?' <span style="color:var(--text3);font-weight:400;">(inativo)</span>':'')+'</label>'+(_roCr?'<input class="form-control" readonly value="'+escHtml(cr.responsavel)+'" title="Responsável inativo — ação encerrada">':'<select class="form-control nc-cr-resp" data-idx="'+idx+'">'+rOpts+'</select>')+'</div></div><div class="form-row cols-3"><div class="form-group"><label class="form-label">Data Prevista</label><div style="display:flex;align-items:center;gap:6px;"><input class="form-control nc-cr-prev" type="date" data-idx="'+idx+'" value="'+(cr.data_prevista||'')+'" style="flex:1;">'+alterBadge+'</div></div><div class="form-group"><label class="form-label">Data Efetiva</label><input class="form-control nc-cr-efet" type="date" data-idx="'+idx+'" value="'+(cr.data_efetiva||'')+'"></div><div class="form-group"><label class="form-label">Evidência Fechamento</label><div style="display:flex;gap:4px;flex-wrap:wrap;">'+evBtns+'</div><div class="help-text">Máx. 5 MB</div><input type="file" class="nc-ev-corr-file" data-idx="'+idx+'" accept="image/*" style="display:none;"></div></div><div style="margin-top:10px;"><strong>Follow-ups:</strong> '+(fuHtml||'<span style="color:var(--text3);font-size:12px;">Nenhum follow-up</span>')+'</div></div>';
   }).join('');
   // v19.62: monta os dados do e-mail de notificação de uma ação — reutilizada pelo botão individual e pelo envio em lote
 function _montarEmailAcao(i) {
