@@ -472,7 +472,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.121';
+const APP_VERSAO = 'v19.122';
 // v19.121: Ata do Fast Response — "Documentação Pendente" (lê a aba RR da planilha Resposta Rápida; nada é gravado).
 // Tabela de responsáveis por documento: ALTERE AQUI. Colunas R..AE da aba RR (rótulo vazio = usa o cabeçalho da linha 4).
 const ATA_RR_CONFIG = {
@@ -6678,10 +6678,8 @@ function _calcDocPendenteRR(ws, hoje, responsaveisDoCodigo) {
     if (d.resp.tipo === 'acoes') {
       const com = [], sem = [], nomes = [];
       cods.forEach(c => { const rs = responsaveisDoCodigo(c); if (rs.length) { com.push(c); nomes.push(...rs); } else sem.push(c); });
-      const partes = [];
-      if (com.length) partes.push(juntar(com, _rrNomesUnicos(nomes)));
-      if (sem.length) partes.push('sem ação cadastrada: ' + sem.join(', '));
-      linhas.push(`${rot}: ${partes.join(' | ')}`);
+      // v19.122: "sem ação cadastrada" vai numa linha própria (separador \n tratado em _montarLinhasAta)
+      linhas.push(`${rot}:` + (com.length ? ' ' + juntar(com, _rrNomesUnicos(nomes)) : '') + (sem.length ? '\nsem ação cadastrada: ' + sem.join(', ') : ''));
     }
   });
   return linhas;
@@ -6733,8 +6731,17 @@ function _montarLinhasAta(dados) {
     add('Documentação Pendente:', { bold: true });
     add('────────────────────────────────────');
     if (dados.docPendente.naoCarregada) add('Planilha RR não carregada', { indent: 1 });
-    else dados.docPendente.linhas.forEach(l => add('🔹 ' + l, { indent: 1 }));
+    else dados.docPendente.linhas.forEach(l => { const _p = l.split('\n'); add('🔹 ' + _p[0], { indent: 1 }); _p.slice(1).forEach(x => add(x, { indent: 2 })); });
     add('');
+    // v19.122: Ata do Fast Response — sem RECORRÊNCIAS / NOVOS ITENS / CURSOS DE 1 TEMA; ATIVIDADES vira
+    // "Ações Corretivas Pendentes" (uma linha por responsável, na ordem dos departamentos, sem o título do departamento).
+    add('Ações Corretivas Pendentes:', { bold: true });
+    add('────────────────────────────────────');
+    const _resps = dados.atividadesPorDepartamento.flatMap(dep => dep.responsaveis);
+    if (!_resps.length) add('Nenhuma ação registrada.', { indent: 1 });
+    const _larg = Math.max(0, ..._resps.map(r => r.nome.length)) + 3;
+    _resps.forEach(r => add(`🔹 ${r.nome}${'\u00A0'.repeat(_larg - r.nome.length)}✅ Fechadas: ${r.fechadas} | ⏳ Pendentes: ${r.pendentes} | 🕒 No prazo: ${r.emAndamento} | ⚠️ Vencidas: ${r.vencidas}`, { indent: 1 }));
+    return linhas;
   }
   // v19.99: recorrência não tem ação corretiva associada — fica num bloco próprio, logo após a
   // presença. Entra na Ata do dia em que foi REGISTRADA (não do dia da produção, que pode ser outro).
