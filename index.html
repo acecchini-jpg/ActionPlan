@@ -12,6 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style id="theme-styles">
 :root { --bg: #f5f7fa; --bg2: #ffffff; --bg3: #f0f2f5; --border: #d1d5db; --border2: #cbd5e1; --accent: #f97316; --accent2: #fb923c; --accent-dim: #fed7aa; --text: #1e293b; --text2: #475569; --text3: #64748b; --green: #10b981; --red: #ef4444; --yellow: #f59e0b; --blue: #3b82f6; --radius: 6px; --sidebar: 240px; --font-hd: 'Barlow Condensed', sans-serif; --font-body: 'Barlow', sans-serif; --font-mono: 'JetBrains Mono', monospace; }
 body.dark-theme { --bg: #0d0f14; --bg2: #131720; --bg3: #1a2030; --border: #252d3d; --border2: #2e3a50; --text: #e2e8f0; --text2: #94a3b8; --text3: #64748b; --accent-dim: #7c3a12; }
@@ -471,7 +472,30 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.120';
+const APP_VERSAO = 'v19.121';
+// v19.121: Ata do Fast Response — "Documentação Pendente" (lê a aba RR da planilha Resposta Rápida; nada é gravado).
+// Tabela de responsáveis por documento: ALTERE AQUI. Colunas R..AE da aba RR (rótulo vazio = usa o cabeçalho da linha 4).
+const ATA_RR_CONFIG = {
+  aba: 'RR', linhaPrazos: 3, linhaCabecalho: 4, linhaInicial: 5, diasAviso: 7,
+  colCodigo: 'A', colDataAbertura: 'B', colTipoProblema: 'F', colResponsavel: 'O',
+  prefixoLogistica: /^\s*log/i,
+  documentos: [
+    { col: 'R',  rotulo: 'Alertas da Qualidade', resp: { tipo: 'alerta', logistica: ['Cleiton', 'Julio'], demais: ['Cleiton', 'Deivison'] } },
+    { col: 'S',  rotulo: 'Contenções', resp: ['Cleiton'] },
+    { col: 'T',  rotulo: '8Ds', resp: { tipo: 'oitoD', fixos: ['Cleiton'] } },
+    { col: 'U',  resp: ['Sandro'] },   // Poka-Yoke
+    { col: 'V',  resp: ['Deivison'] }, // Auditoria Escalonada
+    { col: 'W',  resp: { tipo: 'acoes' } }, // Ação Corretiva Implementada (responsáveis das ações cadastradas no Action Plan)
+    { col: 'X',  resp: ['Cleiton'] },  // Estação de Verificação
+    { col: 'Y',  resp: ['Sandro'] },   // PFMEA
+    { col: 'Z',  resp: ['Sandro'] },   // Instrução de Trabalho
+    { col: 'AA', resp: ['Andrea'] },   // Plano de Controle
+    { col: 'AB', resp: ['Andrea'] },   // Autocontrole
+    { col: 'AC', resp: ['Sandro'] },   // Lições Aprendidas
+    { col: 'AD', resp: ['Cleiton'] },  // Indicador de Eficácia
+    { col: 'AE', resp: ['Cleiton'] }   // Fechamento Cliente
+  ]
+};
 document.getElementById('logo-version').textContent = APP_VERSAO;
 
 const DEFAULT_FIREBASE_CONFIG = { apiKey: "AIzaSyDSVYsBPhyR94KAmnBxhU9-HOhIumFgUp4", authDomain: "planodeacao-c6d12.firebaseapp.com", projectId: "planodeacao-c6d12", storageBucket: "planodeacao-c6d12.firebasestorage.app", messagingSenderId: "18947628416", appId: "1:18947628416:web:29a712de7a620499083565" };
@@ -6594,6 +6618,104 @@ function _iconEvento(texto) {
   if (/^Prazo Alterado/.test(texto)) return '🔄 ';
   return '• ';
 }
+// ── v19.121: Documentação Pendente (aba RR da planilha Resposta Rápida) ──
+// Calcula, para cada documento (colunas R..AE), os códigos com célula em branco que estão vencidos
+// ou vencem em até 7 dias (DataAbertura + prazo da linha 3 <= hoje + 7). Função pura sobre a aba (ws).
+function _rrNorm(t) { return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim(); }
+function _rrNomesUnicos(lista) { // primeiro nome, sem duplicar (ignora acento/maiúscula), mantém a grafia da 1ª ocorrência
+  const vistos = new Set(), out = [];
+  lista.forEach(n => { const p = String(n || '').trim().split(/\s+/)[0]; if (!p) return; const k = _rrNorm(p); if (vistos.has(k)) return; vistos.add(k); out.push(p); });
+  return out;
+}
+function _calcDocPendenteRR(ws, hoje, responsaveisDoCodigo) {
+  const cfg = ATA_RR_CONFIG, U = XLSX.utils;
+  const cel = (col, linha) => ws[U.encode_cell({ r: linha - 1, c: U.decode_col(col) })];
+  const vazio = x => !x || x.v === undefined || x.v === null || (typeof x.v === 'string' && x.v.trim() === '');
+  const txt = x => (x && x.v !== undefined && x.v !== null) ? String(x.v).replace(/\s+/g, ' ').trim() : '';
+  const diaNum = d => Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+  const diaDe = x => { // Date (cellDates) ou serial numérico do Excel; +12h evita erro de fuso
+    if (!x) return null; const v = x.v;
+    if (v instanceof Date) return isNaN(v) ? null : diaNum(new Date(v.getTime() + 12 * 3600000));
+    if (typeof v === 'number' && v > 20000 && v < 80000) return Math.floor(v) - 25569;
+    return null;
+  };
+  const limite = diaNum(hoje) + cfg.diasAviso;
+  const docs = cfg.documentos.map(d => {
+    const p = cel(d.col, cfg.linhaPrazos);
+    return { ...d, prazo: (p && typeof p.v === 'number') ? p.v : null, rotuloFinal: d.rotulo || txt(cel(d.col, cfg.linhaCabecalho)) || d.col, pend: [] };
+  });
+  const ref = U.decode_range(ws['!ref'] || 'A1'); // o !ref pode ir a ~625 mil linhas: só serve de teto, as linhas sem código são ignoradas
+  for (let r = cfg.linhaInicial; r <= ref.e.r + 1; r++) {
+    const codigo = txt(cel(cfg.colCodigo, r));
+    if (!codigo) continue;
+    const b = diaDe(cel(cfg.colDataAbertura, r));
+    if (b === null) continue;
+    docs.forEach(d => {
+      if (d.prazo === null) return;
+      if (vazio(cel(d.col, r)) && (b + d.prazo) <= limite) d.pend.push({ codigo, tipo: txt(cel(cfg.colTipoProblema, r)), resp: txt(cel(cfg.colResponsavel, r)) });
+    });
+  }
+  const juntar = (codigos, nomes) => codigos.join(', ') + (nomes.length ? ' (' + nomes.join('+') + ')' : '');
+  const linhas = [];
+  docs.forEach(d => {
+    const rot = d.rotuloFinal;
+    if (!d.pend.length) { linhas.push(`${rot}: OK`); return; }
+    const cods = d.pend.map(x => x.codigo);
+    if (Array.isArray(d.resp)) { linhas.push(`${rot}: ${juntar(cods, d.resp)}`); return; }
+    if (d.resp.tipo === 'alerta') {
+      const log = d.pend.filter(x => cfg.prefixoLogistica.test(x.tipo)).map(x => x.codigo);
+      const dem = d.pend.filter(x => !cfg.prefixoLogistica.test(x.tipo)).map(x => x.codigo);
+      if (dem.length) linhas.push(`${rot}: ${juntar(dem, d.resp.demais)}`);
+      if (log.length) linhas.push(`${rot}: ${juntar(log, d.resp.logistica)}`);
+      return;
+    }
+    if (d.resp.tipo === 'oitoD') {
+      const fixos = d.resp.fixos || [], kf = new Set(fixos.map(_rrNorm));
+      const nomes = _rrNomesUnicos(d.pend.flatMap(x => x.resp.split('/'))).filter(n => !kf.has(_rrNorm(n)));
+      linhas.push(`${rot}: ${juntar(cods, nomes.concat(fixos))}`);
+      return;
+    }
+    if (d.resp.tipo === 'acoes') {
+      const com = [], sem = [], nomes = [];
+      cods.forEach(c => { const rs = responsaveisDoCodigo(c); if (rs.length) { com.push(c); nomes.push(...rs); } else sem.push(c); });
+      const partes = [];
+      if (com.length) partes.push(juntar(com, _rrNomesUnicos(nomes)));
+      if (sem.length) partes.push('sem ação cadastrada: ' + sem.join(', '));
+      linhas.push(`${rot}: ${partes.join(' | ')}`);
+    }
+  });
+  return linhas;
+}
+// Pede a planilha ao usuário, lê só a aba RR (em memória) e devolve { linhas } | { naoCarregada:true } | null (usuário desistiu da Ata)
+async function _obterDocPendenteRR(plano) {
+  const arq = await new Promise(resolve => {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.xlsm,.xlsx';
+    inp.addEventListener('change', () => resolve(inp.files[0] || null));
+    inp.addEventListener('cancel', () => resolve(null));
+    inp.click();
+  });
+  let motivo = '';
+  if (!arq) motivo = 'Nenhuma planilha foi selecionada.';
+  else {
+    try {
+      if (typeof XLSX === 'undefined') throw new Error('biblioteca SheetJS não carregada');
+      const wb = XLSX.read(await arq.arrayBuffer(), { type: 'array', cellDates: true, sheets: ATA_RR_CONFIG.aba });
+      const ws = wb.Sheets[ATA_RR_CONFIG.aba];
+      if (!ws) throw new Error('a aba "' + ATA_RR_CONFIG.aba + '" não existe na planilha');
+      const h = new Date();
+      const hoje = new Date(h.getFullYear(), h.getMonth(), h.getDate());
+      // responsáveis das ações ABERTAS (sem data efetiva, não canceladas) do Plano, por código (numeroAcao)
+      const mapa = {};
+      state.acoes.filter(p => p.plano_id === plano.id).forEach(p => (p.acoes_corretivas || []).forEach(cr => {
+        if (cr.data_efetiva || cr.cancelado || !_numAcaoValido(cr.numeroAcao) || !cr.responsavel) return;
+        (mapa[String(cr.numeroAcao).trim()] = mapa[String(cr.numeroAcao).trim()] || []).push(cr.responsavel);
+      }));
+      return { linhas: _calcDocPendenteRR(ws, hoje, c => _rrNomesUnicos(mapa[c] || [])) };
+    } catch (e) { motivo = 'Não foi possível ler a planilha: ' + e.message + '.'; }
+  }
+  const ok = await showConfirm(motivo + '\n\nGerar a Ata SEM o bloco de Documentação Pendente?');
+  return ok ? { naoCarregada: true } : null;
+}
 function _montarLinhasAta(dados) {
   const linhas = [];
   const add = (texto, opts) => linhas.push({ texto, indent: (opts && opts.indent) || 0, bold: !!(opts && opts.bold), italic: !!(opts && opts.italic) });
@@ -6606,6 +6728,14 @@ function _montarLinhasAta(dados) {
   if (!dados.participantes.length) add('Nenhum participante necessário registrado no período.', { indent: 1 });
   dados.participantes.forEach(p => add(`${p.icone || '🔹'} ${p.nome} (${p.departamento}) — ${p.label}`, { indent: 1 })); // v19.104: símbolo maior
   add('');
+  // v19.121: Ata do Fast Response — bloco Documentação Pendente (só existe quando a Ata foi gerada com a planilha RR)
+  if (dados.docPendente) {
+    add('Documentação Pendente:', { bold: true });
+    add('────────────────────────────────────');
+    if (dados.docPendente.naoCarregada) add('Planilha RR não carregada', { indent: 1 });
+    else dados.docPendente.linhas.forEach(l => add('🔹 ' + l, { indent: 1 }));
+    add('');
+  }
   // v19.99: recorrência não tem ação corretiva associada — fica num bloco próprio, logo após a
   // presença. Entra na Ata do dia em que foi REGISTRADA (não do dia da produção, que pode ser outro).
   add('RECORRÊNCIAS ADICIONADAS:');
@@ -6709,13 +6839,19 @@ function renderAtaReuniao(container) {
   document.getElementById('ata-copiar-data')?.addEventListener('click', () => {
     document.getElementById('ata-ate').value = document.getElementById('ata-de').value;
   });
-  document.getElementById('ata-gerar')?.addEventListener('click', () => {
+  document.getElementById('ata-gerar')?.addEventListener('click', async () => {
     const de = document.getElementById('ata-de').value;
     const ate = document.getElementById('ata-ate').value;
     if (!de || !ate) { toast('Selecione o período (De e Até).', 'warning'); return; }
     if (de > ate) { toast('A data "De" não pode ser depois da data "Até".', 'warning'); return; }
     const planoId = document.getElementById('ata-plano').value;
+    const _planoSel = planoId ? state.planos.find(p => p.id === planoId) : null;
+    // v19.121: só o Plano "Fast Response" pede a planilha RR (o picker abre no próprio clique, antes de qualquer await)
+    const _ehFast = !!_planoSel && (_planoSel.titulo || '').trim().toLowerCase() === 'fast response';
+    const _docPend = _ehFast ? await _obterDocPendenteRR(_planoSel) : undefined;
+    if (_docPend === null) return; // usuário desistiu
     const dados = _gerarDadosAta(de, ate, planoId);
+    if (_docPend) dados.docPendente = _docPend;
     _renderResultadoAta(dados);
   });
 }
