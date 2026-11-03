@@ -251,7 +251,7 @@ to{transform:translateX(0);opacity:1}
   .kpi-card { min-width: 140px; }
 }
 /* ── Controle de Presença ── */
-.presenca-row { display:grid; grid-template-columns:1.6fr 1fr 2.2fr 1fr; gap:0; align-items:center; padding:10px 16px; border-bottom:1px solid var(--border); transition:background .12s; }
+.presenca-row { display:grid; grid-template-columns:1.6fr 1fr 1fr 3fr; gap:0; align-items:center; padding:10px 16px; border-bottom:1px solid var(--border); transition:background .12s; }
 .presenca-row:hover { background:rgba(249,115,22,.04); }
 .presenca-row:last-child { border-bottom:none; }
 .presenca-check { display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; }
@@ -472,7 +472,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.122';
+const APP_VERSAO = 'v19.123';
 // v19.121: Ata do Fast Response — "Documentação Pendente" (lê a aba RR da planilha Resposta Rápida; nada é gravado).
 // Tabela de responsáveis por documento: ALTERE AQUI. Colunas R..AE da aba RR (rótulo vazio = usa o cabeçalho da linha 4).
 const ATA_RR_CONFIG = {
@@ -6918,17 +6918,23 @@ function renderPresenca(container) {
           </div>
         </div>
         <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:18px;">
-          <div style="display:grid;grid-template-columns:1.6fr 1fr 2.2fr 1fr;padding:8px 16px;background:var(--bg3);border-bottom:2px solid var(--border2);">
+          <div style="display:grid;grid-template-columns:1.6fr 1fr 1fr 3fr;padding:8px 16px;background:var(--bg3);border-bottom:2px solid var(--border2);">
             <span style="font-family:var(--font-hd);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;">Responsável</span>
-            <span style="font-family:var(--font-hd);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;text-align:center;">✅ Presente</span>
-            <span style="font-family:var(--font-hd);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;text-align:center;">📝 Justificado</span>
-            <span style="font-family:var(--font-hd);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;text-align:center;">⭐ Necessário</span>
+            <span style="font-family:var(--font-hd);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;">⭐ Necessário</span>
+            <span style="font-family:var(--font-hd);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;">✅ Presente</span>
+            <span style="font-family:var(--font-hd);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;">📝 Justificado</span>
           </div>
           <div id="presenca-lista">
             ${responsaveisOrdenados.length ? responsaveisOrdenados.map(r=>`
               <div class="presenca-row" data-resp-nome="${escHtml(r.nome)}">
                 <span style="font-size:13px;">${escHtml(r.nome)}${r.departamento?` <span style="font-size:11px;color:var(--text3);">(${escHtml(r.departamento)})</span>`:''}</span>
-                <div style="display:flex;justify-content:center;">
+                <div style="display:flex;justify-content:flex-start;">
+                  <label class="presenca-check" title="Presença necessária">
+                    <input type="checkbox" class="chk-necessario" data-nome="${escHtml(r.nome)}">
+                    <span style="font-size:12px;color:var(--text2);">Necessário</span>
+                  </label>
+                </div>
+                <div style="display:flex;justify-content:flex-start;">
                   <label class="presenca-check" title="Marcar presença">
                     <input type="checkbox" class="chk-presente" data-nome="${escHtml(r.nome)}">
                     <span style="font-size:12px;color:var(--text2);">Presente</span>
@@ -6938,12 +6944,6 @@ function renderPresenca(container) {
                   <label class="presenca-check" title="Ausência justificada (não altera nenhum cálculo — só aparece na Ata)" style="min-width:0;max-width:100%;">
                     <input type="checkbox" class="chk-justificado" data-nome="${escHtml(r.nome)}">
                     <span class="just-label" data-nome="${escHtml(r.nome)}" style="font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Justificado</span>
-                  </label>
-                </div>
-                <div style="display:flex;justify-content:center;">
-                  <label class="presenca-check" title="Presença necessária">
-                    <input type="checkbox" class="chk-necessario" data-nome="${escHtml(r.nome)}">
-                    <span style="font-size:12px;color:var(--text2);">Necessário</span>
                   </label>
                 </div>
               </div>`).join('') : '<div style="padding:24px;text-align:center;color:var(--text3);">Nenhum responsável ativo cadastrado.</div>'}
