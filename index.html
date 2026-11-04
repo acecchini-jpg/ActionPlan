@@ -472,7 +472,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.124';
+const APP_VERSAO = 'v19.125';
 // v19.121: Ata do Fast Response — "Documentação Pendente" (lê a aba RR da planilha Resposta Rápida; nada é gravado).
 // Tabela de responsáveis por documento: ALTERE AQUI. Colunas R..AE da aba RR (rótulo vazio = usa o cabeçalho da linha 4).
 const ATA_RR_CONFIG = {
@@ -6256,7 +6256,7 @@ function _frRenderEscolhaAba() {
   });
 }
 
-function _frProcessarAba(sheetName) {
+function _frProcessarAba(sheetName, automatico) { // v19.125: automatico=true → só prepara _frEstado (sem abrir a tela de revisão) e devolve true
   const ws = _frEstado.wb.getWorksheet(sheetName);
   if (!ws) { toast('Aba não encontrada.', 'error'); return; }
 
@@ -6314,6 +6314,7 @@ function _frProcessarAba(sheetName) {
   _frEstado.pendentes = pendentes;
   _frEstado.resumo = { problemasExistentes, novosItens: ordemItens.length, totalCorretivas };
 
+  if (automatico) return true; // v19.125
   _frRenderRevisao();
 }
 
@@ -6435,9 +6436,11 @@ async function _frExecutarImportacao(resolvidos) {
 
     if (statusEl) statusEl.textContent = `✅ Concluído: ${criados} problema(s) criado(s), ${corretivasCriadas} ação(ões) corretiva(s), ${subtopicosNovos.length} sub-tópico(s) novo(s).`;
     toast('Importação Fast Response concluída!', 'success');
+    return true; // v19.125
   } catch(e) {
     if (statusEl) statusEl.textContent = '❌ Erro: ' + e.message;
     toast('Erro na importação: ' + e.message, 'error');
+    return false; // v19.125
   } finally {
     ligarListeners();
     const btnFechar = overlay.querySelector('#fr-fechar');
@@ -6696,6 +6699,30 @@ function _calcDocPendenteRR(ws, hoje, responsaveisDoCodigo, de, ate) {
   });
   return { pend, fech };
 }
+// v19.125: 8D fechado no período => atualiza as ações do Fast Response (aba "C em Foco" da mesma planilha) ANTES de montar a Ata.
+// Mesmo fluxo da importação de Configurações (apaga e recria os problemas do Plano), mas sem tela de revisão.
+// Não faz nada (e avisa) se: usuário sem acesso nível 1, aba "C em Foco" ausente ou responsáveis sem correspondência.
+async function _atualizarFastResponseAuto(buf, plano) {
+  if (!podeVer('config')) { toast('8D fechado no período, mas só o nível 1 pode atualizar as ações do Fast Response. A Ata usará as ações como estão.', 'warning'); return false; }
+  showLoading('Atualizando ações do Fast Response…');
+  try {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf);
+    const aba = wb.worksheets.find(w => w.name.trim().toLowerCase() === 'c em foco');
+    if (!aba) { toast('8D fechado no período, mas a aba "C em Foco" não existe na planilha. As ações não foram atualizadas.', 'warning'); return false; }
+    _frEstado = { wb, plano };
+    if (!_frProcessarAba(aba.name, true)) return false; // já avisou o motivo
+    const semCorresp = Object.values(_frEstado.pendentes).map(p => p.raw);
+    if (semCorresp.length) { toast('Ações do Fast Response NÃO atualizadas: responsável(is) sem correspondência na planilha: ' + semCorresp.join(', ') + '. Faça a importação em Configurações para mapear.', 'warning'); return false; }
+    if (!(await _frExecutarImportacao({}))) return false;
+    // espera os listeners trazerem os problemas recriados antes de calcular a Ata
+    const n = _frEstado.ordemItens.length;
+    for (let i = 0; i < 50 && state.acoes.filter(a => a.plano_id === plano.id).length !== n; i++) await new Promise(r => setTimeout(r, 200));
+    return true;
+  } catch (e) {
+    toast('Erro ao atualizar as ações do Fast Response: ' + e.message, 'error'); return false;
+  } finally { hideLoading(); }
+}
 // Pede a planilha ao usuário, lê só a aba RR (em memória) e devolve { linhas } | { naoCarregada:true } | null (usuário desistiu da Ata)
 async function _obterDocPendenteRR(plano, de, ate) {
   const arq = await new Promise(resolve => {
@@ -6709,20 +6736,27 @@ async function _obterDocPendenteRR(plano, de, ate) {
   else {
     try {
       if (typeof XLSX === 'undefined') throw new Error('biblioteca SheetJS não carregada');
-      const wb = XLSX.read(await arq.arrayBuffer(), { type: 'array', cellDates: true, sheets: ATA_RR_CONFIG.aba });
+      const buf = await arq.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array', cellDates: true, sheets: ATA_RR_CONFIG.aba });
       const ws = wb.Sheets[ATA_RR_CONFIG.aba];
       if (!ws) throw new Error('a aba "' + ATA_RR_CONFIG.aba + '" não existe na planilha');
       const h = new Date();
       const hoje = new Date(h.getFullYear(), h.getMonth(), h.getDate());
       // responsáveis das ações do Plano, por código (numeroAcao): pendentes usam só as ABERTAS (sem data efetiva, não canceladas); fechados usam TODAS
-      const mapaAbertas = {}, mapaTodas = {};
-      state.acoes.filter(p => p.plano_id === plano.id).forEach(p => (p.acoes_corretivas || []).forEach(cr => {
-        if (!_numAcaoValido(cr.numeroAcao) || !cr.responsavel) return;
-        const k = String(cr.numeroAcao).trim();
-        (mapaTodas[k] = mapaTodas[k] || []).push(cr.responsavel);
-        if (!cr.data_efetiva && !cr.cancelado) (mapaAbertas[k] = mapaAbertas[k] || []).push(cr.responsavel);
-      }));
-      return _calcDocPendenteRR(ws, hoje, (c, todas) => _rrNomesUnicos((todas ? mapaTodas : mapaAbertas)[c] || []), de, ate);
+      const calc = () => {
+        const mapaAbertas = {}, mapaTodas = {};
+        state.acoes.filter(p => p.plano_id === plano.id).forEach(p => (p.acoes_corretivas || []).forEach(cr => {
+          if (!_numAcaoValido(cr.numeroAcao) || !cr.responsavel) return;
+          const k = String(cr.numeroAcao).trim();
+          (mapaTodas[k] = mapaTodas[k] || []).push(cr.responsavel);
+          if (!cr.data_efetiva && !cr.cancelado) (mapaAbertas[k] = mapaAbertas[k] || []).push(cr.responsavel);
+        }));
+        return _calcDocPendenteRR(ws, hoje, (c, todas) => _rrNomesUnicos((todas ? mapaTodas : mapaAbertas)[c] || []), de, ate);
+      };
+      let res = calc();
+      // v19.125: 8D fechado no período => o Cliente em Foco foi atualizado: atualiza as ações do Fast Response antes da Ata
+      if (res.fech.some(b => /^8Ds/.test(b.rot)) && await _atualizarFastResponseAuto(buf, plano)) res = calc();
+      return res;
     } catch (e) { motivo = 'Não foi possível ler a planilha: ' + e.message + '.'; }
   }
   const ok = await showConfirm(motivo + '\n\nGerar a Ata SEM o bloco de Documentação Pendente?');
