@@ -472,7 +472,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.125';
+const APP_VERSAO = 'v19.126';
 // v19.121: Ata do Fast Response — "Documentação Pendente" (lê a aba RR da planilha Resposta Rápida; nada é gravado).
 // Tabela de responsáveis por documento: ALTERE AQUI. Colunas R..AE da aba RR (rótulo vazio = usa o cabeçalho da linha 4).
 const ATA_RR_CONFIG = {
@@ -1046,10 +1046,13 @@ function setupRealtimeListeners() { showLoading('Sincronizando dados…'); const
     }; const cols = ['clientes', 'responsaveis', 'planos', 'subtopicos', 'acoes', 'presencas', 'cursos1tema', 'operadores_turno']; cols.forEach(col => { const unsub = db.collection(col).onSnapshot(snap => { state[col] = snap.docs.map(d => ({ id: d.id, ...d.data() })); if (col === 'acoes') _migrateAcoes(); if (!loaded[col]) { loaded[col] = true; initialRender(); } else render(); }, err => { toast('Erro ' + col + ': ' + err.message, 'error'); if (!loaded[col]) { loaded[col] = true; initialRender(); } hideLoading(); }); _snapUnsubs.push(unsub); });
     // v19.31: modo auditoria — documento único, sincronizado globalmente (afeta todo mundo vendo o app, não só quem ativou)
     const _unsubAuditoria = db.collection('config_sistema').doc('geral').onSnapshot(doc => {
+      const _antAud = state.modoAuditoria, _antLogo = state.logoEmpresaUrl; // v19.126
       state.modoAuditoria = doc.exists ? (doc.data().modo_auditoria === true) : false;
       state.logoEmpresaUrl = doc.exists ? (doc.data().logo_empresa_url || null) : null; // v19.35
       state.ultimaAtaEmitidaPorPlano = doc.exists ? (doc.data().ultima_ata_emitida_por_plano || {}) : {}; // v19.107: ponto de corte por Plano (substitui o campo global da v19.105)
-      render();
+      // v19.126: só redesenha a tela se algo VISÍVEL mudou (modo auditoria / logo). Antes, "Copiar Texto" da Ata gravava
+      // ultima_ata_emitida_por_plano neste documento e o render() apagava o resultado da Ata da tela.
+      if (_antAud !== state.modoAuditoria || _antLogo !== state.logoEmpresaUrl) render();
     }, err => console.warn('Erro ao sincronizar modo auditoria:', err));
     _snapUnsubs.push(_unsubAuditoria);
   }
