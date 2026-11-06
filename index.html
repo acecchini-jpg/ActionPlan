@@ -472,7 +472,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.126';
+const APP_VERSAO = 'v19.127';
 // v19.121: Ata do Fast Response — "Documentação Pendente" (lê a aba RR da planilha Resposta Rápida; nada é gravado).
 // Tabela de responsáveis por documento: ALTERE AQUI. Colunas R..AE da aba RR (rótulo vazio = usa o cabeçalho da linha 4).
 const ATA_RR_CONFIG = {
@@ -1026,6 +1026,7 @@ function desligarListeners() {
 function setupRealtimeListeners() { showLoading('Sincronizando dados…'); const loaded = { clientes: false, responsaveis: false, planos: false, subtopicos: false, acoes: false, presencas: false, cursos1tema: false, operadores_turno: false }; const initialRender = () => {
       if (Object.values(loaded).every(Boolean)) {
         hideLoading();
+        window._cargaCompletaTs = Date.now(); // v19.127: marca a última carga completa (usado pela atualização automática do Fast Response)
         render();
         // ── Abre deeplink assim que todos os dados estiverem prontos ──
         if (_pendingDeeplink) {
@@ -6717,10 +6718,14 @@ async function _atualizarFastResponseAuto(buf, plano) {
     if (!_frProcessarAba(aba.name, true)) return false; // já avisou o motivo
     const semCorresp = Object.values(_frEstado.pendentes).map(p => p.raw);
     if (semCorresp.length) { toast('Ações do Fast Response NÃO atualizadas: responsável(is) sem correspondência na planilha: ' + semCorresp.join(', ') + '. Faça a importação em Configurações para mapear.', 'warning'); return false; }
+    const _ts0 = Date.now();
     if (!(await _frExecutarImportacao({}))) return false;
-    // espera os listeners trazerem os problemas recriados antes de calcular a Ata
+    // espera os listeners (religados ao fim da importação) recarregarem tudo e o app redesenhar a tela ANTES de calcular
+    // a Ata; senão esse redesenho tardio apagava o resultado da Ata logo depois de aparecer (v19.127)
+    const _esperar = ms => new Promise(r => setTimeout(r, ms));
     const n = _frEstado.ordemItens.length;
-    for (let i = 0; i < 50 && state.acoes.filter(a => a.plano_id === plano.id).length !== n; i++) await new Promise(r => setTimeout(r, 200));
+    for (let i = 0; i < 150 && !((window._cargaCompletaTs || 0) > _ts0 && state.acoes.filter(a => a.plano_id === plano.id).length === n); i++) await _esperar(200);
+    await _esperar(3000); // folga para os últimos snapshots/redesenhos assentarem
     return true;
   } catch (e) {
     toast('Erro ao atualizar as ações do Fast Response: ' + e.message, 'error'); return false;
