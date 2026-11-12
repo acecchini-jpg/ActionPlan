@@ -472,7 +472,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.127';
+const APP_VERSAO = 'v19.128';
 // v19.121: Ata do Fast Response — "Documentação Pendente" (lê a aba RR da planilha Resposta Rápida; nada é gravado).
 // Tabela de responsáveis por documento: ALTERE AQUI. Colunas R..AE da aba RR (rótulo vazio = usa o cabeçalho da linha 4).
 const ATA_RR_CONFIG = {
@@ -747,6 +747,47 @@ function nextNumeroAcao() {
 }
 function escHtml(s) { if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 // ── O1: Clipboard unificado ──
+// v19.128: macro VBA (PlaceInCell) copiada para a área de transferência ao exportar a Listagem Geral com fotos.
+// No Excel: Alt+F11 → Inserir → Módulo → Ctrl+V → F5. Converte as imagens flutuantes em imagens dentro da célula.
+const MACRO_FOTOS_INCELL = `Sub ConverterImagensParaInCell()
+    Dim ws As Worksheet
+    Dim shp As Shape
+    Dim nomes As Collection
+    Dim i As Long
+    Dim totalOk As Long, totalErro As Long
+
+    Set ws = ActiveSheet
+    Application.ScreenUpdating = False
+
+    ' Guarda os nomes antes de converter (a coleção Shapes muda durante o processo)
+    Set nomes = New Collection
+    For Each shp In ws.Shapes
+        If shp.Type = msoPicture Or shp.Type = msoLinkedPicture Then
+            nomes.Add shp.Name
+        End If
+    Next shp
+
+    For i = 1 To nomes.Count
+        On Error Resume Next
+        Err.Clear
+        ws.Shapes(nomes(i)).Select
+        Application.CommandBars.ExecuteMso "PicturePlaceInCell"
+        If Err.Number <> 0 Then
+            totalErro = totalErro + 1
+        Else
+            totalOk = totalOk + 1
+        End If
+        On Error GoTo 0
+    Next i
+
+    Application.ScreenUpdating = True
+    MsgBox "Concluído." & vbCrLf & _
+           "Convertidas para in-cell: " & totalOk & vbCrLf & _
+           "Não convertidas (erro/incompatível): " & totalErro, vbInformation
+End Sub`;
+async function _copiarMacroFotos() {
+  try { await navigator.clipboard.writeText(MACRO_FOTOS_INCELL.replace(/\n/g, '\r\n')); return true; } catch (e) { return false; }
+}
 function copyToClipboard(text, successMsg) {
   const msg = successMsg || 'Copiado!';
   const fallback = () => {
@@ -2491,6 +2532,13 @@ function renderListagem(container) {
         toast(`Excel gerado! ${_fotoCount} foto${_fotoCount===1?'':'s'} embutida${_fotoCount===1?'':'s'}${_falhaMsg}`, _fotoFalhas > 0 ? 'warning' : 'success');
       } else {
         toast('Excel gerado — nenhuma foto embutida (as linhas exportadas não têm evidência em imagem).', 'warning');
+      }
+      // v19.128: com fotos, copia a macro que converte as imagens para "dentro da célula" (a cópia automática pode ser bloqueada
+      // pelo navegador depois de uma operação longa; nesse caso pergunta e copia no clique de confirmação)
+      if (_fotoCount > 0) {
+        const _msgMacro = 'Macro copiada! No Excel: Alt+F11 → Inserir → Módulo → Ctrl+V → F5 (ConverterImagensParaInCell).';
+        if (await _copiarMacroFotos()) toast(_msgMacro, 'success');
+        else { hideLoading(); if (await showConfirm('O navegador bloqueou a cópia automática da macro das fotos (imagens dentro da célula). Copiar agora?') && await _copiarMacroFotos()) toast(_msgMacro, 'success'); }
       }
     } catch(e) { toast('Erro ao gerar Excel: ' + e.message, 'error'); }
     finally { hideLoading(); _forcarTabelaCompleta = false; aplicarFiltrosETabela(); }
