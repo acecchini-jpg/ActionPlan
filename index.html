@@ -472,7 +472,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.128';
+const APP_VERSAO = 'v19.130';
 // v19.121: Ata do Fast Response — "Documentação Pendente" (lê a aba RR da planilha Resposta Rápida; nada é gravado).
 // Tabela de responsáveis por documento: ALTERE AQUI. Colunas R..AE da aba RR (rótulo vazio = usa o cabeçalho da linha 4).
 const ATA_RR_CONFIG = {
@@ -1085,7 +1085,7 @@ function setupRealtimeListeners() { showLoading('Sincronizando dados…'); const
           }, 150);
         }
       }
-    }; const cols = ['clientes', 'responsaveis', 'planos', 'subtopicos', 'acoes', 'presencas', 'cursos1tema', 'operadores_turno']; cols.forEach(col => { const unsub = db.collection(col).onSnapshot(snap => { state[col] = snap.docs.map(d => ({ id: d.id, ...d.data() })); if (col === 'acoes') _migrateAcoes(); if (!loaded[col]) { loaded[col] = true; initialRender(); } else render(); }, err => { toast('Erro ' + col + ': ' + err.message, 'error'); if (!loaded[col]) { loaded[col] = true; initialRender(); } hideLoading(); }); _snapUnsubs.push(unsub); });
+    }; const cols = ['clientes', 'responsaveis', 'planos', 'subtopicos', 'acoes', 'presencas', 'cursos1tema', 'operadores_turno']; cols.forEach(col => { const unsub = db.collection(col).onSnapshot(snap => { state[col] = snap.docs.map(d => ({ id: d.id, ...d.data() })); if (col === 'acoes') _migrateAcoes(); if (!loaded[col]) { loaded[col] = true; initialRender(); } else if (state.currentPage !== 'novo-cadastro') render(); /* v19.129: não redesenha o formulário de Novo Cadastro por mudança de outro usuário (apagava o que estava digitado) */ }, err => { toast('Erro ' + col + ': ' + err.message, 'error'); if (!loaded[col]) { loaded[col] = true; initialRender(); } hideLoading(); }); _snapUnsubs.push(unsub); });
     // v19.31: modo auditoria — documento único, sincronizado globalmente (afeta todo mundo vendo o app, não só quem ativou)
     const _unsubAuditoria = db.collection('config_sistema').doc('geral').onSnapshot(doc => {
       const _antAud = state.modoAuditoria, _antLogo = state.logoEmpresaUrl; // v19.126
@@ -6807,7 +6807,9 @@ async function _obterDocPendenteRR(plano, de, ate) {
           (mapaTodas[k] = mapaTodas[k] || []).push(cr.responsavel);
           if (!cr.data_efetiva && !cr.cancelado) (mapaAbertas[k] = mapaAbertas[k] || []).push(cr.responsavel);
         }));
-        return _calcDocPendenteRR(ws, hoje, (c, todas) => _rrNomesUnicos((todas ? mapaTodas : mapaAbertas)[c] || []), de, ate);
+        // v19.130: "sem ação cadastrada" = código sem NENHUMA ação no Plano. Pendentes: responsáveis das ações abertas; se só houver
+        // ações fechadas, usa os responsáveis delas (o código não cai mais em "sem ação cadastrada").
+        return _calcDocPendenteRR(ws, hoje, (c, todas) => _rrNomesUnicos(todas ? (mapaTodas[c] || []) : ((mapaAbertas[c] || []).length ? mapaAbertas[c] : (mapaTodas[c] || []))), de, ate);
       };
       let res = calc();
       // v19.125: 8D fechado no período => o Cliente em Foco foi atualizado: atualiza as ações do Fast Response antes da Ata
