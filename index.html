@@ -472,7 +472,7 @@ details[open] > .nc-notas-summary .nc-notas-marcador { transform:rotate(90deg); 
 <script>
 // ==================== CONFIGURAÇÃO PADRÃO DO FIREBASE ====================
 // ═══ VERSÃO ÚNICA DO APP — só altere aqui; logo e backup leem daqui ═══
-const APP_VERSAO = 'v19.130';
+const APP_VERSAO = 'v19.132';
 // v19.121: Ata do Fast Response — "Documentação Pendente" (lê a aba RR da planilha Resposta Rápida; nada é gravado).
 // Tabela de responsáveis por documento: ALTERE AQUI. Colunas R..AE da aba RR (rótulo vazio = usa o cabeçalho da linha 4).
 const ATA_RR_CONFIG = {
@@ -4862,6 +4862,18 @@ async function _ncSalvar(event) {
         // v19.72: ações corretivas cujo id não existia antes desta edição são NOVAS — ganham o follow-up automático
         const _idsCorretivasAntes = new Set((existente.acoes_corretivas || []).map(c => c.id).filter(Boolean));
         _corretivasOut.forEach(cr => { if (cr.id && !_idsCorretivasAntes.has(cr.id)) _adicionarFollowupAutomaticoNovaAcao(cr, plano); });
+        // v19.131/v19.132: troca de Sub-Tópico => follow-up só nas ações corretivas ABERTAS que já existiam (sem data efetiva): data, usuário logado até o @ e o texto.
+        // Marcado como automático: aparece nos follow-ups da ação, mas não vira "evento" na Ata.
+        if (_subtopicoIdAntes !== subtId) {
+          const _descSub = id => (state.subtopicos.find(x => x.id === id)?.descricao) || '(sem sub-tópico)';
+          const _nomeUsr = String(_usr || 'sistema').split('@')[0];
+          const _txtSub = `Subtópico alterado de ${_descSub(_subtopicoIdAntes)} para ${_descSub(subtId)}`;
+          _corretivasOut.forEach(cr => {
+            if (!cr.id || !_idsCorretivasAntes.has(cr.id) || cr.data_efetiva) return; // as novas já ganham "Nova ação adicionada."; as fechadas (com data efetiva) não recebem
+            if (!cr.followups) cr.followups = [];
+            cr.followups.push({ id: uid(), data_followup: today(), responsavel: _nomeUsr, comentario: _txtSub, automatico: true });
+          });
+        }
         // v19.72: estende a auditoria pro nível de CADA ação corretiva também no caminho do Novo
         // Cadastro — antes só a edição pela Listagem registrava troca de Responsável/Prazo no histórico.
         const _corretivasAntesPorId = {};
